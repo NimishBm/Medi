@@ -1,34 +1,20 @@
 import express from 'express';
 
 import Doctor from '../models/Doctor.js';
-
 import Symptom from '../models/Symptom.js';
-
 import Condition from '../models/Condition.js';
-
 import Specialty from '../models/Specialty.js';
-
 import SymptomCondition from '../models/SymptomCondition.js';
-
 import ConditionSpecialty from '../models/ConditionSpecialty.js';
 
 const router = express.Router();
-
-
-// ======================================================
-// HELPER FUNCTIONS
-// ======================================================
 
 // Escape special characters before creating RegExp
 const escapeRegex = (value) => {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 
-
 // Normalize specialty names
-// Example:
-// "ENT specialist" -> "ent"
-// "ENT"            -> "ent"
 const normalizeSpecialty = (name) => {
   return name
     .toLowerCase()
@@ -37,20 +23,9 @@ const normalizeSpecialty = (name) => {
     .trim();
 };
 
-
-// ======================================================
-// SEARCH API
-// GET /api/search?q=...
-// ======================================================
-
 router.get('/', async (req, res) => {
   try {
     const query = req.query.q?.trim();
-
-
-    // --------------------------------------------------
-    // 1. Validate search query
-    // --------------------------------------------------
 
     if (!query) {
       return res.status(400).json({
@@ -59,68 +34,93 @@ router.get('/', async (req, res) => {
       });
     }
 
-
     const searchRegex = new RegExp(
       escapeRegex(query),
       'i'
     );
 
-
     // ==================================================
-    // 2. SEARCH DOCTORS BY NAME
+    // 1. DIRECT DOCTOR SEARCH
     // ==================================================
 
     const doctorsByName = await Doctor.find({
       isActive: true,
       name: searchRegex,
-    }).select('-password');
-
-
-    // ==================================================
-    // 3. SEARCH DOCTORS BY SPECIALIZATION
-    // ==================================================
+    })
+      .select('-password')
+      .lean();
 
     const doctorsBySpecialization = await Doctor.find({
       isActive: true,
       specialization: searchRegex,
-    }).select('-password');
-
+    })
+      .select('-password')
+      .lean();
 
     // ==================================================
-    // 4. SEARCH SPECIALTY IN BODHI
+    // 2. DIRECT SPECIALTY SEARCH
     // ==================================================
 
     const directSpecialties = await Specialty.find({
       name: searchRegex,
-    });
-
+    }).lean();
 
     // ==================================================
-    // 5. SEARCH CONDITIONS / DISEASES
+    // 3. DIRECT CONDITION SEARCH
     // ==================================================
 
     const directConditions = await Condition.find({
       name: searchRegex,
-    });
-
+    }).lean();
 
     // ==================================================
-    // 6. SEARCH SYMPTOMS
+    // 4. SYMPTOM SEARCH
     // ==================================================
 
-    const symptoms = await Symptom.find({
+    const matchedSymptoms = await Symptom.find({
       name: searchRegex,
+    }).lean();
+
+    /*
+      BODHI contains many symptom variants.
+
+      Example:
+      Headache <pain> electric shock like
+      Headache <agg by> in the morning
+      Headache <char> tenderness
+
+      We don't want to return all of them.
+      We group them using rootSnomedName.
+    */
+
+    const symptomRootMap = new Map();
+
+    matchedSymptoms.forEach((symptom) => {
+      const rootName =
+        symptom.rootSnomedName || symptom.name;
+
+      const rootId =
+        symptom.rootSnomedId || symptom.uuid;
+
+      if (!symptomRootMap.has(rootId)) {
+        symptomRootMap.set(rootId, {
+          id: rootId,
+          name: rootName,
+        });
+      }
     });
 
-
-    // ==================================================
-    // 7. SYMPTOM → CONDITION
-    // ==================================================
-
-    const symptomIds = symptoms.map(
-      (symptom) => symptom.uuid
+    const symptoms = Array.from(
+      symptomRootMap.values()
     );
 
+    // ==================================================
+    // 5. SYMPTOM → CONDITION
+    // ==================================================
+
+    const symptomIds = matchedSymptoms
+      .map((symptom) => symptom.uuid)
+      .filter(Boolean);
 
     const symptomConditions =
       symptomIds.length > 0
@@ -128,51 +128,70 @@ router.get('/', async (req, res) => {
             symptomId: {
               $in: symptomIds,
             },
-          })
+          }).lean()
         : [];
 
-
-    const conditionIdsFromSymptoms = [
-      ...new Set(
-        symptomConditions.map(
-          (item) => item.conditionId
-        )
-      ),
-    ];
-
-
     // ==================================================
-    // 8. COMBINE CONDITIONS
+    // 6. COMBINE CONDITION IDs
     // ==================================================
 
-    const allConditionIds = [
+    const conditionIds = [
       ...new Set([
-        // Conditions found directly
         ...directConditions.map(
           (condition) => condition.snomedId
         ),
 
-        // Conditions found through symptoms
-        ...conditionIdsFromSymptoms,
+        ...symptomConditions.map(
+          (item) => item.conditionId
+        ),
       ]),
     ];
 
+    // ==================================================
+    // 7. GET UNIQUE CONDITIONS
+    // ==================================================
+
+    const matchedConditions =
+      conditionIds.length > 0
+        ? await Condition.find({
+            snomedId: {
+              $in: conditionIds,
+            },
+          }).lean()
+        : [];
+
+    /*
+      Remove duplicate condition names.
+    */
+
+    const conditionMap = new Map();
+
+    matchedConditions.forEach((condition) => {
+      if (!conditionMap.has(condition.name)) {
+        conditionMap.set(
+          condition.name,
+          condition
+        );
+      }
+    });
+
+    const possibleConditions =
+      Array.from(conditionMap.values());
 
     // ==================================================
-    // 9. CONDITION → SPECIALTY
+    // 8. CONDITION → SPECIALTY
     // ==================================================
 
     const conditionSpecialties =
-      allConditionIds.length > 0
+      conditionIds.length > 0
         ? await ConditionSpecialty.find({
             conditionId: {
-              $in: allConditionIds,
+              $in: conditionIds,
             },
-          })
+          }).lean()
         : [];
 
-
-    const specialtyIdsFromConditions = [
+    const specialtyIds = [
       ...new Set(
         conditionSpecialties.map(
           (item) => item.specialtyId
@@ -180,226 +199,157 @@ router.get('/', async (req, res) => {
       ),
     ];
 
-
     // ==================================================
-    // 10. GET SPECIALTY DOCUMENTS
+    // 9. GET SPECIALTIES
     // ==================================================
 
     const specialtiesFromConditions =
-      specialtyIdsFromConditions.length > 0
+      specialtyIds.length > 0
         ? await Specialty.find({
             specialtyId: {
-              $in: specialtyIdsFromConditions,
+              $in: specialtyIds,
             },
-          })
+          }).lean()
         : [];
 
-
-    // ==================================================
-    // 11. COMBINE SPECIALTIES
-    // ==================================================
+    // Combine directly searched specialties
+    // with specialties obtained from conditions.
 
     const specialtyMap = new Map();
-
 
     [
       ...directSpecialties,
       ...specialtiesFromConditions,
     ].forEach((specialty) => {
-      specialtyMap.set(
-        specialty.specialtyId,
-        specialty
+      const key = normalizeSpecialty(
+        specialty.name
       );
+
+      if (!specialtyMap.has(key)) {
+        specialtyMap.set(
+          key,
+          specialty
+        );
+      }
     });
 
-
-    const relatedSpecialties =
+    const specialties =
       Array.from(
         specialtyMap.values()
-      );
-
-
-    // ==================================================
-    // 12. GET ALL ACTIVE DOCTORS FROM MONGODB
-    // ==================================================
-
-    const allDoctors = await Doctor.find({
-      isActive: true,
-    }).select('-password');
-
+      ).map((specialty) => specialty.name);
 
     // ==================================================
-    // 13. FIND DOCTORS FROM DIRECT SPECIALTY SEARCH
+    // 10. GET DOCTORS FROM SPECIALTIES
     // ==================================================
 
     let doctorsFromSpecialties = [];
 
+    const specialtyNames = Array.from(
+      specialtyMap.values()
+    ).map(
+      (specialty) => specialty.name
+    );
 
-    if (directSpecialties.length > 0) {
-
-      // User searched a specialty directly
-      // Example: ENT
-      // Only match doctors belonging to ENT
-
-      const directSpecialtyNames =
-        directSpecialties.map(
-          (specialty) => specialty.name
-        );
-
+    if (specialtyNames.length > 0) {
+      const allDoctors = await Doctor.find({
+        isActive: true,
+      })
+        .select('-password')
+        .lean();
 
       doctorsFromSpecialties =
         allDoctors.filter((doctor) => {
-
           const doctorSpecialty =
             normalizeSpecialty(
               doctor.specialization || ''
             );
 
-
-          return directSpecialtyNames.some(
-            (specialtyName) => {
-
-              return (
-                doctorSpecialty ===
-                normalizeSpecialty(
-                  specialtyName
-                )
-              );
-
-            }
+          return specialtyNames.some(
+            (specialtyName) =>
+              doctorSpecialty ===
+              normalizeSpecialty(
+                specialtyName
+              )
           );
-
         });
-
     }
 
-
     // ==================================================
-    // 14. FIND DOCTORS FROM CONDITION/SYMPTOM SEARCH
-    // ==================================================
-
-    else if (
-      specialtiesFromConditions.length > 0
-    ) {
-
-      // User searched a symptom or condition
-      //
-      // Example:
-      // Headache
-      // ↓
-      // Conditions
-      // ↓
-      // Specialties
-      // ↓
-      // Doctors
-
-      const bodhiSpecialtyNames =
-        specialtiesFromConditions.map(
-          (specialty) => specialty.name
-        );
-
-
-      doctorsFromSpecialties =
-        allDoctors.filter((doctor) => {
-
-          const doctorSpecialty =
-            normalizeSpecialty(
-              doctor.specialization || ''
-            );
-
-
-          return bodhiSpecialtyNames.some(
-            (specialtyName) => {
-
-              return (
-                doctorSpecialty ===
-                normalizeSpecialty(
-                  specialtyName
-                )
-              );
-
-            }
-          );
-
-        });
-
-    }
-
-
-    // ==================================================
-    // 15. COMBINE ALL DOCTORS
+    // 11. COMBINE DOCTORS WITHOUT DUPLICATES
     // ==================================================
 
     const doctorMap = new Map();
-
 
     [
       ...doctorsByName,
       ...doctorsBySpecialization,
       ...doctorsFromSpecialties,
     ].forEach((doctor) => {
-
       doctorMap.set(
         doctor._id.toString(),
         doctor
       );
-
     });
 
+    // ==================================================
+    // 12. CLEAN DOCTOR RESPONSE
+    // ==================================================
+
+    const doctors = Array.from(
+      doctorMap.values()
+    ).map((doctor) => ({
+      _id: doctor._id,
+      name: doctor.name,
+      specialization: doctor.specialization,
+      experience: doctor.experience,
+      qualifications: doctor.qualifications,
+      consultationFee:
+        doctor.consultationFee,
+      clinicLocation:
+        doctor.clinicLocation,
+      consultationType:
+        doctor.consultationType,
+      averageRating:
+        doctor.averageRating,
+      totalReviews:
+        doctor.totalReviews,
+      averageConsultationTime:
+        doctor.averageConsultationTime,
+      availability:
+        doctor.availability,
+    }));
 
     // ==================================================
-    // 16. GET FINAL CONDITIONS
-    // ==================================================
-
-    const finalConditions =
-      allConditionIds.length > 0
-        ? await Condition.find({
-            snomedId: {
-              $in: allConditionIds,
-            },
-          })
-        : [];
-
-
-    // ==================================================
-    // 17. RESPONSE
+    // 13. FINAL CLEAN RESPONSE
     // ==================================================
 
     return res.json({
       success: true,
       query,
 
-      // Actual doctors from YOUR MongoDB
-      doctors: Array.from(
-        doctorMap.values()
-      ),
-
-      // Matching symptoms from BODHI
       symptoms,
 
-      // Matching conditions from BODHI
-      conditions: finalConditions,
+      possibleConditions:
+        possibleConditions.map(
+          (condition) => condition.name
+        ),
 
-      // Relevant specialties from BODHI
-      specialties: relatedSpecialties,
+      specialties,
+
+      doctors,
     });
 
-
   } catch (error) {
-
     console.error(
       'Search error:',
       error
     );
 
-
     return res.status(500).json({
       success: false,
       message: 'Search failed',
     });
-
   }
 });
-
 
 export default router;
