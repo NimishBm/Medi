@@ -40,18 +40,18 @@ export const Landing = () => {
 
   const handleSearch = (e) => {
     if (e.key === 'Enter' && searchInput.trim()) {
-      const targetRoute = user ? '/patient/marketplace' : '/login/patient';
+      const targetRoute = user ? '/patient/marketplace' : '/marketplace';
       navigate(targetRoute, { state: { search: searchInput } });
     }
   };
 
   const handleSpecialtyClick = (specialty) => {
-    const targetRoute = user ? '/patient/marketplace' : '/login/patient';
+    const targetRoute = user ? '/patient/marketplace' : '/marketplace';
     navigate(targetRoute, { state: { category: specialty.name } });
   };
 
   const browseClick = () => {
-    const targetRoute = user ? '/patient/marketplace' : '/login/patient';
+    const targetRoute = user ? '/patient/marketplace' : '/marketplace';
     navigate(targetRoute);
   };
 
