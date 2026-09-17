@@ -5,6 +5,7 @@ import { doctorAPI, queueAPI } from '../../services/api';
 import { useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
+import { ChevronLeft, Heart, Star } from 'lucide-react';
 
 // Reviews will be fetched from consultation history / API when available
 
@@ -66,16 +67,27 @@ export const DoctorDetail = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <button onClick={() => navigate('/patient/marketplace')} className="text-gray-600 hover:text-gray-900 text-2xl">
-            ←
-          </button>
-          <h1 className="text-lg font-bold text-gray-900">Doctor Profile</h1>
-          <button
-            onClick={() => dispatch(logout())}
-            className="text-gray-700 hover:text-red-600 font-medium text-xs px-3 py-1.5"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate('/patient/marketplace')} className="text-gray-600 hover:text-gray-900 p-1">
+              <ChevronLeft size={22} />
+            </button>
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Heart className="text-white" size={18} strokeWidth={2.5} />
+            </div>
+            <h1 className="text-base font-bold text-gray-900">ClinicFlow</h1>
+          </div>
+          <h2 className="text-base font-bold text-gray-900">Doctor Profile</h2>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center bg-gray-100 px-3 py-1.5 rounded-full">
+              <span className="text-xs font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+            </div>
+            <button
+              onClick={() => dispatch(logout())}
+              className="text-gray-700 hover:text-red-600 font-medium text-xs px-3 py-1.5"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 
@@ -83,7 +95,7 @@ export const DoctorDetail = () => {
         {/* Doctor Header Card */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
           {/* Banner */}
-          <div className="h-24 bg-gradient-to-r from-blue-500 via-blue-600 to-purple-600"></div>
+          <div className="h-24 bg-gradient-to-r from-blue-500 to-blue-700"></div>
 
           {/* Doctor Info */}
           <div className="p-6 -mt-8 relative">
@@ -111,7 +123,10 @@ export const DoctorDetail = () => {
               </div>
               <div>
                 <p className="text-xs text-gray-600">Rating</p>
-                <p className="text-xl font-bold text-yellow-500">{avgRating.toFixed(1)}⭐</p>
+                <div className="flex items-center gap-1">
+                  <Star size={16} className="text-yellow-400 fill-yellow-400" />
+                  <p className="text-xl font-bold text-gray-900">{reviews.length > 0 ? avgRating.toFixed(1) : '—'}</p>
+                </div>
               </div>
               <div>
                 <p className="text-xs text-gray-600">Fees</p>
@@ -211,21 +226,17 @@ export const DoctorDetail = () => {
           <div className="space-y-6">
             {/* Quick Book */}
             <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-sm p-6 text-white">
-              <h4 className="font-bold mb-4">Quick Book</h4>
+              <h4 className="font-bold mb-4">Book Appointment</h4>
               <button
                 onClick={() => navigate(`/patient/doctors/${doctorId}/book`)}
-                className="w-full bg-white text-blue-600 hover:bg-gray-100 py-3 rounded-lg font-bold transition-colors mb-3"
+                className="w-full bg-white text-blue-600 hover:bg-gray-100 py-3 rounded-lg font-bold transition-colors mb-4"
               >
-                Book Appointment
+                Select Time Slot
               </button>
               <div className="space-y-2 text-sm">
                 <div>
-                  <p className="text-blue-100">Wait Time</p>
+                  <p className="text-blue-100">Est. Wait Time</p>
                   <p className="text-2xl font-bold">{waitTime}m</p>
-                </div>
-                <div className="pt-2 border-t border-blue-400">
-                  <p className="text-blue-100">Next Available</p>
-                  <p className="font-bold">Today, 3:00 PM</p>
                 </div>
               </div>
             </div>
@@ -237,8 +248,8 @@ export const DoctorDetail = () => {
                 <p className="font-bold text-gray-900">{doctor.averageConsultationTime} minutes</p>
               </div>
               <div className="pt-3 border-t border-gray-200">
-                <p className="text-xs text-gray-600">Patient Satisfaction</p>
-                <p className="font-bold text-green-600">98% Happy</p>
+                <p className="text-xs text-gray-600">Patient Reviews</p>
+                <p className="font-bold text-gray-900">{reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}</p>
               </div>
             </div>
           </div>

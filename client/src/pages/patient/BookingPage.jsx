@@ -5,6 +5,7 @@ import { useDispatch } from 'react-redux';
 import { doctorAPI, appointmentAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
+import { ChevronLeft, Heart } from 'lucide-react';
 
 const appointmentTypes = [
   'General Consultation',
@@ -121,16 +122,27 @@ export const BookingPage = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <button onClick={() => navigate(`/patient/doctors/${doctorId}`)} className="text-gray-600 hover:text-gray-900 text-2xl">
-            ←
-          </button>
-          <h1 className="text-lg font-bold text-gray-900">Book Appointment</h1>
-          <button
-            onClick={() => dispatch(logout())}
-            className="text-gray-700 hover:text-red-600 font-medium text-xs px-3 py-1.5"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate(`/patient/doctors/${doctorId}`)} className="text-gray-600 hover:text-gray-900 p-1">
+              <ChevronLeft size={22} />
+            </button>
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Heart className="text-white" size={18} strokeWidth={2.5} />
+            </div>
+            <h1 className="text-base font-bold text-gray-900">ClinicFlow</h1>
+          </div>
+          <h2 className="text-base font-bold text-gray-900">Book Appointment</h2>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center bg-gray-100 px-3 py-1.5 rounded-full">
+              <span className="text-xs font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+            </div>
+            <button
+              onClick={() => dispatch(logout())}
+              className="text-gray-700 hover:text-red-600 font-medium text-xs px-3 py-1.5"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 
@@ -214,9 +226,7 @@ export const BookingPage = () => {
                   ))}
                 </div>
               ) : (
-                <div>
-                  <p className="text-xs text-amber-600 mb-3 p-2 bg-amber-50 rounded">⚠️ Using test time slots (doctor hasn't set any yet)</p>
-                  <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                     {DUMMY_TIME_SLOTS.map((slot) => (
                       <button
                         key={slot}
@@ -231,7 +241,6 @@ export const BookingPage = () => {
                         {slot}
                       </button>
                     ))}
-                  </div>
                 </div>
               )}
             </div>

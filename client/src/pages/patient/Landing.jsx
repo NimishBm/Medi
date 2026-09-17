@@ -2,15 +2,31 @@ import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../store/slices/authSlice';
-import toast from 'react-hot-toast';
+import {
+  Search,
+  Heart,
+  Eye,
+  Smile,
+  Activity,
+  Thermometer,
+  Layers,
+  MapPin,
+  ShieldCheck,
+  Smartphone,
+  CheckCircle,
+  CalendarCheck,
+  Clock,
+  Shield,
+  Calendar,
+} from 'lucide-react';
 
-const CATEGORIES = [
-  { id: 'fever', name: 'Fever', icon: '🌡️', description: 'For high temperature' },
-  { id: 'skin', name: 'Skin', icon: '💆', description: 'Skin concerns' },
-  { id: 'heart', name: 'Heart', icon: '❤️', description: 'Heart checkup' },
-  { id: 'eye', name: 'Eye', icon: '👁️', description: 'Vision issues' },
-  { id: 'dental', name: 'Dental', icon: '🦷', description: 'Teeth problem' },
-  { id: 'general', name: 'General', icon: '⚕️', description: 'General checkup' },
+const SPECIALTIES = [
+  { id: 'general', name: 'General Physician', icon: Activity, color: 'from-blue-400 to-blue-600' },
+  { id: 'cardio', name: 'Cardiology', icon: Heart, color: 'from-red-400 to-red-600' },
+  { id: 'derma', name: 'Dermatology', icon: Layers, color: 'from-purple-400 to-purple-600' },
+  { id: 'eye', name: 'Ophthalmology', icon: Eye, color: 'from-green-400 to-green-600' },
+  { id: 'dental', name: 'Dental', icon: Smile, color: 'from-yellow-400 to-yellow-600' },
+  { id: 'pediatrics', name: 'Pediatrics', icon: Thermometer, color: 'from-pink-400 to-pink-600' },
 ];
 
 const LOCATIONS = ['Current Location', 'Mumbai', 'Delhi', 'Bangalore', 'Pune', 'Hyderabad'];
@@ -20,33 +36,36 @@ export const Landing = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [selectedLocation, setSelectedLocation] = useState('Current Location');
+  const [searchInput, setSearchInput] = useState('');
 
-  const handleCategoryClick = (category) => {
-    navigate('/patient/marketplace', { state: { category: category.name } });
+  const handleSearch = (e) => {
+    if (e.key === 'Enter' && searchInput.trim()) {
+      navigate('/patient/marketplace', { state: { search: searchInput } });
+    }
+  };
+
+  const handleSpecialtyClick = (specialty) => {
+    navigate('/patient/marketplace', { state: { category: specialty.name } });
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white shadow-sm">
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">🏥</span>
+            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Heart className="text-white" size={24} strokeWidth={2.5} />
             </div>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
-                ClinicFlow
-              </h1>
-            </div>
+            <h1 className="text-xl font-bold text-gray-900">ClinicFlow</h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Location Selector - Small */}
+          <div className="hidden md:flex items-center gap-2">
+            <MapPin size={16} className="text-gray-500" />
             <select
               value={selectedLocation}
               onChange={(e) => setSelectedLocation(e.target.value)}
-              className="hidden md:block px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
             >
               {LOCATIONS.map((loc) => (
                 <option key={loc} value={loc}>
@@ -54,13 +73,19 @@ export const Landing = () => {
                 </option>
               ))}
             </select>
+          </div>
 
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/patient/appointments')}
+              onClick={() => navigate('/patient/my-appointments')}
               className="text-gray-700 hover:text-blue-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-blue-50 transition"
             >
-              Appointments
+              My Appointments
             </button>
+            <div className="hidden sm:block h-6 border-l border-gray-300"></div>
+            <div className="hidden sm:flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full">
+              <span className="text-sm font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+            </div>
             <button
               onClick={() => dispatch(logout())}
               className="text-gray-700 hover:text-red-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-red-50 transition"
@@ -71,111 +96,202 @@ export const Landing = () => {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-            Hi {user?.name?.split(' ')[0]}! 👋
-          </h2>
-          <p className="text-lg text-gray-600">Find and book the best doctors near you</p>
-        </div>
+      {/* Hero Section */}
+      <section className="bg-gradient-to-r from-blue-700 via-blue-600 to-blue-500 text-white">
+        <div className="max-w-7xl mx-auto px-4 py-16 md:py-24">
+          <div className="max-w-3xl">
+            {/* Eyebrow */}
+            <p className="text-sm uppercase tracking-widest font-semibold text-blue-100 mb-4">
+              Book • Skip the Wait • Consult
+            </p>
 
-        {/* Hero Section with Search */}
-        <div className="mb-12 bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 md:p-10 text-white">
-          <h3 className="text-2xl md:text-3xl font-bold mb-2">What brings you here?</h3>
-          <p className="text-blue-100 mb-6 text-sm md:text-base">Search by symptom, doctor name, or specialty</p>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Type symptoms or doctor name..."
-              className="w-full px-5 py-3 rounded-full text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-blue-300 text-sm md:text-base"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && e.target.value.trim()) {
-                  navigate('/patient/marketplace', { state: { search: e.target.value } });
-                }
-              }}
-            />
-            <button className="absolute right-1 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-1.5 rounded-full font-semibold text-sm transition">
-              Search
-            </button>
+            {/* Headline */}
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-4">
+              Find the Right Doctor,<br />Book in Minutes.
+            </h1>
+
+            {/* Subtext */}
+            <p className="text-lg text-blue-100 mb-8">
+              Search by symptom, doctor name, or specialty. Real-time queue tracking included.
+            </p>
+
+            {/* Search Bar */}
+            <div className="relative mb-6">
+              <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by symptom or doctor name..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyPress={handleSearch}
+                className="w-full pl-12 pr-5 py-3.5 rounded-full text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-blue-300 text-base font-medium"
+              />
+            </div>
+
+            {/* Trust Pills */}
+            <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-2 bg-white bg-opacity-20 px-4 py-2 rounded-full text-sm font-medium">
+                <Shield size={16} />
+                <span>Verified Doctors</span>
+              </div>
+              <div className="flex items-center gap-2 bg-white bg-opacity-20 px-4 py-2 rounded-full text-sm font-medium">
+                <Clock size={16} />
+                <span>Real-time Queue</span>
+              </div>
+              <div className="flex items-center gap-2 bg-white bg-opacity-20 px-4 py-2 rounded-full text-sm font-medium">
+                <Calendar size={16} />
+                <span>Instant Booking</span>
+              </div>
+            </div>
           </div>
         </div>
+      </section>
 
-        {/* Categories Section */}
-        <div className="mb-12">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6">Browse by Specialty</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {CATEGORIES.map((cat) => (
+      {/* Browse by Specialty */}
+      <section className="max-w-7xl mx-auto px-4 py-16 md:py-20">
+        <h2 className="text-3xl font-bold text-gray-900 mb-10">Browse by Specialty</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {SPECIALTIES.map((specialty) => {
+            const IconComponent = specialty.icon;
+            return (
               <button
-                key={cat.id}
-                onClick={() => handleCategoryClick(cat)}
-                className="group bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-xl p-4 text-center transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+                key={specialty.id}
+                onClick={() => handleSpecialtyClick(specialty)}
+                className="group bg-white border border-gray-200 hover:border-blue-400 rounded-xl p-4 text-center transition-all duration-300 hover:shadow-md"
               >
-                <div className="text-4xl mb-2">{cat.icon}</div>
-                <h4 className="font-bold text-gray-900 text-sm mb-0.5">{cat.name}</h4>
-                <p className="text-xs text-gray-600">{cat.description}</p>
+                <div className={`w-12 h-12 mx-auto mb-3 bg-gradient-to-br ${specialty.color} rounded-lg flex items-center justify-center`}>
+                  <IconComponent size={24} className="text-white" strokeWidth={2} />
+                </div>
+                <h3 className="font-semibold text-gray-900 text-sm mb-1">{specialty.name}</h3>
+                <p className="text-xs text-gray-500">Book Now</p>
               </button>
-            ))}
+            );
+          })}
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="bg-gray-50 py-16 md:py-20">
+        <div className="max-w-7xl mx-auto px-4">
+          <h2 className="text-3xl font-bold text-gray-900 mb-12 text-center">How It Works</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-6">
+            {/* Step 1 */}
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search size={28} strokeWidth={2} />
+              </div>
+              <h3 className="font-bold text-gray-900 text-lg mb-2">Search a Doctor</h3>
+              <p className="text-gray-600 text-sm">Enter your symptoms or browse by specialty to find the right doctor for your needs.</p>
+            </div>
+
+            {/* Arrow (hidden on mobile) */}
+            <div className="hidden md:flex items-center justify-center">
+              <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-blue-300 to-transparent"></div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-4">
+                <CalendarCheck size={28} strokeWidth={2} />
+              </div>
+              <h3 className="font-bold text-gray-900 text-lg mb-2">Book a Slot</h3>
+              <p className="text-gray-600 text-sm">Pick your preferred date and time. Instant confirmation of your appointment with no waiting on calls.</p>
+            </div>
+
+            {/* Arrow (hidden on mobile) */}
+            <div className="hidden md:flex items-center justify-center">
+              <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-blue-300 to-transparent"></div>
+            </div>
+
+            {/* Step 3 */}
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle size={28} strokeWidth={2} />
+              </div>
+              <h3 className="font-bold text-gray-900 text-lg mb-2">Visit & Consult</h3>
+              <p className="text-gray-600 text-sm">Arrive at the clinic and track your queue position live. Get instant updates on your turn.</p>
+            </div>
           </div>
         </div>
+      </section>
 
-        {/* Quick Stats */}
-        <div className="mb-12 bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <div className="grid grid-cols-3 gap-6 text-center">
+      {/* Stats Bar */}
+      <section className="bg-blue-50 border-y border-blue-100 py-12">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
-              <h4 className="text-2xl md:text-3xl font-bold text-blue-600">500+</h4>
-              <p className="text-gray-600 text-sm mt-1">Verified Doctors</p>
+              <p className="text-3xl md:text-4xl font-bold text-blue-600">500+</p>
+              <p className="text-sm text-gray-600 mt-2">Verified Doctors</p>
             </div>
             <div>
-              <h4 className="text-2xl md:text-3xl font-bold text-green-600">24/7</h4>
-              <p className="text-gray-600 text-sm mt-1">Available Service</p>
+              <p className="text-3xl md:text-4xl font-bold text-blue-600">10,000+</p>
+              <p className="text-sm text-gray-600 mt-2">Patients Served</p>
             </div>
             <div>
-              <h4 className="text-2xl md:text-3xl font-bold text-purple-600">10min</h4>
-              <p className="text-gray-600 text-sm mt-1">Avg Wait Time</p>
+              <p className="text-3xl md:text-4xl font-bold text-blue-600">4.8</p>
+              <p className="text-sm text-gray-600 mt-2">Average Rating</p>
+            </div>
+            <div>
+              <p className="text-3xl md:text-4xl font-bold text-blue-600">10 min</p>
+              <p className="text-sm text-gray-600 mt-2">Avg Wait Time</p>
             </div>
           </div>
         </div>
+      </section>
 
-        {/* CTA Section */}
-        <div className="mb-12 bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 rounded-xl p-6 md:p-10 text-white text-center">
-          <h3 className="text-2xl font-bold mb-2">Ready to book an appointment?</h3>
-          <p className="text-blue-100 mb-6 text-sm md:text-base">Pick a specialty above or search for a specific doctor</p>
+      {/* Why ClinicFlow */}
+      <section className="max-w-7xl mx-auto px-4 py-16 md:py-20">
+        <h2 className="text-3xl font-bold text-gray-900 mb-10 text-center">Why Choose ClinicFlow?</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Feature 1 */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+              <ShieldCheck size={24} className="text-blue-600" strokeWidth={2} />
+            </div>
+            <h3 className="font-bold text-gray-900 text-base mb-2">Verified Doctors</h3>
+            <p className="text-gray-600 text-sm">Every doctor on our platform is certified and background-verified to ensure your safety and care quality.</p>
+          </div>
+
+          {/* Feature 2 */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+              <Activity size={24} className="text-blue-600" strokeWidth={2} />
+            </div>
+            <h3 className="font-bold text-gray-900 text-base mb-2">Live Queue Tracking</h3>
+            <p className="text-gray-600 text-sm">Know your exact wait time before you leave home. Track your position in real-time using our live queue system.</p>
+          </div>
+
+          {/* Feature 3 */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+              <Smartphone size={24} className="text-blue-600" strokeWidth={2} />
+            </div>
+            <h3 className="font-bold text-gray-900 text-base mb-2">Simple Booking</h3>
+            <p className="text-gray-600 text-sm">Book an appointment in under 60 seconds without making any calls. Quick, easy, and hassle-free.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Banner */}
+      <section className="bg-gradient-to-r from-blue-700 to-blue-600 text-white py-16 md:py-20">
+        <div className="max-w-4xl mx-auto px-4 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to see a doctor today?</h2>
+          <p className="text-blue-100 text-lg mb-8">Browse our network of verified specialists near you.</p>
           <button
             onClick={() => navigate('/patient/marketplace')}
-            className="bg-white text-blue-600 hover:bg-gray-100 px-6 py-2.5 rounded-full font-bold text-sm md:text-base transition-all"
+            className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3.5 rounded-full font-bold text-base transition-colors"
           >
-            Explore All Doctors →
+            Browse Doctors
           </button>
         </div>
+      </section>
 
-        {/* Features */}
-        <div className="mb-12">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6">Why ClinicFlow?</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white rounded-lg p-5 border border-gray-200">
-              <div className="text-3xl mb-3">✅</div>
-              <h4 className="font-bold text-gray-900 text-sm mb-1.5">Verified Doctors</h4>
-              <p className="text-gray-600 text-sm">All doctors are certified and experienced</p>
-            </div>
-            <div className="bg-white rounded-lg p-5 border border-gray-200">
-              <div className="text-3xl mb-3">⏱️</div>
-              <h4 className="font-bold text-gray-900 text-sm mb-1.5">Real-time Queue</h4>
-              <p className="text-gray-600 text-sm">See live queue status and estimated wait time</p>
-            </div>
-            <div className="bg-white rounded-lg p-5 border border-gray-200">
-              <div className="text-3xl mb-3">💬</div>
-              <h4 className="font-bold text-gray-900 text-sm mb-1.5">Easy Booking</h4>
-              <p className="text-gray-600 text-sm">Book appointments in just 2 taps</p>
-            </div>
-          </div>
+      {/* Footer */}
+      <footer className="border-t border-gray-200 py-6">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <p className="text-gray-600 text-sm">© 2026 ClinicFlow. All rights reserved.</p>
         </div>
-
-        {/* Footer */}
-        <div className="text-center text-gray-600 pb-8 border-t pt-8">
-          <p>© 2024 ClinicFlow. All rights reserved.</p>
-        </div>
-      </div>
+      </footer>
     </div>
   );
 };
