@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { logout } from '../../store/slices/authSlice';
 import {
   Search,
@@ -40,13 +40,25 @@ export const Landing = () => {
 
   const handleSearch = (e) => {
     if (e.key === 'Enter' && searchInput.trim()) {
-      navigate('/patient/marketplace', { state: { search: searchInput } });
+      const targetRoute = user ? '/patient/marketplace' : '/login/patient';
+      navigate(targetRoute, { state: { search: searchInput } });
     }
   };
 
   const handleSpecialtyClick = (specialty) => {
-    navigate('/patient/marketplace', { state: { category: specialty.name } });
+    const targetRoute = user ? '/patient/marketplace' : '/login/patient';
+    navigate(targetRoute, { state: { category: specialty.name } });
   };
+
+  const browseClick = () => {
+    const targetRoute = user ? '/patient/marketplace' : '/login/patient';
+    navigate(targetRoute);
+  };
+
+  // If logged in as DOCTOR or RECEPTIONIST, redirect them
+  if (user && user.role !== 'PATIENT') {
+    return <Navigate to={user.role === 'DOCTOR' ? '/doctor' : '/receptionist'} replace />;
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -60,39 +72,58 @@ export const Landing = () => {
             <h1 className="text-xl font-bold text-gray-900">ClinicFlow</h1>
           </div>
 
-          <div className="hidden md:flex items-center gap-2">
-            <MapPin size={16} className="text-gray-500" />
-            <select
-              value={selectedLocation}
-              onChange={(e) => setSelectedLocation(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
-            >
-              {LOCATIONS.map((loc) => (
-                <option key={loc} value={loc}>
-                  {loc}
-                </option>
-              ))}
-            </select>
-          </div>
+          {user ? (
+            <>
+              <div className="hidden md:flex items-center gap-2">
+                <MapPin size={16} className="text-gray-500" />
+                <select
+                  value={selectedLocation}
+                  onChange={(e) => setSelectedLocation(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+                >
+                  {LOCATIONS.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/patient/my-appointments')}
-              className="text-gray-700 hover:text-blue-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-blue-50 transition"
-            >
-              My Appointments
-            </button>
-            <div className="hidden sm:block h-6 border-l border-gray-300"></div>
-            <div className="hidden sm:flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full">
-              <span className="text-sm font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => navigate('/patient/my-appointments')}
+                  className="text-gray-700 hover:text-blue-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-blue-50 transition hidden sm:block"
+                >
+                  My Appointments
+                </button>
+                <div className="hidden sm:block h-6 border-l border-gray-300"></div>
+                <div className="hidden sm:flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full">
+                  <span className="text-sm font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+                </div>
+                <button
+                  onClick={() => dispatch(logout())}
+                  className="text-gray-700 hover:text-red-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-red-50 transition"
+                >
+                  Logout
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/login/patient')}
+                className="text-gray-700 hover:text-blue-600 font-medium text-sm px-4 py-2 rounded-lg hover:bg-blue-50 transition"
+              >
+                Login as Patient
+              </button>
+              <button
+                onClick={() => navigate('/login/doctor')}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm px-4 py-2 rounded-lg transition"
+              >
+                Login as Doctor
+              </button>
             </div>
-            <button
-              onClick={() => dispatch(logout())}
-              className="text-gray-700 hover:text-red-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-red-50 transition"
-            >
-              Logout
-            </button>
-          </div>
+          )}
         </div>
       </header>
 
@@ -278,7 +309,7 @@ export const Landing = () => {
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to see a doctor today?</h2>
           <p className="text-blue-100 text-lg mb-8">Browse our network of verified specialists near you.</p>
           <button
-            onClick={() => navigate('/patient/marketplace')}
+            onClick={browseClick}
             className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3.5 rounded-full font-bold text-base transition-colors"
           >
             Browse Doctors
