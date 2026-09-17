@@ -295,7 +295,14 @@ export const Marketplace = () => {
                     </div>
 
                     {/* Book Button */}
-                    <button className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-2.5 rounded-lg font-semibold text-xs transition-all shadow-sm hover:shadow-md">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        navigate(`/patient/doctors/${doctor._id}/book`);
+                      }}
+                      className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-2.5 rounded-lg font-semibold text-xs transition-all shadow-sm hover:shadow-md"
+                    >
                       Book Appointment
                     </button>
                   </div>

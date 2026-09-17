@@ -22,7 +22,6 @@ export const DoctorDetail = () => {
   const [doctor, setDoctor] = useState(null);
   const [queueStats, setQueueStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showBookingForm, setShowBookingForm] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -101,7 +100,7 @@ export const DoctorDetail = () => {
                 <p className="text-lg text-blue-600 font-semibold">{doctor.specialization}</p>
               </div>
               <button
-                onClick={() => setShowBookingForm(true)}
+                onClick={() => navigate(`/patient/doctors/${doctorId}/book`)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition-colors"
               >
                 Book Now
@@ -211,7 +210,7 @@ export const DoctorDetail = () => {
             <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-sm p-6 text-white">
               <h4 className="font-bold mb-4">Quick Book</h4>
               <button
-                onClick={() => setShowBookingForm(true)}
+                onClick={() => navigate(`/patient/doctors/${doctorId}/book`)}
                 className="w-full bg-white text-blue-600 hover:bg-gray-100 py-3 rounded-lg font-bold transition-colors mb-3"
               >
                 Book Appointment
@@ -243,197 +242,6 @@ export const DoctorDetail = () => {
         </div>
       </div>
 
-      {/* Booking Form Modal */}
-      {showBookingForm && (
-        <BookingFormModal
-          doctor={doctor}
-          user={user}
-          doctorId={doctorId}
-          onClose={() => setShowBookingForm(false)}
-          onSuccess={() => navigate('/patient/appointments')}
-        />
-      )}
-    </div>
-  );
-};
-
-const BookingFormModal = ({ doctor, user, doctorId, onClose, onSuccess }) => {
-  const { appointmentAPI } = require('../../services/api');
-  const [formData, setFormData] = useState({
-    appointmentDate: new Date().toISOString().split('T')[0],
-    appointmentTime: '09:00',
-    appointmentType: 'General Consultation',
-    reason: '',
-    bookFor: 'self',
-    selectedFamilyMember: '',
-  });
-  const [loading, setLoading] = useState(false);
-
-  const appointmentTypes = ['General Consultation', 'New Patient', 'Follow-up', 'Specialist Consultation', 'Routine Check-up'];
-  const timeSlots = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30'];
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.appointmentDate || !formData.appointmentTime) {
-      toast.error('Please select date and time');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const payload = {
-        doctorId,
-        appointmentDate: formData.appointmentDate,
-        appointmentTime: formData.appointmentTime,
-        appointmentType: formData.appointmentType,
-        reason: formData.reason || 'Consultation',
-      };
-
-      if (formData.bookFor === 'family' && formData.selectedFamilyMember) {
-        const familyMember = user.familyMembers[parseInt(formData.selectedFamilyMember)];
-        payload.bookedFor = {
-          name: familyMember.name,
-          relationship: familyMember.relationship,
-          isFamilyMember: true,
-        };
-        payload.bookedBy = user._id;
-      }
-
-      await appointmentAPI.createAppointment(payload);
-      toast.success('Appointment booked successfully!');
-      onSuccess();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to book appointment');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg max-w-md w-full max-h-screen overflow-y-auto">
-        {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold">Book Appointment</h2>
-          <button onClick={onClose} className="text-2xl hover:text-blue-100">
-            ×
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Type</label>
-            <select
-              value={formData.appointmentType}
-              onChange={(e) => setFormData({ ...formData, appointmentType: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              {appointmentTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-            <input
-              type="date"
-              value={formData.appointmentDate}
-              onChange={(e) => setFormData({ ...formData, appointmentDate: e.target.value })}
-              min={new Date().toISOString().split('T')[0]}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Time Slot</label>
-            <div className="grid grid-cols-4 gap-2">
-              {timeSlots.map((slot) => (
-                <button
-                  key={slot}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, appointmentTime: slot })}
-                  className={`py-1.5 rounded font-medium text-xs transition-colors ${
-                    formData.appointmentTime === slot
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {slot}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Visit</label>
-            <input
-              type="text"
-              value={formData.reason}
-              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-              placeholder="Describe your symptoms..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
-          </div>
-
-          <div className="border-t pt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-3">Booking For</label>
-            <div className="space-y-2">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="bookFor"
-                  value="self"
-                  checked={formData.bookFor === 'self'}
-                  onChange={(e) => setFormData({ ...formData, bookFor: e.target.value })}
-                  className="mr-2"
-                />
-                <span className="text-sm text-gray-700">Myself</span>
-              </label>
-              {user.familyMembers && user.familyMembers.length > 0 && (
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="bookFor"
-                    value="family"
-                    checked={formData.bookFor === 'family'}
-                    onChange={(e) => setFormData({ ...formData, bookFor: e.target.value })}
-                    className="mr-2"
-                  />
-                  <span className="text-sm text-gray-700">Family Member</span>
-                </label>
-              )}
-            </div>
-
-            {formData.bookFor === 'family' && user.familyMembers && user.familyMembers.length > 0 && (
-              <select
-                value={formData.selectedFamilyMember}
-                onChange={(e) => setFormData({ ...formData, selectedFamilyMember: e.target.value })}
-                className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              >
-                <option value="">Select a family member</option>
-                {user.familyMembers.map((member, idx) => (
-                  <option key={idx} value={idx}>
-                    {member.name} ({member.relationship})
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2.5 rounded-lg font-bold transition-colors"
-          >
-            {loading ? 'Booking...' : 'Confirm Booking'}
-          </button>
-        </form>
-      </div>
     </div>
   );
 };

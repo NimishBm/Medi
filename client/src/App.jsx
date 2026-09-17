@@ -13,6 +13,7 @@ import { setUser } from './store/slices/authSlice';
 import { Landing } from './pages/patient/Landing';
 import { Marketplace } from './pages/patient/Marketplace';
 import { DoctorDetail } from './pages/patient/DoctorDetail';
+import { BookingPage } from './pages/patient/BookingPage';
 import { BookAppointment } from './pages/patient/BookAppointment';
 import { Appointments } from './pages/patient/Appointments';
 import { FamilyMembers } from './pages/patient/FamilyMembers';
@@ -90,6 +91,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRoles={['PATIENT']}>
                 <DoctorDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/doctors/:doctorId/book"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <BookingPage />
               </ProtectedRoute>
             }
           />
