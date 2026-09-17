@@ -17,7 +17,8 @@ const appointmentTypes = [
   'Teleconsultation',
 ];
 
-const timeSlots = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30'];
+// Dummy time slots for testing - will be replaced with doctor's availableTimeSlots
+const DUMMY_TIME_SLOTS = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30'];
 
 export const BookingPage = () => {
   const { doctorId } = useParams();
@@ -66,6 +67,7 @@ export const BookingPage = () => {
     try {
       setBooking(true);
       const payload = {
+        patientId: user._id,
         doctorId,
         appointmentDate: formData.appointmentDate,
         appointmentTime: formData.appointmentTime,
@@ -85,9 +87,10 @@ export const BookingPage = () => {
 
       await appointmentAPI.createAppointment(payload);
       toast.success('Appointment booked successfully!');
-      navigate('/patient/appointments');
+      navigate('/patient/my-appointments');
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to book appointment';
+      console.error('Booking error:', error.response?.data);
+      const message = error.response?.data?.message || error.response?.data?.error || 'Failed to book appointment';
       toast.error(message);
     } finally {
       setBooking(false);
@@ -190,25 +193,47 @@ export const BookingPage = () => {
               />
             </div>
 
-            {/* Time Slots */}
+            {/* Time Slots - From Doctor Profile */}
             <div>
               <label className="block text-sm font-semibold text-gray-900 mb-3">Select Time Slot</label>
-              <div className="grid grid-cols-4 gap-3">
-                {timeSlots.map((slot) => (
-                  <button
-                    key={slot}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, appointmentTime: slot })}
-                    className={`py-3 rounded-lg font-medium transition-all ${
-                      formData.appointmentTime === slot
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
-                    }`}
-                  >
-                    {slot}
-                  </button>
-                ))}
-              </div>
+              {doctor?.availableTimeSlots && doctor.availableTimeSlots.length > 0 ? (
+                <div className="grid grid-cols-4 gap-3">
+                  {doctor.availableTimeSlots.map((slot) => (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, appointmentTime: slot })}
+                      className={`py-3 rounded-lg font-medium transition-all ${
+                        formData.appointmentTime === slot
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                      }`}
+                    >
+                      {slot}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div>
+                  <p className="text-xs text-amber-600 mb-3 p-2 bg-amber-50 rounded">⚠️ Using test time slots (doctor hasn't set any yet)</p>
+                  <div className="grid grid-cols-4 gap-3">
+                    {DUMMY_TIME_SLOTS.map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, appointmentTime: slot })}
+                        className={`py-3 rounded-lg font-medium transition-all ${
+                          formData.appointmentTime === slot
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Booking For */}

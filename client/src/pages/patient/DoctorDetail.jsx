@@ -6,12 +6,7 @@ import { useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 
-const REVIEWS = [
-  { name: 'Rajesh Kumar', rating: 5, text: 'Excellent doctor, very professional and caring', date: '2 weeks ago' },
-  { name: 'Priya Singh', rating: 4.5, text: 'Great experience, helped me recover quickly', date: '1 month ago' },
-  { name: 'Amit Patel', rating: 5, text: 'Best consultation I had, highly recommended', date: '1 month ago' },
-  { name: 'Sneha Desai', rating: 4, text: 'Good doctor, a bit busy but helpful', date: '2 months ago' },
-];
+// Reviews will be fetched from consultation history / API when available
 
 export const DoctorDetail = () => {
   const { doctorId } = useParams();
@@ -21,6 +16,7 @@ export const DoctorDetail = () => {
 
   const [doctor, setDoctor] = useState(null);
   const [queueStats, setQueueStats] = useState(null);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -63,7 +59,7 @@ export const DoctorDetail = () => {
   }
 
   const waitTime = (queueStats?.waiting || 0) * (doctor.averageConsultationTime || 10);
-  const avgRating = REVIEWS.reduce((sum, r) => sum + r.rating, 0) / REVIEWS.length;
+  const avgRating = reviews.length > 0 ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -186,21 +182,28 @@ export const DoctorDetail = () => {
 
             {/* Reviews Section */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Patient Reviews ({REVIEWS.length})</h3>
-              <div className="space-y-4">
-                {REVIEWS.map((review, idx) => (
-                  <div key={idx} className="pb-4 border-b border-gray-200 last:border-0">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="font-semibold text-gray-900">{review.name}</p>
-                        <p className="text-xs text-gray-500">{review.date}</p>
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Patient Reviews ({reviews.length})</h3>
+              {reviews.length > 0 ? (
+                <div className="space-y-4">
+                  {reviews.map((review, idx) => (
+                    <div key={idx} className="pb-4 border-b border-gray-200 last:border-0">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <p className="font-semibold text-gray-900">{review.name}</p>
+                          <p className="text-xs text-gray-500">{review.date}</p>
+                        </div>
+                        <p className="text-yellow-500 font-bold">{review.rating}⭐</p>
                       </div>
-                      <p className="text-yellow-500 font-bold">{review.rating}⭐</p>
+                      <p className="text-sm text-gray-700">{review.text}</p>
                     </div>
-                    <p className="text-sm text-gray-700">{review.text}</p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600 mb-2">No reviews yet</p>
+                  <p className="text-sm text-gray-500">Be the first to share your experience</p>
+                </div>
+              )}
             </div>
           </div>
 
