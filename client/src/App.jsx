@@ -3,8 +3,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
 
-import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { PatientLogin } from './pages/PatientLogin';
+import { DoctorLogin } from './pages/DoctorLogin';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { authAPI } from './services/api';
 import { setUser } from './store/slices/authSlice';
@@ -63,11 +64,16 @@ export default function App() {
       <BrowserRouter future={{ v7_relativeSplatPath: true }}>
         <Routes>
           {/* Auth Routes */}
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={<Navigate to="/login/patient" replace />} />
+          <Route path="/login/patient" element={<PatientLogin />} />
+          <Route path="/login/doctor" element={<DoctorLogin />} />
           <Route path="/register" element={<Register />} />
 
           {/* Display Routes */}
           <Route path="/display" element={<WaitingRoomDisplay />} />
+
+          {/* Landing - Public Page */}
+          <Route path="/" element={<Landing />} />
 
           {/* Patient Routes */}
           <Route
@@ -112,6 +118,14 @@ export default function App() {
           />
           <Route
             path="/patient/appointments"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <Appointments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/my-appointments"
             element={
               <ProtectedRoute requiredRoles={['PATIENT']}>
                 <Appointments />
@@ -219,9 +233,8 @@ export default function App() {
             }
           />
 
-          {/* Default Routes */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </>

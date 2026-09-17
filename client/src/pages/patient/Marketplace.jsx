@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { doctorAPI, queueAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
+import { ChevronLeft, Search, Heart, Activity, Star, SearchX } from 'lucide-react';
 
 const CATEGORIES = [
   { id: 'all', name: 'All', icon: '⭐' },
@@ -137,26 +138,30 @@ export const Marketplace = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/patient')} className="text-gray-600 hover:text-gray-900 text-2xl">
-              ←
+            <button onClick={() => navigate('/patient')} className="text-gray-600 hover:text-gray-900 p-1">
+              <ChevronLeft size={22} />
             </button>
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">🏥</span>
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Heart className="text-white" size={18} strokeWidth={2.5} />
             </div>
-            <h1 className="text-lg font-bold text-gray-900">ClinicFlow</h1>
+            <h1 className="text-base font-bold text-gray-900">ClinicFlow</h1>
           </div>
-          <div className="hidden md:flex items-center gap-3">
+          <h2 className="text-base font-bold text-gray-900">Browse Doctors</h2>
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/patient/appointments')}
-              className="text-gray-700 hover:text-blue-600 font-medium text-xs px-3 py-1.5 rounded-lg hover:bg-blue-50 transition"
+              onClick={() => navigate('/patient/my-appointments')}
+              className="text-gray-700 hover:text-blue-600 font-medium text-xs px-3 py-1.5 rounded-lg hover:bg-blue-50 transition hidden sm:block"
             >
-              Appointments
+              My Appointments
             </button>
+            <div className="hidden sm:flex items-center bg-gray-100 px-3 py-1.5 rounded-full">
+              <span className="text-xs font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+            </div>
             <button
               onClick={() => dispatch(logout())}
               className="text-gray-700 hover:text-red-600 font-medium text-xs px-3 py-1.5"
@@ -168,17 +173,17 @@ export const Marketplace = () => {
       </header>
 
       {/* Search Bar */}
-      <div className="bg-white border-b border-gray-200 sticky top-12 z-40">
+      <div className="bg-white border-b border-gray-200 sticky z-40">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="relative">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Search doctors, symptoms..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-gray-50"
+              className="w-full pl-12 pr-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
           </div>
         </div>
       </div>
@@ -227,7 +232,7 @@ export const Marketplace = () => {
         {/* Doctor Cards */}
         {filteredAndSortedDoctors.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-5xl mb-3">😔</div>
+            <SearchX size={48} className="mx-auto text-gray-400 mb-4" />
             <p className="text-gray-600 font-medium">No doctors found</p>
             <p className="text-gray-500 text-sm">Try different filters or search</p>
           </div>
@@ -244,7 +249,7 @@ export const Marketplace = () => {
                   className="bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all duration-200 overflow-hidden group"
                 >
                   {/* Card Header with Avatar */}
-                  <div className="h-20 bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 flex items-end px-4 pb-3">
+                  <div className="h-20 bg-gradient-to-br from-blue-500 to-blue-700 flex items-end px-4 pb-3">
                     <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-2xl font-bold text-blue-600 shadow-md">
                       {doctor.name.charAt(0)}
                     </div>
@@ -272,7 +277,10 @@ export const Marketplace = () => {
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Rating</p>
-                        <p className="font-bold text-gray-900 text-sm">4.5⭐</p>
+                        <div className="flex items-center gap-1">
+                          <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                          <p className="font-bold text-gray-900 text-sm">4.5</p>
+                        </div>
                       </div>
                     </div>
 
