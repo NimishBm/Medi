@@ -14,6 +14,18 @@ router.get(
   })
 );
 
+// Get distinct specializations actually present in the Doctors collection
+router.get(
+  '/specializations',
+  catchAsyncErrors(async (req, res) => {
+    const specializations = await Doctor.distinct('specialization', {
+      isActive: true
+    });
+
+    res.json(specializations.filter(Boolean).sort());
+  })
+);
+
 // Get doctor by ID
 router.get(
   '/:id',
