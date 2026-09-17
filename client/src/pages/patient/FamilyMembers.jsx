@@ -1,18 +1,10 @@
 import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Sidebar } from '../../components/Sidebar';
-import { Navbar } from '../../components/Navbar';
+import { patientNav } from '../../components/PatientNav';
 import { userAPI } from '../../services/api';
 import { setUser } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
-
-const patientNav = [
-  { path: '/patient', label: 'Dashboard', icon: '📊' },
-  { path: '/patient/book-appointment', label: 'Book Appointment', icon: '📅' },
-  { path: '/patient/appointments', label: 'My Appointments', icon: '📋' },
-  { path: '/patient/family', label: 'Family Members', icon: '👨‍👩‍👧' },
-  { path: '/patient/queue', label: 'Live Queue', icon: '⏱️' },
-];
 
 export const FamilyMembers = () => {
   const { user, token } = useSelector((state) => state.auth);

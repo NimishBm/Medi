@@ -3,14 +3,18 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
 
-import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { PatientLogin } from './pages/PatientLogin';
+import { DoctorLogin } from './pages/DoctorLogin';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { authAPI } from './services/api';
 import { setUser } from './store/slices/authSlice';
 
 // Patient Pages
-import { PatientDashboard } from './pages/patient/Dashboard';
+import { Landing } from './pages/patient/Landing';
+import { Marketplace } from './pages/patient/Marketplace';
+import { DoctorDetail } from './pages/patient/DoctorDetail';
+import { BookingPage } from './pages/patient/BookingPage';
 import { BookAppointment } from './pages/patient/BookAppointment';
 import { Appointments } from './pages/patient/Appointments';
 import { FamilyMembers } from './pages/patient/FamilyMembers';
@@ -60,18 +64,51 @@ export default function App() {
       <BrowserRouter future={{ v7_relativeSplatPath: true }}>
         <Routes>
           {/* Auth Routes */}
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={<Navigate to="/login/patient" replace />} />
+          <Route path="/login/patient" element={<PatientLogin />} />
+          <Route path="/login/doctor" element={<DoctorLogin />} />
           <Route path="/register" element={<Register />} />
 
           {/* Display Routes */}
           <Route path="/display" element={<WaitingRoomDisplay />} />
+
+          {/* Landing - Public Page */}
+          <Route path="/" element={<Landing />} />
+
+          {/* Public Browse Routes - No Login Required */}
+          <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/doctors/:doctorId" element={<DoctorDetail />} />
 
           {/* Patient Routes */}
           <Route
             path="/patient"
             element={
               <ProtectedRoute requiredRoles={['PATIENT']}>
-                <PatientDashboard />
+                <Landing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/marketplace"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <Marketplace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/doctors/:doctorId"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <DoctorDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/doctors/:doctorId/book"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <BookingPage />
               </ProtectedRoute>
             }
           />
@@ -85,6 +122,14 @@ export default function App() {
           />
           <Route
             path="/patient/appointments"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <Appointments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/my-appointments"
             element={
               <ProtectedRoute requiredRoles={['PATIENT']}>
                 <Appointments />
@@ -192,9 +237,8 @@ export default function App() {
             }
           />
 
-          {/* Default Routes */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </>

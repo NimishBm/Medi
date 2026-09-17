@@ -42,7 +42,7 @@ const userSchema = new mongoose.Schema(
 
     gender: {
       type: String,
-      enum: ['M', 'F', 'Other'],
+      enum: ['M', 'F', 'Other', null],
     },
 
     medicalHistory: [
@@ -180,7 +180,7 @@ const userSchema = new mongoose.Schema(
 
         gender: {
           type: String,
-          enum: ['M', 'F', 'Other'],
+          enum: ['M', 'F', 'Other', null],
         },
 
         allergies: [String],
