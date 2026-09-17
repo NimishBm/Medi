@@ -54,7 +54,7 @@ export const Landing = () => {
     const targetRoute = user ? '/patient/marketplace' : '/marketplace';
     navigate(targetRoute);
   };
-
+  
   // If logged in as DOCTOR or RECEPTIONIST, redirect them
   if (user && user.role !== 'PATIENT') {
     return <Navigate to={user.role === 'DOCTOR' ? '/doctor' : '/receptionist'} replace />;
