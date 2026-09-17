@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { doctorAPI, queueAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
-import { ChevronLeft, Search, Heart, Activity, Star, SearchX } from 'lucide-react';
+import { ChevronLeft, Search, Heart, Activity, Star, SearchX, MapPin } from 'lucide-react';
 
 const CATEGORIES = [
   { id: 'all', name: 'All', icon: '⭐' },
@@ -42,6 +42,7 @@ export const Marketplace = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('relevant');
   const [loading, setLoading] = useState(true);
+  const [selectedLocation, setSelectedLocation] = useState('Current Location');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -61,7 +62,12 @@ export const Marketplace = () => {
         }
         setDoctorQueueStats(queueStatsMap);
       } catch (error) {
-        toast.error('Failed to load doctors');
+        if (error.response?.status === 401) {
+          setDoctors([]);
+          setDoctorQueueStats({});
+        } else {
+          toast.error('Failed to load doctors');
+        }
       } finally {
         setLoading(false);
       }
@@ -152,23 +158,54 @@ export const Marketplace = () => {
             <h1 className="text-base font-bold text-gray-900">ClinicFlow</h1>
           </div>
           <h2 className="text-base font-bold text-gray-900">Browse Doctors</h2>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/patient/my-appointments')}
-              className="text-gray-700 hover:text-blue-600 font-medium text-xs px-3 py-1.5 rounded-lg hover:bg-blue-50 transition hidden sm:block"
-            >
-              My Appointments
-            </button>
-            <div className="hidden sm:flex items-center bg-gray-100 px-3 py-1.5 rounded-full">
-              <span className="text-xs font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+
+          {user ? (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/patient/my-appointments')}
+                className="text-gray-700 hover:text-blue-600 font-medium text-xs px-3 py-1.5 rounded-lg hover:bg-blue-50 transition hidden sm:block"
+              >
+                My Appointments
+              </button>
+              <div className="hidden sm:flex items-center bg-gray-100 px-3 py-1.5 rounded-full">
+                <span className="text-xs font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+              </div>
+              <button
+                onClick={() => dispatch(logout())}
+                className="text-gray-700 hover:text-red-600 font-medium text-xs px-3 py-1.5"
+              >
+                Logout
+              </button>
             </div>
-            <button
-              onClick={() => dispatch(logout())}
-              className="text-gray-700 hover:text-red-600 font-medium text-xs px-3 py-1.5"
-            >
-              Logout
-            </button>
-          </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <MapPin size={16} className="text-gray-500" />
+              <select
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+              >
+                <option value="Current Location">Current Location</option>
+                <option value="Mumbai">Mumbai</option>
+                <option value="Delhi">Delhi</option>
+                <option value="Bangalore">Bangalore</option>
+                <option value="Pune">Pune</option>
+                <option value="Hyderabad">Hyderabad</option>
+              </select>
+              <button
+                onClick={() => navigate('/login/patient')}
+                className="text-gray-700 hover:text-blue-600 font-medium text-xs px-3 py-1.5 rounded-lg hover:bg-blue-50 transition"
+              >
+                Login as Patient
+              </button>
+              <button
+                onClick={() => navigate('/login/doctor')}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-3 py-1.5 rounded-lg transition"
+              >
+                Login as Doctor
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -245,7 +282,7 @@ export const Marketplace = () => {
               return (
                 <Link
                   key={doctor._id}
-                  to={`/patient/doctors/${doctor._id}`}
+                  to={user ? `/patient/doctors/${doctor._id}` : `/doctors/${doctor._id}`}
                   className="bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all duration-200 overflow-hidden group"
                 >
                   {/* Card Header with Avatar */}
@@ -307,7 +344,12 @@ export const Marketplace = () => {
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        navigate(`/patient/doctors/${doctor._id}/book`);
+                        if (user) {
+                          navigate(`/patient/doctors/${doctor._id}/book`);
+                        } else {
+                          toast.error('Login to book an appointment');
+                          navigate('/login/patient');
+                        }
                       }}
                       className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-2.5 rounded-lg font-semibold text-xs transition-all shadow-sm hover:shadow-md"
                     >

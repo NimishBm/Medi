@@ -75,6 +75,10 @@ export default function App() {
           {/* Landing - Public Page */}
           <Route path="/" element={<Landing />} />
 
+          {/* Public Browse Routes - No Login Required */}
+          <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/doctors/:doctorId" element={<DoctorDetail />} />
+
           {/* Patient Routes */}
           <Route
             path="/patient"
