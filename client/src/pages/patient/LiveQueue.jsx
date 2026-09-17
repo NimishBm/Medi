@@ -1,17 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Sidebar } from '../../components/Sidebar';
-import { Navbar } from '../../components/Navbar';
+import { patientNav } from '../../components/PatientNav';
 import { appointmentAPI, queueAPI } from '../../services/api';
-import { initSocket, getSocket } from '../../services/socket';
+import { initSocket } from '../../services/socket';
 import toast from 'react-hot-toast';
-
-const patientNav = [
-  { path: '/patient', label: 'Dashboard', icon: '📊' },
-  { path: '/patient/book-appointment', label: 'Book Appointment', icon: '📅' },
-  { path: '/patient/appointments', label: 'My Appointments', icon: '📋' },
-  { path: '/patient/queue', label: 'Live Queue', icon: '⏱️' },
-];
 
 const getStatusColor = (status) => {
   switch (status) {
@@ -30,44 +23,46 @@ export const LiveQueue = () => {
   const [queue, setQueue] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const appRes = await appointmentAPI.getAppointments();
-        const upcoming = appRes.data
-          .filter((a) => a.status !== 'CANCELLED' && a.status !== 'NO_SHOW')
-          .sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate))[0];
+  const fetchQueue = async () => {
+    try {
+      const appRes = await appointmentAPI.getAppointments();
+      const upcoming = appRes.data
+        .filter((a) => a.status !== 'CANCELLED' && a.status !== 'NO_SHOW')
+        .sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate))[0];
 
-        if (upcoming) {
-          setNextAppointment(upcoming);
-          const queueRes = await queueAPI.getQueueByDoctorId(upcoming.doctorId._id);
-          setQueue(queueRes.data.queue);
-        }
-      } catch (error) {
-        toast.error('Failed to load queue');
-      } finally {
-        setIsLoading(false);
+      if (upcoming) {
+        setNextAppointment(upcoming);
+        const queueRes = await queueAPI.getQueueByDoctorId(upcoming.doctorId._id);
+        setQueue(queueRes.data.queue);
       }
+    } catch (error) {
+      toast.error('Failed to load queue');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQueue();
+  }, []);
+
+  useEffect(() => {
+    if (!nextAppointment?._id) return;
+
+    const socket = initSocket();
+    socket.emit('join-queue', { doctorId: nextAppointment.doctorId._id });
+
+    const handleQueueUpdate = () => {
+      fetchQueue();
     };
 
-    fetchData();
-    const socket = initSocket();
+    socket.on('queue-update', handleQueueUpdate);
 
-    if (nextAppointment?._id) {
-      socket.emit('join-queue', { doctorId: nextAppointment.doctorId._id });
-
-      const handleQueueUpdate = () => {
-        fetchData();
-      };
-
-      socket.on('queue-update', handleQueueUpdate);
-
-      return () => {
-        socket.off('queue-update', handleQueueUpdate);
-        socket.emit('leave-queue', { doctorId: nextAppointment.doctorId._id });
-      };
-    }
-  }, [nextAppointment?.doctorId._id]);
+    return () => {
+      socket.off('queue-update', handleQueueUpdate);
+      socket.emit('leave-queue', { doctorId: nextAppointment.doctorId._id });
+    };
+  }, [nextAppointment?._id]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
@@ -96,6 +91,8 @@ export const LiveQueue = () => {
   const consulting = queue.find((q) => q.status === 'CONSULTING');
   const waiting = queue.filter((q) => q.status === 'WAITING');
   const patientsAhead = waiting.filter((q) => q.tokenNumber < (myPosition?.tokenNumber || 0)).length;
+  const avgConsultTime = nextAppointment?.doctorId?.averageConsultationTime || 10;
+  const estimatedWait = patientsAhead * avgConsultTime;
 
   return (
     <div className="flex bg-gray-100 min-h-screen">
@@ -130,7 +127,7 @@ export const LiveQueue = () => {
 
                 <div className="bg-purple-50 p-4 rounded-lg">
                   <p className="text-xs text-gray-600 uppercase">Est. Wait Time</p>
-                  <p className="text-3xl font-bold text-purple-600">~{patientsAhead * 10}m</p>
+                  <p className="text-3xl font-bold text-purple-600">~{estimatedWait}m</p>
                 </div>
               </div>
             </div>

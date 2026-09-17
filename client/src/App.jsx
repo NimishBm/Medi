@@ -10,7 +10,9 @@ import { authAPI } from './services/api';
 import { setUser } from './store/slices/authSlice';
 
 // Patient Pages
-import { PatientDashboard } from './pages/patient/Dashboard';
+import { Landing } from './pages/patient/Landing';
+import { Marketplace } from './pages/patient/Marketplace';
+import { DoctorDetail } from './pages/patient/DoctorDetail';
 import { BookAppointment } from './pages/patient/BookAppointment';
 import { Appointments } from './pages/patient/Appointments';
 import { FamilyMembers } from './pages/patient/FamilyMembers';
@@ -71,7 +73,23 @@ export default function App() {
             path="/patient"
             element={
               <ProtectedRoute requiredRoles={['PATIENT']}>
-                <PatientDashboard />
+                <Landing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/marketplace"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <Marketplace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/doctors/:doctorId"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <DoctorDetail />
               </ProtectedRoute>
             }
           />

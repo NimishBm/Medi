@@ -2,7 +2,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../store/slices/authSlice';
 
-export const Sidebar = ({ navItems }) => {
+export const Sidebar = ({ nav, navItems }) => {
+  const items = nav || navItems;
   const location = useLocation();
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
@@ -19,7 +20,7 @@ export const Sidebar = ({ navItems }) => {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4">
-        {navItems.map((item) => (
+        {items && items.map((item) => (
           <Link
             key={item.path}
             to={item.path}
