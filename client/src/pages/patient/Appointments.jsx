@@ -1,17 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
+import { Link } from 'react-router-dom';
 import { Sidebar } from '../../components/Sidebar';
-import { Navbar } from '../../components/Navbar';
+import { patientNav } from '../../components/PatientNav';
 import { appointmentAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-
-const patientNav = [
-  { path: '/patient', label: 'Dashboard', icon: '📊' },
-  { path: '/patient/book-appointment', label: 'Book Appointment', icon: '📅' },
-  { path: '/patient/appointments', label: 'My Appointments', icon: '📋' },
-  { path: '/patient/family', label: 'Family Members', icon: '👨‍👩‍👧' },
-  { path: '/patient/queue', label: 'Live Queue', icon: '⏱️' },
-];
 
 const TABS = ['All', 'Upcoming', 'Past', 'Cancelled'];
 
@@ -76,10 +69,9 @@ export const Appointments = () => {
   }
 
   return (
-    <div className="flex bg-gray-100 min-h-screen">
-      <Sidebar navItems={patientNav} />
-      <div className="flex-1 flex flex-col">
-        <Navbar title="My Appointments" />
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar nav={patientNav} />
+      <div className="flex-1 overflow-auto">
         <div className="p-8 max-w-6xl mx-auto w-full">
           <div className="card">
             <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
@@ -143,15 +135,25 @@ export const Appointments = () => {
                       <p className="text-xs text-gray-600 mb-4"><strong>Reason:</strong> {appointment.reason}</p>
                     )}
 
-                    {appointment.status === 'BOOKED' && (
-                      <button
-                        onClick={() => handleCancel(appointment._id)}
-                        disabled={cancelingId === appointment._id}
-                        className="btn btn-danger btn-small w-full"
-                      >
-                        {cancelingId === appointment._id ? 'Cancelling...' : 'Cancel'}
-                      </button>
-                    )}
+                    <div className="space-y-2">
+                      {(appointment.status === 'CHECKED_IN' || appointment.status === 'WAITING' || appointment.status === 'CALLED' || appointment.status === 'CONSULTING') && (
+                        <Link
+                          to="/patient/queue"
+                          className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition-colors text-sm"
+                        >
+                          Track Queue →
+                        </Link>
+                      )}
+                      {appointment.status === 'BOOKED' && (
+                        <button
+                          onClick={() => handleCancel(appointment._id)}
+                          disabled={cancelingId === appointment._id}
+                          className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white py-2 rounded-lg font-medium transition-colors text-sm"
+                        >
+                          {cancelingId === appointment._id ? 'Cancelling...' : 'Cancel'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

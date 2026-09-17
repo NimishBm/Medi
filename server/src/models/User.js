@@ -33,7 +33,7 @@ const userSchema = new mongoose.Schema(
     dateOfBirth: Date,
     gender: {
       type: String,
-      enum: ['M', 'F', 'Other'],
+      enum: ['M', 'F', 'Other', null],
     },
     medicalHistory: [
       {
@@ -82,7 +82,7 @@ const userSchema = new mongoose.Schema(
         dateOfBirth: Date,
         gender: {
           type: String,
-          enum: ['M', 'F', 'Other'],
+          enum: ['M', 'F', 'Other', null],
         },
         allergies: [String],
       },

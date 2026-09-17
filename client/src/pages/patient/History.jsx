@@ -1,14 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Sidebar } from '../../components/Sidebar';
-import { Navbar } from '../../components/Navbar';
+import { patientNav } from '../../components/PatientNav';
 import { consultationAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-
-const patientNav = [
-  { path: '/patient', label: 'Dashboard', icon: '📊' },
-  { path: '/patient/history', label: 'Medical History', icon: '📚' },
-];
 
 export const History = () => {
   const { user } = useSelector((state) => state.auth);
