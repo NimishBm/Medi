@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 const doctorSchema = new mongoose.Schema(
   {
@@ -34,17 +35,41 @@ const doctorSchema = new mongoose.Schema(
 
     experience: {
       type: Number,
-      required: true
+      default: 0
     },
 
     qualifications: {
       type: [String],
-      required: true
+      default: []
     },
 
     consultationFee: {
       type: Number,
-      required: true
+      default: 0
+    },
+
+    licenseNumber: {
+      type: String
+    },
+
+    officeLocation: {
+      type: String
+    },
+
+    clinicName: {
+      type: String
+    },
+
+    clinicAddress: {
+      type: String
+    },
+
+    clinicCity: {
+      type: String
+    },
+
+    clinicPhone: {
+      type: String
     },
 
     roomNumber: {
@@ -54,6 +79,21 @@ const doctorSchema = new mongoose.Schema(
     clinicLocation: {
       type: String,
       trim: true
+    },
+
+    availabilityStart: {
+      type: String,
+      default: '09:00'
+    },
+
+    availabilityEnd: {
+      type: String,
+      default: '18:00'
+    },
+
+    daysOff: {
+      type: [String],
+      default: []
     },
 
     consultationType: {
@@ -121,7 +161,17 @@ const doctorSchema = new mongoose.Schema(
   }
 );
 
-// Hide password from API responses
+doctorSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+doctorSchema.methods.comparePassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
 doctorSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;

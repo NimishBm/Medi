@@ -24,6 +24,12 @@ export const DoctorLogin = () => {
     try {
       setLoading(true);
       const response = await authAPI.login({ email, password });
+
+      if (response.data.user.role !== 'DOCTOR') {
+        toast.error('Invalid credentials. Please use your doctor account.');
+        return;
+      }
+
       dispatch(setUser({ user: response.data.user, token: response.data.token }));
       toast.success('Login successful!');
       navigate('/doctor');
@@ -131,6 +137,12 @@ export const DoctorLogin = () => {
 
             {/* Links */}
             <div className="mt-6 space-y-3 text-center">
+              <p className="text-gray-600 text-sm">
+                Don't have an account?{' '}
+                <Link to="/register/doctor" className="text-blue-600 hover:text-blue-700 font-medium">
+                  Register here
+                </Link>
+              </p>
               <p className="text-gray-500 text-xs">
                 <Link to="/login/patient" className="text-blue-600 hover:text-blue-700 font-medium">
                   Are you a patient? Login here →

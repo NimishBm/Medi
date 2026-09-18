@@ -24,6 +24,12 @@ export const PatientLogin = () => {
     try {
       setLoading(true);
       const response = await authAPI.login({ email, password });
+
+      if (response.data.user.role !== 'PATIENT') {
+        toast.error('Invalid credentials. Please use your patient account.');
+        return;
+      }
+
       dispatch(setUser({ user: response.data.user, token: response.data.token }));
       toast.success('Login successful!');
       navigate('/patient');

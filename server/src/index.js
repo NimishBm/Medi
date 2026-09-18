@@ -34,7 +34,7 @@ app.use(cors());
 app.use(express.json());
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/clinicflow').then(async () => {
+mongoose.connect(process.env.MONGO_URI).then(async () => {
   console.log('MongoDB connected');
   console.log('Database:', mongoose.connection.name);
   console.log('Doctors count:', await mongoose.connection.collection('Doctors').countDocuments());

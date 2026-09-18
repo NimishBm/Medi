@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useDispatch } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { doctorAPI, queueAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
@@ -36,13 +36,26 @@ export const Marketplace = () => {
   const user = useSelector((state) => state.auth.user);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const [doctors, setDoctors] = useState([]);
   const [doctorQueueStats, setDoctorQueueStats] = useState({});
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(location.state?.search || '');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('relevant');
   const [loading, setLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState('Current Location');
+
+  // Handle category from route state
+  useEffect(() => {
+    if (location.state?.category) {
+      setSelectedCategory(location.state.category);
+      // Clear state after reading it
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    if (location.state?.search) {
+      setSearch(location.state.search);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -79,11 +92,14 @@ export const Marketplace = () => {
   const filteredAndSortedDoctors = useMemo(() => {
     let result = doctors;
 
-    // Filter by category
+    // Filter by category (can be category ID or specialization name)
     if (selectedCategory !== 'all') {
       const cat = CATEGORIES.find((c) => c.id === selectedCategory);
       if (cat?.specialization) {
         result = result.filter((d) => d.specialization === cat.specialization);
+      } else {
+        // Direct specialization match (from Landing component)
+        result = result.filter((d) => d.specialization === selectedCategory);
       }
     }
 
