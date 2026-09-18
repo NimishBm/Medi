@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-
 const doctorSchema = new mongoose.Schema(
   {
     name: {
@@ -28,11 +27,22 @@ const doctorSchema = new mongoose.Schema(
     },
 
     specialization: {
-      type: String,
-      required: true,
-      trim: true
-    },
+  type: String,
+  required: true,
+  trim: true
+},
 
+organizationIds: [
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization'
+  }
+],
+
+experience: {
+  type: Number,
+  required: true
+},
     experience: {
       type: Number,
       default: 0
@@ -160,18 +170,10 @@ const doctorSchema = new mongoose.Schema(
     timestamps: true
   }
 );
-
-doctorSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
-
 doctorSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
-
+// Hide password from API responses
 doctorSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;

@@ -91,4 +91,4 @@ patientSchema.methods.toJSON = function () {
   return obj;
 };
 
-export default mongoose.model('Patient', patientSchema);
+export default mongoose.model('Patient', patientSchema, 'Patients');
