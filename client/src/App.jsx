@@ -29,6 +29,7 @@ import { DoctorDashboard } from './pages/doctor/Dashboard';
 import { DoctorProfile } from './pages/doctor/Profile';
 import { DoctorQueue } from './pages/doctor/Queue';
 import { DoctorAppointments } from './pages/doctor/Appointments';
+import { SetupProfile } from './pages/doctor/SetupProfile';
 
 // Receptionist Pages
 import { ReceptionistDashboard } from './pages/receptionist/Dashboard';
@@ -184,6 +185,14 @@ export default function App() {
           />
 
           {/* Doctor Routes */}
+          <Route
+            path="/doctor/setup-profile"
+            element={
+              <ProtectedRoute requiredRoles={['DOCTOR']}>
+                <SetupProfile />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/doctor"
             element={

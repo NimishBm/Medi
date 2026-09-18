@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Sidebar } from '../../components/Sidebar';
+import { Navbar } from '../../components/Navbar';
 import { patientNav } from '../../components/PatientNav';
 import { prescriptionAPI } from '../../services/api';
 import toast from 'react-hot-toast';

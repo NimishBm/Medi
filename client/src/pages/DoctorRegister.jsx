@@ -35,9 +35,8 @@ export const DoctorRegister = () => {
     phone: '',
     password: '',
     specialization: '',
-    experience: '',
-    qualifications: '',
-    consultationFee: '',
+    licenseNumber: '',
+    officeLocation: '',
   });
 
   const handleChange = (e) => {
@@ -47,7 +46,7 @@ export const DoctorRegister = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.phone || !formData.password || !formData.specialization || !formData.experience || !formData.consultationFee) {
+    if (!formData.name || !formData.email || !formData.phone || !formData.password || !formData.specialization || !formData.licenseNumber) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -56,8 +55,8 @@ export const DoctorRegister = () => {
       setLoading(true);
       const response = await authAPI.registerDoctor(formData);
       dispatch(setUser({ user: response.data.user, token: response.data.token }));
-      toast.success('Registration successful!');
-      navigate('/doctor');
+      toast.success('Registration successful! Please complete your profile.');
+      navigate('/doctor/setup-profile');
     } catch (error) {
       const message = error.response?.data?.message || 'Registration failed';
       toast.error(message);
@@ -78,10 +77,10 @@ export const DoctorRegister = () => {
           <p className="text-blue-100 text-lg mb-12">for Doctors</p>
           <div className="space-y-6 text-sm text-blue-100">
             <p>Join our network of verified doctors and manage your clinic digitally.</p>
-            <ul className="space-y-2">
-              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-green-300 rounded-full"></span>Set your availability and consultation fee</li>
-              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-green-300 rounded-full"></span>Manage patient queue in real time</li>
-              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-green-300 rounded-full"></span>View and manage appointments</li>
+            <ul className="space-y-3">
+              <li className="flex items-start gap-2"><span className="w-1.5 h-1.5 bg-green-300 rounded-full mt-1.5 flex-shrink-0"></span><span>Complete your profile and set availability</span></li>
+              <li className="flex items-start gap-2"><span className="w-1.5 h-1.5 bg-green-300 rounded-full mt-1.5 flex-shrink-0"></span><span>Manage patient queue in real time</span></li>
+              <li className="flex items-start gap-2"><span className="w-1.5 h-1.5 bg-green-300 rounded-full mt-1.5 flex-shrink-0"></span><span>View and manage appointments</span></li>
             </ul>
           </div>
         </div>
@@ -97,7 +96,7 @@ export const DoctorRegister = () => {
             </div>
 
             <h2 className="text-3xl font-bold text-gray-900 mb-1">Doctor Registration</h2>
-            <p className="text-gray-600 mb-8">Create your clinic profile</p>
+            <p className="text-gray-600 mb-8">Create your account (Step 1 of 2)</p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -151,41 +150,26 @@ export const DoctorRegister = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Experience (years) *</label>
-                  <input
-                    type="number"
-                    name="experience"
-                    value={formData.experience}
-                    onChange={handleChange}
-                    placeholder="5"
-                    min="0"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Consultation Fee (₹) *</label>
-                  <input
-                    type="number"
-                    name="consultationFee"
-                    value={formData.consultationFee}
-                    onChange={handleChange}
-                    placeholder="500"
-                    min="0"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Medical License Number *</label>
+                <input
+                  type="text"
+                  name="licenseNumber"
+                  value={formData.licenseNumber}
+                  onChange={handleChange}
+                  placeholder="e.g., MCI12345"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Qualifications <span className="text-gray-400 font-normal">(comma separated)</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Office Location</label>
                 <input
                   type="text"
-                  name="qualifications"
-                  value={formData.qualifications}
+                  name="officeLocation"
+                  value={formData.officeLocation}
                   onChange={handleChange}
-                  placeholder="MBBS, MD, DNB"
+                  placeholder="e.g., Mumbai, Delhi"
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
@@ -216,7 +200,7 @@ export const DoctorRegister = () => {
                 disabled={loading}
                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2.5 rounded-lg font-bold transition-colors mt-2"
               >
-                {loading ? 'Registering...' : 'Create Account'}
+                {loading ? 'Registering...' : 'Continue'}
               </button>
             </form>
 

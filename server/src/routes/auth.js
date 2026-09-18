@@ -72,9 +72,9 @@ router.post(
 router.post(
   '/register/doctor',
   catchAsyncErrors(async (req, res) => {
-    const { name, email, phone, password, specialization, experience, qualifications, consultationFee } = req.body;
+    const { name, email, phone, password, specialization, licenseNumber, officeLocation, experience, qualifications, consultationFee } = req.body;
 
-    if (!name || !email || !phone || !password || !specialization || !experience || !consultationFee) {
+    if (!name || !email || !phone || !password || !specialization || !licenseNumber) {
       return res.status(400).json({ message: 'Please provide all required fields' });
     }
 
@@ -89,11 +89,13 @@ router.post(
       phone,
       password,
       specialization,
-      experience: Number(experience),
+      licenseNumber,
+      officeLocation,
+      experience: experience ? Number(experience) : 0,
       qualifications: qualifications
         ? (Array.isArray(qualifications) ? qualifications : qualifications.split(',').map(q => q.trim()).filter(Boolean))
         : [],
-      consultationFee: Number(consultationFee),
+      consultationFee: consultationFee ? Number(consultationFee) : 0,
     });
 
     await doctor.save();
