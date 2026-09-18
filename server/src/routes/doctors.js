@@ -140,7 +140,8 @@ router.put(
       'emergencyConsultation', 'waitingTime', 'patientsSeen', 'successRate', 'rating',
       'profilePhoto', 'breaks', 'bufferTime', 'maxPatientsPerDay', 'allowSameDayBooking',
       'minBookingNotice', 'clinicLocation', 'clinicName', 'clinicAddress', 'clinicCity',
-      'clinicPhone', 'availabilityStart', 'availabilityEnd', 'daysOff', 'consultationType'
+      'clinicPhone', 'availabilityStart', 'availabilityEnd', 'daysOff', 'consultationType',
+      'wpSiteUrl', 'wpUsername', 'wpAppPassword'
     ];
     const updateData = {};
 

@@ -112,4 +112,12 @@ export const analyticsAPI = {
   getClinicAnalytics: () => api.get('/analytics/clinic/overview'),
 };
 
+export const blogAPI = {
+  getPosts: () => api.get('/blog/posts'),
+  createPost: (data) => api.post('/blog/posts', data),
+  updatePost: (id, data) => api.put(`/blog/posts/${id}`, data),
+  deletePost: (id) => api.delete(`/blog/posts/${id}`),
+  getCategories: () => api.get('/blog/categories'),
+};
+
 export default api;

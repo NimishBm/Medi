@@ -19,6 +19,7 @@ import paymentRoutes from './routes/payments.js';
 import analyticsRoutes from './routes/analytics.js';
 import searchRoutes from './routes/search.js';
 import organizationRoutes from './routes/organizations.js';
+import blogRoutes from './routes/blog.js';
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -60,6 +61,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/organizations', organizationRoutes);
+app.use('/api/blog', blogRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK' });

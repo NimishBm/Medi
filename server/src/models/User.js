@@ -229,6 +229,24 @@ const userSchema = new mongoose.Schema(
       default: 0,
     },
 
+    // ==================================================
+    // WORDPRESS BLOG
+    // ==================================================
+
+    wpSiteUrl: {
+      type: String,
+      trim: true,
+    },
+
+    wpUsername: {
+      type: String,
+      trim: true,
+    },
+
+    wpAppPassword: {
+      type: String,
+      trim: true,
+    },
 
     // ==================================================
     // FAMILY MEMBERS
