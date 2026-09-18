@@ -1,110 +1,96 @@
 import express from 'express';
-import Consultation from '../models/Consultation.js';
-import Appointment from '../models/Appointment.js';
+import Doctor from '../models/Doctor.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
 const router = express.Router();
 
-// Create consultation
-router.post(
+// Get all doctors
+router.get(
   '/',
-  protect,
-  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
-    const { appointmentId, symptoms, diagnosis, notes, treatmentPlan, followUpDate } = req.body;
+    const doctors = await Doctor.find({ isActive: true }).select('-password');
 
-    if (!appointmentId) {
-      return res.status(400).json({ message: 'Appointment ID is required' });
-    }
-
-    const appointment = await Appointment.findById(appointmentId);
-    if (!appointment) {
-      return res.status(404).json({ message: 'Appointment not found' });
-    }
-
-    const consultation = new Consultation({
-      appointmentId,
-      patientId: appointment.patientId,
-      doctorId: appointment.doctorId,
-      symptoms,
-      diagnosis,
-      notes,
-      treatmentPlan,
-      followUpDate,
-    });
-
-    await consultation.save();
-
-    res.status(201).json({
-      message: 'Consultation created successfully',
-      consultation,
-    });
+    res.json(doctors);
   })
 );
 
-// Get consultations for patient
-router.get(
-  '/patient/:patientId',
-  protect,
-  catchAsyncErrors(async (req, res) => {
-    const consultations = await Consultation.find({ patientId: req.params.patientId })
-      .populate('doctorId', 'name specialization roomNumber')
-      .sort({ createdAt: -1 });
-
-    res.json(consultations);
-  })
-);
-
-// Get consultations for doctor
-router.get(
-  '/doctor/:doctorId',
-  protect,
-  catchAsyncErrors(async (req, res) => {
-    const consultations = await Consultation.find({ doctorId: req.params.doctorId })
-      .populate('patientId', 'name email phone gender dateOfBirth allergies')
-      .sort({ createdAt: -1 });
-
-    res.json(consultations);
-  })
-);
-
-// Get consultation by ID
+// Get doctor by ID
 router.get(
   '/:id',
-  protect,
   catchAsyncErrors(async (req, res) => {
-    const consultation = await Consultation.findById(req.params.id)
-      .populate('patientId', 'name email phone dateOfBirth')
-      .populate('doctorId', 'name specialization roomNumber');
+    const doctor = await Doctor.findById(req.params.id).select('-password');
 
-    if (!consultation) {
-      return res.status(404).json({ message: 'Consultation not found' });
+    if (!doctor) {
+      return res.status(404).json({
+        message: 'Doctor not found'
+      });
     }
 
-    res.json(consultation);
+    res.json(doctor);
   })
 );
 
-// Update consultation
+// Get doctor details (protected)
+router.get(
+  '/:id/details',
+  protect,
+  catchAsyncErrors(async (req, res) => {
+    const doctor = await Doctor.findById(req.params.id).select('-password');
+
+    if (!doctor) {
+      return res.status(404).json({
+        message: 'Doctor not found'
+      });
+    }
+
+    res.json(doctor);
+  })
+);
+
+// Update doctor's own profile
 router.put(
-  '/:id',
+  '/me',
   protect,
   authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
-    const consultation = await Consultation.findById(req.params.id);
+    const allowedFields = [
+      'specialization',
+      'consultationFee',
+      'roomNumber',
+      'qualifications',
+      'experience',
+      'availability',
+      'isActive',
+      'phone',
+      'clinicLocation',
+      'consultationType'
+    ];
 
-    if (!consultation) {
-      return res.status(404).json({ message: 'Consultation not found' });
+    const updateData = {};
+
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
+    const doctor = await Doctor.findByIdAndUpdate(
+      req.user.id,
+      updateData,
+      {
+        new: true,
+        runValidators: true
+      }
+    ).select('-password');
+
+    if (!doctor) {
+      return res.status(404).json({
+        message: 'Doctor not found'
+      });
     }
 
-    Object.assign(consultation, req.body);
-    await consultation.save();
-
-    res.json({
-      message: 'Consultation updated successfully',
-      consultation,
-    });
+    res.json(doctor.toJSON());
   })
 );
 
