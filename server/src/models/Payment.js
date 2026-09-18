@@ -7,42 +7,55 @@ const paymentSchema = new mongoose.Schema(
       ref: 'Appointment',
       required: true,
     },
+
     patientId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Patient',
       required: true,
     },
+
     doctorId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Doctor',
       required: true,
     },
+
     consultationFee: {
       type: Number,
       required: true,
     },
+
     additionalCharges: {
       type: Number,
       default: 0,
     },
+
     totalAmount: {
       type: Number,
       required: true,
     },
+
     paymentMethod: {
       type: String,
       enum: ['CASH', 'UPI', 'CARD'],
       required: true,
     },
+
     status: {
       type: String,
       enum: ['PENDING', 'PAID', 'REFUNDED'],
       default: 'PENDING',
     },
+
     paymentDate: Date,
     refundDate: Date,
     refundReason: String,
-    processedBy: mongoose.Schema.Types.ObjectId,
+
+    processedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Receptionist',
+    },
+
     notes: String,
   },
   {

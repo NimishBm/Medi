@@ -4,22 +4,26 @@ const appointmentSchema = new mongoose.Schema(
   {
     patientId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Patient',
       required: true,
     },
+
     doctorId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Doctor',
       required: true,
     },
+
     appointmentDate: {
       type: Date,
       required: true,
     },
+
     appointmentTime: {
       type: String,
       required: true,
     },
+
     status: {
       type: String,
       enum: [
@@ -35,16 +39,20 @@ const appointmentSchema = new mongoose.Schema(
       ],
       default: 'BOOKED',
     },
+
     tokenNumber: {
       type: Number,
       index: true,
     },
+
     notes: String,
     reason: String,
+
     priority: {
       type: Boolean,
       default: false,
     },
+
     priorityReason: String,
     priorityChangedBy: mongoose.Schema.Types.ObjectId,
     priorityChangedAt: Date,
@@ -52,15 +60,17 @@ const appointmentSchema = new mongoose.Schema(
     calledTime: Date,
     consultationStartTime: Date,
     consultationEndTime: Date,
+
     runningLate: {
       isLate: Boolean,
       estimatedDelay: Number,
       markedAt: Date,
     },
+
     bookedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
     },
+
     bookedFor: {
       name: String,
       relationship: String,
@@ -69,6 +79,7 @@ const appointmentSchema = new mongoose.Schema(
         default: false,
       },
     },
+
     appointmentType: {
       type: String,
       enum: [
@@ -89,7 +100,6 @@ const appointmentSchema = new mongoose.Schema(
   }
 );
 
-// Index for queries
 appointmentSchema.index({ patientId: 1, appointmentDate: 1 });
 appointmentSchema.index({ doctorId: 1, appointmentDate: 1 });
 appointmentSchema.index({ tokenNumber: 1, doctorId: 1, appointmentDate: 1 });
