@@ -75,6 +75,13 @@ router.put(
       'isActive',
       'phone',
       'clinicLocation',
+      'clinicName',
+      'clinicAddress',
+      'clinicCity',
+      'clinicPhone',
+      'availabilityStart',
+      'availabilityEnd',
+      'daysOff',
       'consultationType'
     ];
 
@@ -91,7 +98,7 @@ router.put(
       updateData,
       {
         new: true,
-        runValidators: true
+        runValidators: false
       }
     ).select('-password');
 

@@ -24,8 +24,10 @@ export const Appointments = () => {
       try {
         setIsLoading(true);
         const response = await appointmentAPI.getAppointments();
+        console.log('Appointments response:', response.data);
         setAppointments(response.data);
       } catch (error) {
+        console.error('Failed to load appointments:', error);
         toast.error('Failed to load appointments');
       } finally {
         setIsLoading(false);
@@ -181,6 +183,8 @@ export const Appointments = () => {
             {filteredAppointments.map((appointment) => {
               const aptDate = new Date(appointment.appointmentDate);
               const review = reviews[appointment._id] || { rating: 0, comment: '', submitted: false };
+              const doctorName = appointment.doctorId?.name || 'Doctor';
+              const doctorInitial = (appointment.doctorId?.name || '?').charAt(0);
 
               return (
                 <div key={appointment._id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden">
@@ -191,12 +195,12 @@ export const Appointments = () => {
                       {/* Doctor Header */}
                       <div className="flex items-start gap-3 mb-4">
                         <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-2xl font-bold text-white flex-shrink-0">
-                          {appointment.doctorId.name.charAt(0)}
+                          {doctorInitial}
                         </div>
                         <div className="flex-1">
-                          <h3 className="font-bold text-gray-900 text-base">Dr. {appointment.doctorId.name.replace(/^Dr\.?\s+/, '')}</h3>
-                          <p className="text-sm text-blue-600 font-semibold">{appointment.doctorId.specialization}</p>
-                          <p className="text-xs text-gray-600 mt-1">{appointment.doctorId.experience}y exp • ₹{appointment.doctorId.consultationFee}</p>
+                          <h3 className="font-bold text-gray-900 text-base">Dr. {doctorName.replace(/^Dr\.?\s+/, '')}</h3>
+                          {appointment.doctorId?.specialization && <p className="text-sm text-blue-600 font-semibold">{appointment.doctorId.specialization}</p>}
+                          {appointment.doctorId && <p className="text-xs text-gray-600 mt-1">{appointment.doctorId.experience}y exp • ₹{appointment.doctorId.consultationFee}</p>}
                         </div>
                       </div>
 
@@ -252,7 +256,7 @@ export const Appointments = () => {
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">Room</p>
-                            <p className="text-sm font-semibold text-gray-900">Room {appointment.doctorId.roomNumber}</p>
+                            <p className="text-sm font-semibold text-gray-900">Room {appointment.doctorId?.roomNumber || 'N/A'}</p>
                           </div>
                         </div>
 
