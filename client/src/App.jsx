@@ -24,10 +24,13 @@ import { History } from './pages/patient/History';
 import { Payments } from './pages/patient/Payments';
 
 // Doctor Pages
+import { DoctorLanding } from './pages/doctor/Landing';
 import { DoctorDashboard } from './pages/doctor/Dashboard';
 import { DoctorProfile } from './pages/doctor/Profile';
 import { DoctorQueue } from './pages/doctor/Queue';
 import { DoctorAppointments } from './pages/doctor/Appointments';
+import { DoctorPatients } from './pages/doctor/Patients';
+import { DoctorSchedule } from './pages/doctor/Schedule';
 
 // Receptionist Pages
 import { ReceptionistDashboard } from './pages/receptionist/Dashboard';
@@ -175,6 +178,10 @@ export default function App() {
 
           {/* Doctor Routes */}
           <Route
+            path="/doctor-landing"
+            element={<DoctorLanding />}
+          />
+          <Route
             path="/doctor"
             element={
               <ProtectedRoute requiredRoles={['DOCTOR']}>
@@ -203,6 +210,22 @@ export default function App() {
             element={
               <ProtectedRoute requiredRoles={['DOCTOR']}>
                 <DoctorAppointments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/patients"
+            element={
+              <ProtectedRoute requiredRoles={['DOCTOR']}>
+                <DoctorPatients />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/schedule"
+            element={
+              <ProtectedRoute requiredRoles={['DOCTOR']}>
+                <DoctorSchedule />
               </ProtectedRoute>
             }
           />

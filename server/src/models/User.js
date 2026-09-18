@@ -47,8 +47,11 @@ const userSchema = new mongoose.Schema(
     // Doctor specific fields
     specialization: String,
     consultationFee: Number,
+    videoConsultationFee: Number,
     roomNumber: String,
     qualifications: [String],
+    boardCertifications: [String],
+    specializations: [String],
     experience: Number,
     availability: {
       monday: { start: String, end: String },
@@ -63,9 +66,78 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 10,
     },
+    consultationDuration: {
+      type: Number,
+      default: 30,
+    },
+    waitingTime: {
+      type: Number,
+      default: 30,
+    },
     isActive: {
       type: Boolean,
       default: true,
+    },
+    onlineConsultation: {
+      type: Boolean,
+      default: true,
+    },
+    emergencyConsultation: {
+      type: Boolean,
+      default: false,
+    },
+    aboutMe: String,
+    treatments: [String],
+    languages: [String],
+    achievements: [String],
+    registrationNumber: String,
+    hospital: String,
+    address: String,
+    city: String,
+    state: String,
+    zipCode: String,
+    insurance: String,
+    website: String,
+    patientsSeen: {
+      type: Number,
+      default: 0,
+    },
+    successRate: {
+      type: Number,
+      default: 0,
+    },
+    rating: {
+      type: Number,
+      default: 0,
+    },
+    profilePhoto: {
+      type: String,
+      default: null,
+    },
+    breaks: [
+      {
+        id: Number,
+        day: String,
+        start: String,
+        end: String,
+        title: String,
+      },
+    ],
+    bufferTime: {
+      type: Number,
+      default: 0,
+    },
+    maxPatientsPerDay: {
+      type: Number,
+      default: null,
+    },
+    allowSameDayBooking: {
+      type: Boolean,
+      default: true,
+    },
+    minBookingNotice: {
+      type: Number,
+      default: 0,
     },
 
     // Family members (only for patients)

@@ -76,7 +76,17 @@ export const consultationAPI = {
 };
 
 export const doctorProfileAPI = {
+  getMe: () => api.get('/auth/me'),
   updateMe: (data) => api.put('/doctors/me', data),
+  uploadPhoto: (file) => {
+    const formData = new FormData();
+    formData.append('profilePhoto', file);
+    return api.post('/doctors/upload-photo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
 };
 
 export const prescriptionAPI = {

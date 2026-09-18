@@ -5,6 +5,8 @@ import 'express-async-errors';
 import http from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Routes
 import authRoutes from './routes/auth.js';
@@ -17,6 +19,9 @@ import paymentRoutes from './routes/payments.js';
 import analyticsRoutes from './routes/analytics.js';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
@@ -32,6 +37,9 @@ export const io = new Server(server, {
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/clinicflow').then(() => {
