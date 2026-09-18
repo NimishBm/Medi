@@ -300,6 +300,11 @@ export const Marketplace = () => {
                         {doctor.name.replace(/^Dr\.?\s+/, 'Dr. ')}
                       </h3>
                       <p className="text-xs text-blue-600 font-semibold mt-0.5">{doctor.specialization}</p>
+                      {doctor.organizationId && (
+                        <span className="inline-block mt-1 text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded font-medium">
+                          🏥 {doctor.organizationId.name}
+                        </span>
+                      )}
                     </div>
 
                     {/* Rating & Info */}

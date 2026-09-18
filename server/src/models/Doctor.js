@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 const doctorSchema = new mongoose.Schema(
   {
@@ -111,6 +112,27 @@ const doctorSchema = new mongoose.Schema(
       }
     },
 
+    // Organization membership
+    organizationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
+      default: null
+    },
+
+    // Tracks a pending join request to an org (before approval)
+    pendingOrgId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
+      default: null
+    },
+
+    // NONE = independent, PENDING = requested join, APPROVED = member
+    orgMembershipStatus: {
+      type: String,
+      enum: ['NONE', 'PENDING', 'APPROVED'],
+      default: 'NONE'
+    },
+
     isActive: {
       type: Boolean,
       default: true
@@ -120,6 +142,28 @@ const doctorSchema = new mongoose.Schema(
     timestamps: true
   }
 );
+
+// Hash password before saving
+doctorSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+doctorSchema.methods.comparePassword = async function (enteredPassword) {
+  // Support both bcrypt-hashed and plain text passwords already in the DB
+  const isHashed = this.password.startsWith('$2');
+  if (isHashed) {
+    return await bcrypt.compare(enteredPassword, this.password);
+  }
+  return enteredPassword === this.password;
+};
 
 // Hide password from API responses
 doctorSchema.methods.toJSON = function () {

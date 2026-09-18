@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-const receptionistSchema = new mongoose.Schema(
+const organizationSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -28,10 +28,16 @@ const receptionistSchema = new mongoose.Schema(
       minlength: 6
     },
 
-    assignedDoctorId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Doctor',
+    // Auto-generated unique org ID issued at registration e.g. "ORG-A1B2C3"
+    orgId: {
+      type: String,
+      unique: true,
       required: true
+    },
+
+    address: {
+      type: String,
+      trim: true
     },
 
     isActive: {
@@ -44,7 +50,7 @@ const receptionistSchema = new mongoose.Schema(
   }
 );
 
-receptionistSchema.pre('save', async function (next) {
+organizationSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
 
   try {
@@ -56,8 +62,7 @@ receptionistSchema.pre('save', async function (next) {
   }
 });
 
-receptionistSchema.methods.comparePassword = async function (enteredPassword) {
-  // Support both bcrypt-hashed and plain text passwords already in the DB
+organizationSchema.methods.comparePassword = async function (enteredPassword) {
   const isHashed = this.password.startsWith('$2');
   if (isHashed) {
     return await bcrypt.compare(enteredPassword, this.password);
@@ -65,11 +70,10 @@ receptionistSchema.methods.comparePassword = async function (enteredPassword) {
   return enteredPassword === this.password;
 };
 
-receptionistSchema.methods.toJSON = function () {
+organizationSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
   return obj;
 };
 
-// IMPORTANT: use the existing Atlas collection "Receptionist"
-export default mongoose.model('Receptionist', receptionistSchema, 'Receptionist');
+export default mongoose.model('Organization', organizationSchema);

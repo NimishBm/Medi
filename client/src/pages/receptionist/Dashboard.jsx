@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { Sidebar } from '../../components/Sidebar';
 import { Navbar } from '../../components/Navbar';
 import { analyticsAPI, appointmentAPI } from '../../services/api';
@@ -11,6 +12,9 @@ const receptionistNav = [
 ];
 
 export const ReceptionistDashboard = () => {
+  const { user } = useSelector((state) => state.auth);
+  const assignedDoctor = user?.assignedDoctorId;
+  const doctorName = typeof assignedDoctor === 'object' ? assignedDoctor?.name : null;
   const [analytics, setAnalytics] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,6 +47,13 @@ export const ReceptionistDashboard = () => {
       <div className="flex-1 flex flex-col">
         <Navbar title="Clinic Dashboard" />
         <div className="p-8">
+          {doctorName && (
+            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <p className="text-sm text-emerald-800">
+                Managing appointments for: <span className="font-bold">Dr. {doctorName}</span>
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
             <div className="card border-l-4 border-blue-600">
               <h3 className="text-sm font-medium text-gray-600 mb-1">Total Today</h3>

@@ -6,6 +6,10 @@ import { Toaster } from 'react-hot-toast';
 import { Register } from './pages/Register';
 import { PatientLogin } from './pages/PatientLogin';
 import { DoctorLogin } from './pages/DoctorLogin';
+import { ReceptionistLogin } from './pages/ReceptionistLogin';
+import { OrganizationLogin } from './pages/OrganizationLogin';
+import { OrgRegister } from './pages/OrgRegister';
+import { OrgDashboard } from './pages/org/OrgDashboard';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { authAPI } from './services/api';
 import { setUser } from './store/slices/authSlice';
@@ -67,6 +71,9 @@ export default function App() {
           <Route path="/login" element={<Navigate to="/login/patient" replace />} />
           <Route path="/login/patient" element={<PatientLogin />} />
           <Route path="/login/doctor" element={<DoctorLogin />} />
+          <Route path="/login/receptionist" element={<ReceptionistLogin />} />
+          <Route path="/login/organization" element={<OrganizationLogin />} />
+          <Route path="/register/organization" element={<OrgRegister />} />
           <Route path="/register" element={<Register />} />
 
           {/* Display Routes */}
@@ -233,6 +240,24 @@ export default function App() {
             element={
               <ProtectedRoute requiredRoles={['RECEPTIONIST']}>
                 <ReceptionistQueue />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Organization Routes */}
+          <Route
+            path="/org"
+            element={
+              <ProtectedRoute requiredRoles={['ORGANIZATION']}>
+                <OrgDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/org/*"
+            element={
+              <ProtectedRoute requiredRoles={['ORGANIZATION']}>
+                <OrgDashboard />
               </ProtectedRoute>
             }
           />

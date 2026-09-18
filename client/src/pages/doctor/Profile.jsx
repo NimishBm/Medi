@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Sidebar } from '../../components/Sidebar';
 import { Navbar } from '../../components/Navbar';
-import { doctorProfileAPI } from '../../services/api';
+import { doctorProfileAPI, doctorOrgAPI } from '../../services/api';
 import { setUser } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 
@@ -21,6 +21,8 @@ export const DoctorProfile = () => {
   const dispatch = useDispatch();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newQualification, setNewQualification] = useState('');
+  const [orgIdInput, setOrgIdInput] = useState('');
+  const [orgRequestLoading, setOrgRequestLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     specialization: user?.specialization || '',
@@ -285,6 +287,87 @@ export const DoctorProfile = () => {
               </a>
             </div>
           </form>
+
+          {/* Organization Membership Panel */}
+          <div className="card mt-8">
+            <h2 className="text-xl font-bold text-gray-900 mb-1">Organization Membership</h2>
+
+            {user?.orgMembershipStatus === 'APPROVED' && (
+              <div className="mt-3 p-4 bg-violet-50 border border-violet-200 rounded-lg">
+                <p className="text-sm font-medium text-violet-800">
+                  ✅ You are a member of <span className="font-bold">{user?.organizationId?.name || 'an organization'}</span>
+                </p>
+                <p className="text-xs text-violet-600 mt-1">
+                  Org ID: {user?.organizationId?.orgId}
+                </p>
+              </div>
+            )}
+
+            {user?.orgMembershipStatus === 'PENDING' && (
+              <div className="mt-3 p-4 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-orange-800">⏳ Join request pending approval</p>
+                  <p className="text-xs text-orange-600 mt-1">Waiting for the organization to approve your request.</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      setOrgRequestLoading(true);
+                      await doctorOrgAPI.cancelRequest();
+                      toast.success('Join request cancelled');
+                      dispatch(setUser({ user: { ...user, orgMembershipStatus: 'NONE', pendingOrgId: null }, token }));
+                    } catch {
+                      toast.error('Failed to cancel request');
+                    } finally {
+                      setOrgRequestLoading(false);
+                    }
+                  }}
+                  disabled={orgRequestLoading}
+                  className="text-sm text-red-600 border border-red-300 px-3 py-1.5 rounded-lg hover:bg-red-50"
+                >
+                  Cancel Request
+                </button>
+              </div>
+            )}
+
+            {(!user?.orgMembershipStatus || user?.orgMembershipStatus === 'NONE') && (
+              <div className="mt-3">
+                <p className="text-sm text-gray-600 mb-3">
+                  Enter your organization's Org ID to request membership. The organization will review and approve your request.
+                </p>
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={orgIdInput}
+                    onChange={(e) => setOrgIdInput(e.target.value.toUpperCase())}
+                    placeholder="ORG-XXXXXX"
+                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm font-mono"
+                  />
+                  <button
+                    type="button"
+                    disabled={orgRequestLoading || !orgIdInput}
+                    onClick={async () => {
+                      try {
+                        setOrgRequestLoading(true);
+                        const res = await doctorOrgAPI.requestJoin(orgIdInput);
+                        toast.success(res.data.message);
+                        dispatch(setUser({ user: { ...user, orgMembershipStatus: 'PENDING' }, token }));
+                        setOrgIdInput('');
+                      } catch (error) {
+                        toast.error(error.response?.data?.message || 'Failed to send request');
+                      } finally {
+                        setOrgRequestLoading(false);
+                      }
+                    }}
+                    className="px-4 py-2.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:bg-gray-400 text-sm font-medium"
+                  >
+                    {orgRequestLoading ? 'Sending...' : 'Request to Join'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
     </div>

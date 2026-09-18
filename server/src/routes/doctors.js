@@ -1,5 +1,6 @@
 import express from 'express';
 import Doctor from '../models/Doctor.js';
+import Organization from '../models/Organization.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
@@ -9,7 +10,9 @@ const router = express.Router();
 router.get(
   '/',
   catchAsyncErrors(async (req, res) => {
-    const doctors = await Doctor.find({ isActive: true }).select('-password');
+    const doctors = await Doctor.find({ isActive: true })
+      .select('-password')
+      .populate('organizationId', 'name orgId');
     res.json(doctors);
   })
 );
@@ -102,6 +105,65 @@ router.put(
     }
 
     res.json(doctor.toJSON());
+  })
+);
+
+// Doctor requests to join an org using the orgId code
+router.post(
+  '/me/request-join',
+  protect,
+  authorize('DOCTOR'),
+  catchAsyncErrors(async (req, res) => {
+    const { orgId } = req.body;
+
+    if (!orgId) {
+      return res.status(400).json({ message: 'Please provide an orgId' });
+    }
+
+    const doctor = await Doctor.findById(req.user.id);
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor not found' });
+    }
+
+    if (doctor.orgMembershipStatus === 'APPROVED') {
+      return res.status(400).json({ message: 'You are already a member of an organization' });
+    }
+
+    if (doctor.orgMembershipStatus === 'PENDING') {
+      return res.status(400).json({ message: 'You already have a pending join request' });
+    }
+
+    const org = await Organization.findOne({ orgId });
+    if (!org) {
+      return res.status(404).json({ message: 'Organization not found. Please check the Org ID.' });
+    }
+
+    doctor.pendingOrgId = org._id;
+    doctor.orgMembershipStatus = 'PENDING';
+    await doctor.save();
+
+    res.json({ message: `Join request sent to ${org.name}. Awaiting approval.` });
+  })
+);
+
+// Doctor cancels their pending join request
+router.delete(
+  '/me/request-join',
+  protect,
+  authorize('DOCTOR'),
+  catchAsyncErrors(async (req, res) => {
+    const doctor = await Doctor.findById(req.user.id);
+    if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+
+    if (doctor.orgMembershipStatus !== 'PENDING') {
+      return res.status(400).json({ message: 'No pending request to cancel' });
+    }
+
+    doctor.pendingOrgId = null;
+    doctor.orgMembershipStatus = 'NONE';
+    await doctor.save();
+
+    res.json({ message: 'Join request cancelled' });
   })
 );
 

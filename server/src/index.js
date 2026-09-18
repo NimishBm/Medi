@@ -16,6 +16,8 @@ import prescriptionRoutes from './routes/prescriptions.js';
 import paymentRoutes from './routes/payments.js';
 import analyticsRoutes from './routes/analytics.js';
 import searchRoutes from './routes/search.js';
+import organizationRoutes from './routes/organization.js';
+import orgManagementRoutes from './routes/orgManagement.js';
 dotenv.config();
 console.log('Mongo URI loaded:', !!process.env.MONGO_URI);
 const app = express();
@@ -38,6 +40,8 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/clinicflow'
   console.log('MongoDB connected');
   console.log('Database:', mongoose.connection.name);
   console.log('Doctors count:', await mongoose.connection.collection('Doctors').countDocuments());
+  console.log('Patients count:', await mongoose.connection.collection('Patients').countDocuments());
+  console.log('Receptionist count:', await mongoose.connection.collection('Receptionist').countDocuments());
 });
 // Routes
 app.use('/api/auth', authRoutes);
@@ -49,6 +53,8 @@ app.use('/api/prescriptions', prescriptionRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/organization', organizationRoutes);
+app.use('/api/org', orgManagementRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK' });

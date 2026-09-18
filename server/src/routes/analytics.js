@@ -24,6 +24,8 @@ router.get(
 
     if (req.user.role === 'DOCTOR') {
       filter.doctorId = req.user.id;
+    } else if (req.user.role === 'RECEPTIONIST' && req.user.assignedDoctorId) {
+      filter.doctorId = req.user.assignedDoctorId;
     }
 
     const appointments = await Appointment.find(filter);
@@ -94,14 +96,24 @@ router.get(
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const todayAppointments = await Appointment.find({
+    const appointmentFilter = {
       appointmentDate: { $gte: today, $lt: tomorrow },
-    });
+    };
+    if (req.user.assignedDoctorId) {
+      appointmentFilter.doctorId = req.user.assignedDoctorId;
+    }
 
-    const payments = await Payment.find({
+    const todayAppointments = await Appointment.find(appointmentFilter);
+
+    const paymentFilter = {
       createdAt: { $gte: today, $lt: tomorrow },
       status: 'PAID',
-    });
+    };
+    if (req.user.assignedDoctorId) {
+      paymentFilter.doctorId = req.user.assignedDoctorId;
+    }
+
+    const payments = await Payment.find(paymentFilter);
 
     res.json({
       totalAppointmentsToday: todayAppointments.length,

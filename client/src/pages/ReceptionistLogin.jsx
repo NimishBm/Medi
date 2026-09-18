@@ -6,7 +6,7 @@ import { setUser } from '../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import { Heart, CheckCircle } from 'lucide-react';
 
-export const DoctorLogin = () => {
+export const ReceptionistLogin = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -25,14 +25,14 @@ export const DoctorLogin = () => {
       const response = await authAPI.login({ email, password });
       const { user, token } = response.data;
 
-      if (user.role !== 'DOCTOR') {
-        toast.error('Access denied. Doctor credentials required.');
+      if (user.role !== 'RECEPTIONIST') {
+        toast.error('Access denied. Receptionist credentials required.');
         return;
       }
 
       dispatch(setUser({ user, token }));
       toast.success('Login successful!');
-      navigate('/doctor');
+      navigate('/receptionist');
     } catch (error) {
       const message = error.response?.data?.message || 'Login failed';
       toast.error(message);
@@ -45,33 +45,33 @@ export const DoctorLogin = () => {
     <div className="min-h-screen bg-white">
       <div className="grid grid-cols-1 md:grid-cols-2 h-screen">
         {/* Left Panel - Branding */}
-        <div className="hidden md:flex flex-col justify-center items-start p-12 bg-gradient-to-br from-slate-800 via-slate-700 to-blue-800 text-white">
+        <div className="hidden md:flex flex-col justify-center items-start p-12 bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 text-white">
           <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center mb-6">
             <Heart className="text-white" size={28} strokeWidth={2.5} />
           </div>
           <h1 className="text-4xl font-bold mb-1">ClinicFlow</h1>
-          <p className="text-blue-100 text-lg mb-12">for Doctors</p>
+          <p className="text-emerald-100 text-lg mb-12">for Receptionists</p>
 
           <div className="space-y-4">
             <div className="flex items-start gap-3">
               <CheckCircle size={20} className="text-green-300 mt-1 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-base">View Appointments</p>
-                <p className="text-blue-100 text-sm">See all scheduled patient consultations</p>
+                <p className="font-semibold text-base">Manage Appointments</p>
+                <p className="text-emerald-100 text-sm">Check in patients and manage bookings for your doctor</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <CheckCircle size={20} className="text-green-300 mt-1 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-base">Manage Patient Queue</p>
-                <p className="text-blue-100 text-sm">Track and manage real-time patient queue</p>
+                <p className="font-semibold text-base">Monitor Queue</p>
+                <p className="text-emerald-100 text-sm">Track real-time patient queue for your assigned doctor</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <CheckCircle size={20} className="text-green-300 mt-1 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-base">Update Your Schedule</p>
-                <p className="text-blue-100 text-sm">Set availability and manage your clinic hours</p>
+                <p className="font-semibold text-base">View Daily Overview</p>
+                <p className="text-emerald-100 text-sm">See today's stats, revenue, and appointment status</p>
               </div>
             </div>
           </div>
@@ -82,14 +82,14 @@ export const DoctorLogin = () => {
           <div className="w-full max-w-sm">
             {/* Mobile Logo */}
             <div className="md:hidden flex items-center gap-2 mb-8">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center">
                 <Heart className="text-white" size={22} strokeWidth={2.5} />
               </div>
               <h1 className="text-2xl font-bold text-gray-900">ClinicFlow</h1>
             </div>
 
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Doctor Login</h2>
-            <p className="text-gray-600 mb-8">Manage your clinic and patients</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Receptionist Login</h2>
+            <p className="text-gray-600 mb-8">Manage your doctor's appointments and queue</p>
 
             <form onSubmit={handleLogin} className="space-y-4">
               {/* Email */}
@@ -99,8 +99,8 @@ export const DoctorLogin = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="doctor@clinic.com"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="receptionist@clinic.com"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
                 />
               </div>
 
@@ -112,7 +112,7 @@ export const DoctorLogin = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
                 />
               </div>
 
@@ -120,22 +120,22 @@ export const DoctorLogin = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2.5 rounded-lg font-bold transition-colors mt-6"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white py-2.5 rounded-lg font-bold transition-colors mt-6"
               >
                 {loading ? 'Logging in...' : 'Login'}
               </button>
             </form>
 
             {/* Links */}
-            <div className="mt-6 space-y-3 text-center">
+            <div className="mt-6 space-y-2 text-center">
               <p className="text-gray-500 text-xs">
                 <Link to="/login/patient" className="text-blue-600 hover:text-blue-700 font-medium">
-                  Are you a patient? Login here →
+                  Patient Login →
                 </Link>
               </p>
               <p className="text-gray-500 text-xs">
-                <Link to="/login/receptionist" className="text-emerald-600 hover:text-emerald-700 font-medium">
-                  Are you a receptionist? Login here →
+                <Link to="/login/doctor" className="text-blue-600 hover:text-blue-700 font-medium">
+                  Doctor Login →
                 </Link>
               </p>
             </div>

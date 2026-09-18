@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { Sidebar } from '../../components/Sidebar';
 import { Navbar } from '../../components/Navbar';
-import { queueAPI, doctorAPI } from '../../services/api';
+import { queueAPI } from '../../services/api';
 import { initSocket } from '../../services/socket';
 import toast from 'react-hot-toast';
 
@@ -11,31 +12,19 @@ const receptionistNav = [
 ];
 
 export const ReceptionistQueue = () => {
-  const [doctors, setDoctors] = useState([]);
-  const [selectedDoctorId, setSelectedDoctorId] = useState('');
+  const { user } = useSelector((state) => state.auth);
+  const assignedDoctor = user?.assignedDoctorId;
+  const [selectedDoctorId] = useState(
+    typeof assignedDoctor === 'object' ? assignedDoctor?._id : assignedDoctor
+  );
   const [queue, setQueue] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchDoctors = async () => {
-      try {
-        const response = await doctorAPI.getDoctors();
-        setDoctors(response.data);
-        if (response.data.length > 0) {
-          setSelectedDoctorId(response.data[0]._id);
-        }
-      } catch (error) {
-        toast.error('Failed to load doctors');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchDoctors();
-  }, []);
-
-  useEffect(() => {
-    if (!selectedDoctorId) return;
+    if (!selectedDoctorId) {
+      setIsLoading(false);
+      return;
+    }
 
     const fetchQueue = async () => {
       try {
@@ -43,6 +32,8 @@ export const ReceptionistQueue = () => {
         setQueue(response.data.queue);
       } catch (error) {
         toast.error('Failed to load queue');
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -75,7 +66,9 @@ export const ReceptionistQueue = () => {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
 
-  const selectedDoctor = doctors.find((d) => d._id === selectedDoctorId);
+  const doctorName = typeof assignedDoctor === 'object'
+    ? assignedDoctor?.name
+    : 'Assigned Doctor';
 
   return (
     <div className="flex bg-gray-100 min-h-screen">
@@ -84,21 +77,12 @@ export const ReceptionistQueue = () => {
         <Navbar title="Queue Management" />
         <div className="p-8">
           <div className="card mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select Doctor</label>
-            <select
-              value={selectedDoctorId}
-              onChange={(e) => setSelectedDoctorId(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-            >
-              {doctors.map((doctor) => (
-                <option key={doctor._id} value={doctor._id}>
-                  Dr. {doctor.name} - {doctor.specialization} (Room {doctor.roomNumber})
-                </option>
-              ))}
-            </select>
+            <p className="text-sm font-medium text-gray-700">
+              Showing queue for: <span className="font-bold text-gray-900">Dr. {doctorName}</span>
+            </p>
           </div>
 
-          {selectedDoctor && (
+          {selectedDoctorId && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div className="card border-l-4 border-blue-600">

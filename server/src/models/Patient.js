@@ -82,7 +82,12 @@ patientSchema.pre('save', async function (next) {
 });
 
 patientSchema.methods.comparePassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  // Support both bcrypt-hashed and plain text passwords already in the DB
+  const isHashed = this.password.startsWith('$2');
+  if (isHashed) {
+    return await bcrypt.compare(enteredPassword, this.password);
+  }
+  return enteredPassword === this.password;
 };
 
 patientSchema.methods.toJSON = function () {
@@ -91,4 +96,5 @@ patientSchema.methods.toJSON = function () {
   return obj;
 };
 
-export default mongoose.model('Patient', patientSchema);
+// IMPORTANT: use the existing Atlas collection "Patients"
+export default mongoose.model('Patient', patientSchema, 'Patients');

@@ -83,6 +83,8 @@ router.get(
       filter = { $or: [{ patientId: req.user.id }, { bookedBy: req.user.id }] };
     } else if (req.user.role === 'DOCTOR') {
       filter.doctorId = req.user.id;
+    } else if (req.user.role === 'RECEPTIONIST' && req.user.assignedDoctorId) {
+      filter.doctorId = req.user.assignedDoctorId;
     }
 
     const appointments = await Appointment.find(filter)
@@ -112,6 +114,8 @@ router.get(
 
     if (req.user.role === 'DOCTOR') {
       filter.doctorId = req.user.id;
+    } else if (req.user.role === 'RECEPTIONIST' && req.user.assignedDoctorId) {
+      filter.doctorId = req.user.assignedDoctorId;
     }
 
     const appointments = await Appointment.find(filter)

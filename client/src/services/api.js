@@ -22,10 +22,13 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Only force-redirect on 401 for protected routes, not login/register calls
+    const url = error.config?.url || '';
+    const isAuthCall = url.includes('/auth/login') || url.includes('/auth/register');
+    if (error.response?.status === 401 && !isAuthCall) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      window.location.href = '/login/patient';
     }
     return Promise.reject(error);
   }
@@ -33,6 +36,7 @@ api.interceptors.response.use(
 
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
+  registerDoctor: (data) => api.post('/auth/register/doctor', data),
   login: (data) => api.post('/auth/login', data),
   getMe: () => api.get('/auth/me'),
 };
@@ -90,6 +94,28 @@ export const paymentAPI = {
   getPaymentsByPatient: (patientId) => api.get(`/payments/patient/${patientId}`),
   getPaymentById: (id) => api.get(`/payments/${id}`),
   refundPayment: (id, data) => api.post(`/payments/${id}/refund`, data),
+};
+
+export const organizationAPI = {
+  register: (data) => api.post('/organization/register', data),
+  login: (data) => api.post('/organization/login', data),
+  getMe: () => api.get('/organization/me'),
+  // approved doctors
+  getDoctors: () => api.get('/org/doctors'),
+  addDoctor: (doctorId) => api.post(`/org/doctors/${doctorId}`),
+  removeDoctor: (doctorId) => api.delete(`/org/doctors/${doctorId}`),
+  // join requests
+  getRequests: () => api.get('/org/requests'),
+  approveRequest: (doctorId) => api.post(`/org/requests/${doctorId}/approve`),
+  rejectRequest: (doctorId) => api.post(`/org/requests/${doctorId}/reject`),
+  // data
+  getTodayAppointments: () => api.get('/org/appointments/today'),
+  getAnalytics: () => api.get('/org/analytics'),
+};
+
+export const doctorOrgAPI = {
+  requestJoin: (orgId) => api.post('/doctors/me/request-join', { orgId }),
+  cancelRequest: () => api.delete('/doctors/me/request-join'),
 };
 
 export const analyticsAPI = {

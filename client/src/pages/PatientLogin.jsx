@@ -23,7 +23,14 @@ export const PatientLogin = () => {
     try {
       setLoading(true);
       const response = await authAPI.login({ email, password });
-      dispatch(setUser({ user: response.data.user, token: response.data.token }));
+      const { user, token } = response.data;
+
+      if (user.role !== 'PATIENT') {
+        toast.error('Access denied. Patient credentials required.');
+        return;
+      }
+
+      dispatch(setUser({ user, token }));
       toast.success('Login successful!');
       navigate('/patient');
     } catch (error) {
@@ -130,6 +137,16 @@ export const PatientLogin = () => {
               <p className="text-gray-500 text-xs">
                 <Link to="/login/doctor" className="text-blue-600 hover:text-blue-700 font-medium">
                   Are you a doctor? Login here →
+                </Link>
+              </p>
+              <p className="text-gray-500 text-xs">
+                <Link to="/login/receptionist" className="text-emerald-600 hover:text-emerald-700 font-medium">
+                  Are you a receptionist? Login here →
+                </Link>
+              </p>
+              <p className="text-gray-500 text-xs">
+                <Link to="/login/organization" className="text-violet-600 hover:text-violet-700 font-medium">
+                  Organization Login →
                 </Link>
               </p>
             </div>

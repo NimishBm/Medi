@@ -3,21 +3,22 @@ import jwt from 'jsonwebtoken';
 import Patient from '../models/Patient.js';
 import Doctor from '../models/Doctor.js';
 import Receptionist from '../models/Receptionist.js';
+import Organization from '../models/Organization.js';
 import { protect } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
 const router = express.Router();
 
 const generateToken = (user, role) => {
-  return jwt.sign(
-    {
-      id: user._id,
-      role,
-      email: user.email
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+  const payload = {
+    id: user._id,
+    role,
+    email: user.email
+  };
+  if (role === 'RECEPTIONIST' && user.assignedDoctorId) {
+    payload.assignedDoctorId = user.assignedDoctorId;
+  }
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
 
 // REGISTER PATIENT
@@ -68,6 +69,57 @@ router.post(
   })
 );
 
+// REGISTER DOCTOR
+router.post(
+  '/register/doctor',
+  catchAsyncErrors(async (req, res) => {
+    const {
+      name,
+      email,
+      phone,
+      password,
+      specialization,
+      experience,
+      qualifications,
+      consultationFee,
+      roomNumber,
+      clinicLocation
+    } = req.body;
+
+    if (!name || !email || !phone || !password || !specialization || !experience || !consultationFee) {
+      return res.status(400).json({ message: 'Please provide all required fields' });
+    }
+
+    const existing = await Doctor.findOne({ email });
+    if (existing) {
+      return res.status(400).json({ message: 'Doctor already exists with this email' });
+    }
+
+    const doctor = new Doctor({
+      name,
+      email,
+      phone,
+      password,
+      specialization,
+      experience: Number(experience),
+      qualifications: qualifications || [],
+      consultationFee: Number(consultationFee),
+      roomNumber,
+      clinicLocation
+    });
+
+    await doctor.save();
+
+    const token = generateToken(doctor, 'DOCTOR');
+
+    res.status(201).json({
+      message: 'Doctor registered successfully',
+      token,
+      user: { ...doctor.toJSON(), role: 'DOCTOR' }
+    });
+  })
+);
+
 // LOGIN
 router.post(
   '/login',
@@ -85,6 +137,7 @@ router.post(
 
     // Check PATIENT
     user = await Patient.findOne({ email });
+    console.log(`[LOGIN] Patient lookup for "${email}":`, user ? `found (_id: ${user._id})` : 'not found');
 
     if (user) {
       role = 'PATIENT';
@@ -93,6 +146,7 @@ router.post(
     // Check DOCTOR
     if (!user) {
       user = await Doctor.findOne({ email });
+      console.log(`[LOGIN] Doctor lookup for "${email}":`, user ? `found (_id: ${user._id})` : 'not found');
 
       if (user) {
         role = 'DOCTOR';
@@ -101,7 +155,8 @@ router.post(
 
     // Check RECEPTIONIST
     if (!user) {
-      user = await Receptionist.findOne({ email });
+      user = await Receptionist.findOne({ email }).populate('assignedDoctorId', 'name specialization roomNumber');
+      console.log(`[LOGIN] Receptionist lookup for "${email}":`, user ? `found (_id: ${user._id})` : 'not found');
 
       if (user) {
         role = 'RECEPTIONIST';
@@ -109,12 +164,14 @@ router.post(
     }
 
     if (!user) {
+      console.log(`[LOGIN] No user found in any collection for "${email}"`);
       return res.status(401).json({
         message: 'Invalid email or password'
       });
     }
 
     const isPasswordValid = await user.comparePassword(password);
+    console.log(`[LOGIN] Password check for "${email}" (role: ${role}):`, isPasswordValid ? 'valid' : 'INVALID');
 
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -147,7 +204,9 @@ router.get(
     } else if (req.user.role === 'DOCTOR') {
       user = await Doctor.findById(req.user.id);
     } else if (req.user.role === 'RECEPTIONIST') {
-      user = await Receptionist.findById(req.user.id);
+      user = await Receptionist.findById(req.user.id).populate('assignedDoctorId', 'name specialization roomNumber');
+    } else if (req.user.role === 'ORGANIZATION') {
+      user = await Organization.findById(req.user.id);
     }
 
     if (!user) {
