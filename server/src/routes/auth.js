@@ -68,6 +68,46 @@ router.post(
   })
 );
 
+// REGISTER DOCTOR
+router.post(
+  '/register/doctor',
+  catchAsyncErrors(async (req, res) => {
+    const { name, email, phone, password, specialization, experience, qualifications, consultationFee } = req.body;
+
+    if (!name || !email || !phone || !password || !specialization || !experience || !consultationFee) {
+      return res.status(400).json({ message: 'Please provide all required fields' });
+    }
+
+    const existingDoctor = await Doctor.findOne({ email });
+    if (existingDoctor) {
+      return res.status(400).json({ message: 'Doctor already exists with this email' });
+    }
+
+    const doctor = new Doctor({
+      name,
+      email,
+      phone,
+      password,
+      specialization,
+      experience: Number(experience),
+      qualifications: qualifications
+        ? (Array.isArray(qualifications) ? qualifications : qualifications.split(',').map(q => q.trim()).filter(Boolean))
+        : [],
+      consultationFee: Number(consultationFee),
+    });
+
+    await doctor.save();
+
+    const token = generateToken(doctor, 'DOCTOR');
+
+    res.status(201).json({
+      message: 'Doctor registered successfully',
+      token,
+      user: { ...doctor.toJSON(), role: 'DOCTOR' },
+    });
+  })
+);
+
 // LOGIN
 router.post(
   '/login',

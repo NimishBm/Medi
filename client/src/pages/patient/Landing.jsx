@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { logout } from '../../store/slices/authSlice';
 import {
   Search,
@@ -54,12 +54,12 @@ export const Landing = () => {
     const targetRoute = user ? '/patient/marketplace' : '/marketplace';
     navigate(targetRoute);
   };
-  
-  
-  
-  if (user && user.role !== 'PATIENT') {
-    return <Navigate to={user.role === 'DOCTOR' ? '/doctor' : '/receptionist'} replace />;
-  }
+
+  useEffect(() => {
+    if (user && user.role !== 'PATIENT') {
+      navigate(user.role === 'DOCTOR' ? '/doctor' : '/receptionist', { replace: true });
+    }
+  }, [user, navigate]);
 
   return (
     <div className="min-h-screen bg-white">

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast';
 import { Register } from './pages/Register';
 import { PatientLogin } from './pages/PatientLogin';
 import { DoctorLogin } from './pages/DoctorLogin';
+import { DoctorRegister } from './pages/DoctorRegister';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { authAPI } from './services/api';
 import { setUser } from './store/slices/authSlice';
@@ -40,9 +41,11 @@ import { WaitingRoomDisplay } from './pages/WaitingRoomDisplay';
 export default function App() {
   const dispatch = useDispatch();
   const { user, token } = useSelector((state) => state.auth);
+  const fetchingRef = useRef(false);
 
   useEffect(() => {
-    if (token && !user) {
+    if (token && !user && !fetchingRef.current) {
+      fetchingRef.current = true;
       const fetchUser = async () => {
         try {
           const response = await authAPI.getMe();
@@ -52,11 +55,13 @@ export default function App() {
           }));
         } catch (error) {
           console.error('Failed to fetch user', error);
+        } finally {
+          fetchingRef.current = false;
         }
       };
       fetchUser();
     }
-  }, [token, user, dispatch]);
+  }, [token, dispatch]);
 
   return (
     <>
@@ -67,6 +72,7 @@ export default function App() {
           <Route path="/login" element={<Navigate to="/login/patient" replace />} />
           <Route path="/login/patient" element={<PatientLogin />} />
           <Route path="/login/doctor" element={<DoctorLogin />} />
+          <Route path="/register/doctor" element={<DoctorRegister />} />
           <Route path="/register" element={<Register />} />
 
           {/* Display Routes */}
