@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-
+import bcrypt from 'bcryptjs';
 const doctorSchema = new mongoose.Schema(
   {
     name: {
@@ -27,11 +27,22 @@ const doctorSchema = new mongoose.Schema(
     },
 
     specialization: {
-      type: String,
-      required: true,
-      trim: true
-    },
+  type: String,
+  required: true,
+  trim: true
+},
 
+organizationIds: [
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization'
+  }
+],
+
+experience: {
+  type: Number,
+  required: true
+},
     experience: {
       type: Number,
       required: true
@@ -120,7 +131,9 @@ const doctorSchema = new mongoose.Schema(
     timestamps: true
   }
 );
-
+doctorSchema.methods.comparePassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
 // Hide password from API responses
 doctorSchema.methods.toJSON = function () {
   const obj = this.toObject();

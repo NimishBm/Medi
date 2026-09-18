@@ -1,9 +1,13 @@
 import express from "express";
 
 import Doctor from "../models/Doctor.js";
+
 import Symptom from "../models/Symptom.js";
+
 import SymptomCondition from "../models/SymptomCondition.js";
+
 import ConditionSpecialty from "../models/ConditionSpecialty.js";
+
 import Specialty from "../models/Specialty.js";
 
 const router = express.Router();
@@ -19,9 +23,7 @@ const normalizeSpecialty = (value = "") => {
     .replace(/[^a-z0-9]/g, "");
 };
 
-// Confidence vocabulary used by BODHI's own likelihood/weight fields,
-// ranked so we can keep only the strongest links instead of every
-// link ever recorded (which is what was pulling in ~all specialties).
+// Confidence vocabulary used by BODHI's own likelihood/weight fields
 const CONFIDENCE_RANK = {
   zero: 0,
   rare: 1,
@@ -34,9 +36,6 @@ const CONFIDENCE_RANK = {
 const confidenceRank = (value = "") =>
   CONFIDENCE_RANK[value.toLowerCase().trim()] ?? 0;
 
-// Keeps only the items at the strongest confidence level present,
-// falling back to weaker levels only if nothing stronger exists,
-// so a real match is never reduced to zero results.
 const keepStrongestConfidence = (items, getLevel) => {
   if (items.length === 0) return items;
 
@@ -50,9 +49,7 @@ const keepStrongestConfidence = (items, getLevel) => {
 };
 
 // ==========================================
-// SYMPTOM SUGGESTIONS (autocomplete)
-// Pulled live from the BODHI Symptom collection —
-// never a hardcoded word list.
+// SYMPTOM SUGGESTIONS
 // ==========================================
 
 router.get("/suggestions", async (req, res) => {
@@ -60,10 +57,16 @@ router.get("/suggestions", async (req, res) => {
     const query = (req.query.q || "").trim();
 
     if (query.length < 2) {
-      return res.json({ success: true, suggestions: [] });
+      return res.json({
+        success: true,
+        suggestions: [],
+      });
     }
 
-    const searchRegex = new RegExp(escapeRegex(query), "i");
+    const searchRegex = new RegExp(
+      escapeRegex(query),
+      "i"
+    );
 
     const matchedSymptoms = await Symptom.find({
       $or: [
@@ -82,7 +85,10 @@ router.get("/suggestions", async (req, res) => {
       ),
     ];
 
-    return res.json({ success: true, suggestions });
+    return res.json({
+      success: true,
+      suggestions,
+    });
   } catch (error) {
     console.error("Suggestions error:", error);
 
@@ -93,6 +99,10 @@ router.get("/suggestions", async (req, res) => {
     });
   }
 });
+
+// ==========================================
+// MAIN SEARCH
+// ==========================================
 
 router.get("/", async (req, res) => {
   try {
@@ -113,7 +123,7 @@ router.get("/", async (req, res) => {
     );
 
     // ==========================================
-    // 1. SEARCH DOCTOR NAME FROM OUR DB
+    // 1. SEARCH DOCTOR NAME
     // ==========================================
 
     const doctorsByName = await Doctor.find({
@@ -124,7 +134,7 @@ router.get("/", async (req, res) => {
       .lean();
 
     // ==========================================
-    // 2. SEARCH SPECIALIZATION FROM OUR DB
+    // 2. SEARCH SPECIALIZATION
     // ==========================================
 
     const doctorsBySpecialization =
@@ -135,12 +145,28 @@ router.get("/", async (req, res) => {
         .select("-password")
         .lean();
 
-    // Remove duplicates
+    // ==========================================
+    // 3. SEARCH ORGANIZATION
+    // ==========================================
+
+    const doctorsByOrganization =
+      await Doctor.find({
+        isActive: true,
+        organization: searchRegex,
+      })
+        .select("-password")
+        .lean();
+
+    // ==========================================
+    // REMOVE DUPLICATES
+    // ==========================================
+
     const directDoctorMap = new Map();
 
     [
       ...doctorsByName,
       ...doctorsBySpecialization,
+      ...doctorsByOrganization,
     ].forEach((doctor) => {
       directDoctorMap.set(
         doctor._id.toString(),
@@ -149,8 +175,9 @@ router.get("/", async (req, res) => {
     });
 
     // ==========================================
-    // 3. IF NAME/SPECIALIZATION FOUND
-    //    RETURN OUR DOCTORS DIRECTLY
+    // 4. IF DOCTOR / SPECIALIZATION /
+    //    ORGANIZATION FOUND
+    //    RETURN DIRECTLY
     //    DO NOT TOUCH BODHI
     // ==========================================
 
@@ -165,7 +192,7 @@ router.get("/", async (req, res) => {
     }
 
     // ==========================================
-    // 4. SEARCH SYMPTOM FROM BODHI
+    // 5. SEARCH SYMPTOM FROM BODHI
     // ==========================================
 
     const matchedSymptoms = await Symptom.find({
@@ -186,7 +213,7 @@ router.get("/", async (req, res) => {
     }
 
     // ==========================================
-    // 5. SYMPTOM → CONDITION
+    // 6. SYMPTOM → CONDITION
     // ==========================================
 
     const symptomIds = matchedSymptoms.map(
@@ -201,7 +228,8 @@ router.get("/", async (req, res) => {
     const strongestSymptomConditions =
       keepStrongestConfidence(
         symptomConditions,
-        (item) => item.likelihoodConditionGivenSymptom
+        (item) =>
+          item.likelihoodConditionGivenSymptom
       );
 
     const conditionIds = [
@@ -221,7 +249,7 @@ router.get("/", async (req, res) => {
     }
 
     // ==========================================
-    // 6. CONDITION → SPECIALTY
+    // 7. CONDITION → SPECIALTY
     // ==========================================
 
     const conditionSpecialties =
@@ -235,32 +263,43 @@ router.get("/", async (req, res) => {
         (item) => item.weight
       );
 
-    // A specialty can show up with just one strong link while another
-    // specialty has many. Counting how often each specialty appears
-    // lets us keep only the specialties that are repeatedly, not just
-    // once, linked at the strongest confidence level.
     const specialtyLinkCounts = new Map();
 
-    strongestConditionSpecialties.forEach((item) => {
-      specialtyLinkCounts.set(
-        item.specialtyId,
-        (specialtyLinkCounts.get(item.specialtyId) || 0) + 1
-      );
-    });
+    strongestConditionSpecialties.forEach(
+      (item) => {
+        specialtyLinkCounts.set(
+          item.specialtyId,
+          (specialtyLinkCounts.get(
+            item.specialtyId
+          ) || 0) + 1
+        );
+      }
+    );
+
+    if (specialtyLinkCounts.size === 0) {
+      return res.json({
+        success: true,
+        doctors: [],
+        searchType: "symptom",
+      });
+    }
 
     const maxSpecialtyLinkCount = Math.max(
       ...specialtyLinkCounts.values()
     );
 
-    // Search-logic constant (like the 4-char minimum), not medical data.
+    // Search-logic constant
     const MIN_SPECIALTY_LINK_SHARE = 0.5;
 
-    const specialtyIds = [...specialtyLinkCounts.entries()]
+    const specialtyIds = [
+      ...specialtyLinkCounts.entries(),
+    ]
       .filter(
         ([, count]) =>
           count >=
           Math.ceil(
-            maxSpecialtyLinkCount * MIN_SPECIALTY_LINK_SHARE
+            maxSpecialtyLinkCount *
+              MIN_SPECIALTY_LINK_SHARE
           )
       )
       .map(([specialtyId]) => specialtyId);
@@ -274,7 +313,7 @@ router.get("/", async (req, res) => {
     }
 
     // ==========================================
-    // 7. GET SPECIALTY NAMES FROM BODHI DB
+    // 8. GET SPECIALTY NAMES FROM BODHI
     // ==========================================
 
     const specialties = await Specialty.find({
@@ -286,8 +325,8 @@ router.get("/", async (req, res) => {
       .filter(Boolean);
 
     // ==========================================
-    // 8. MATCH BODHI SPECIALTY WITH OUR
-    //    DOCTORS COLLECTION
+    // 9. MATCH BODHI SPECIALTY WITH
+    //    OUR DOCTORS
     // ==========================================
 
     const allDoctors = await Doctor.find({
@@ -312,7 +351,9 @@ router.get("/", async (req, res) => {
       });
 
     // ==========================================
-    // 9. RETURN OUR DOCTORS
+    // 10. RETURN OUR DOCTORS
+    //     ORGANIZATION DETAILS ARE INCLUDED
+    //     AUTOMATICALLY FROM DOCTORS COLLECTION
     // ==========================================
 
     return res.json({
@@ -320,7 +361,6 @@ router.get("/", async (req, res) => {
       doctors: doctorsFromSymptoms,
       searchType: "symptom",
     });
-
   } catch (error) {
     console.error("Search error:", error);
 

@@ -1,7 +1,7 @@
 import express from 'express';
 import Appointment from '../models/Appointment.js';
 import Queue from '../models/Queue.js';
-import User from '../models/User.js';
+
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
