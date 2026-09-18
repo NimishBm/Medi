@@ -17,6 +17,7 @@ import paymentRoutes from './routes/payments.js';
 import analyticsRoutes from './routes/analytics.js';
 import searchRoutes from './routes/search.js';
 import organizationRoutes from './routes/organizations.js';
+import adminRoutes from './routes/admin.js';
 dotenv.config();
 console.log('Mongo URI loaded:', !!process.env.MONGO_URI);
 const app = express();
@@ -51,6 +52,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/organizations', organizationRoutes);
+app.use('/api/admin', adminRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK' });

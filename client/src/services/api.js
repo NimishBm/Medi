@@ -23,8 +23,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      const isAuthEndpoint = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register');
-      if (!isAuthEndpoint) {
+      const url = error.config?.url || '';
+      const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register');
+      const isAdminEndpoint = url.includes('/admin/');
+      if (!isAuthEndpoint && !isAdminEndpoint) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
@@ -94,6 +96,17 @@ export const paymentAPI = {
   getPaymentsByPatient: (patientId) => api.get(`/payments/patient/${patientId}`),
   getPaymentById: (id) => api.get(`/payments/${id}`),
   refundPayment: (id, data) => api.post(`/payments/${id}/refund`, data),
+};
+
+export const adminAPI = {
+  login: (data) => api.post('/admin/login', data),
+  getStats: () => api.get('/admin/stats'),
+  getDoctors: (status) => api.get('/admin/doctors', { params: status ? { status } : {} }),
+  getDoctorById: (id) => api.get(`/admin/doctors/${id}`),
+  approveDoctor: (id, note) => api.post(`/admin/doctors/${id}/approve`, { note }),
+  rejectDoctor: (id, note) => api.post(`/admin/doctors/${id}/reject`, { note }),
+  verifyLicense: (id) => api.post(`/admin/doctors/${id}/verify-license`),
+  getPatients: () => api.get('/admin/patients'),
 };
 
 export const analyticsAPI = {

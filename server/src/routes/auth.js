@@ -1,5 +1,6 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import axios from 'axios';
 import Patient from '../models/Patient.js';
 import Doctor from '../models/Doctor.js';
 import Receptionist from '../models/Receptionist.js';
@@ -83,6 +84,18 @@ router.post(
       return res.status(400).json({ message: 'Doctor already exists with this email' });
     }
 
+    // Call AskMyDoc license verification API (non-blocking — failure just leaves licenseVerified false)
+    let licenseVerified = false;
+    try {
+      const verifyRes = await axios.get(
+        `https://api.askmydoc.in/api/verify?reg_number=${licenseNumber}`,
+        { timeout: 10000 }
+      );
+      licenseVerified = verifyRes.data?.verified === true && verifyRes.data?.success === true;
+    } catch {
+      licenseVerified = false;
+    }
+
     const doctor = new Doctor({
       name,
       email,
@@ -96,6 +109,8 @@ router.post(
         ? (Array.isArray(qualifications) ? qualifications : qualifications.split(',').map(q => q.trim()).filter(Boolean))
         : [],
       consultationFee: consultationFee ? Number(consultationFee) : 0,
+      licenseVerified,
+      verificationStatus: 'PENDING',
     });
 
     await doctor.save();
@@ -103,7 +118,7 @@ router.post(
     const token = generateToken(doctor, 'DOCTOR');
 
     res.status(201).json({
-      message: 'Doctor registered successfully',
+      message: 'Registration successful. Your account is under review. You will be able to login once an admin approves your account.',
       token,
       user: { ...doctor.toJSON(), role: 'DOCTOR' },
     });
@@ -138,6 +153,18 @@ router.post(
 
       if (user) {
         role = 'DOCTOR';
+
+        // Block login if not yet approved by admin
+        if (user.verificationStatus === 'PENDING') {
+          return res.status(403).json({
+            message: 'Your account is under review. Please wait for admin approval before logging in.'
+          });
+        }
+        if (user.verificationStatus === 'REJECTED') {
+          return res.status(403).json({
+            message: 'Your registration has been rejected. Please contact support for more information.'
+          });
+        }
       }
     }
 
