@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { doctorAPI, queueAPI } from '../../services/api';
 import { useDispatch } from 'react-redux';
@@ -68,7 +68,7 @@ export const DoctorDetail = () => {
       <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/patient/marketplace')} className="text-gray-600 hover:text-gray-900 p-1">
+            <button onClick={() => navigate(user ? '/patient/marketplace' : '/marketplace')} className="text-gray-600 hover:text-gray-900 p-1">
               <ChevronLeft size={22} />
             </button>
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -78,20 +78,33 @@ export const DoctorDetail = () => {
           </div>
           <h2 className="text-base font-bold text-gray-900">Doctor Profile</h2>
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center bg-gray-100 px-3 py-1.5 rounded-full">
-              <span className="text-xs font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
-            </div>
-            <button
-              onClick={() => dispatch(logout())}
-              className="text-gray-700 hover:text-red-600 font-medium text-xs px-3 py-1.5"
-            >
-              Logout
-            </button>
+            {user ? (
+              <>
+                <div className="hidden sm:flex items-center bg-gray-100 px-3 py-1.5 rounded-full">
+                  <span className="text-xs font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+                </div>
+                <button
+                  onClick={() => dispatch(logout())}
+                  className="text-gray-700 hover:text-red-600 font-medium text-xs px-3 py-1.5"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => navigate('/login/patient')}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-1.5 rounded-lg transition"
+              >
+                Login to Book
+              </button>
+            )}
           </div>
         </div>
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* Redirect logged-in doctor/receptionist away from patient page */}
+        {user && user.role !== 'PATIENT' && <Navigate to={user.role === 'DOCTOR' ? '/doctor' : '/receptionist'} replace />}
         {/* Doctor Header Card */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
           {/* Banner */}
@@ -108,7 +121,14 @@ export const DoctorDetail = () => {
                 <p className="text-lg text-blue-600 font-semibold">{doctor.specialization}</p>
               </div>
               <button
-                onClick={() => navigate(`/patient/doctors/${doctorId}/book`)}
+                onClick={() => {
+                  if (user) {
+                    navigate(`/patient/doctors/${doctorId}/book`);
+                  } else {
+                    toast.error('Login to book an appointment');
+                    navigate('/login/patient');
+                  }
+                }}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition-colors"
               >
                 Book Now
@@ -228,7 +248,14 @@ export const DoctorDetail = () => {
             <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-sm p-6 text-white">
               <h4 className="font-bold mb-4">Book Appointment</h4>
               <button
-                onClick={() => navigate(`/patient/doctors/${doctorId}/book`)}
+                onClick={() => {
+                  if (user) {
+                    navigate(`/patient/doctors/${doctorId}/book`);
+                  } else {
+                    toast.error('Login to book an appointment');
+                    navigate('/login/patient');
+                  }
+                }}
                 className="w-full bg-white text-blue-600 hover:bg-gray-100 py-3 rounded-lg font-bold transition-colors mb-4"
               >
                 Select Time Slot

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Sidebar } from '../../components/Sidebar';
+import { Navbar } from '../../components/Navbar';
 import { patientNav } from '../../components/PatientNav';
 import { userAPI } from '../../services/api';
 import { setUser } from '../../store/slices/authSlice';
