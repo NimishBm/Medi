@@ -37,9 +37,10 @@ api.interceptors.response.use(
 );
 
 export const notificationAPI = {
-  getAll:    ()   => api.get('/notifications'),
-  markRead:  (id) => api.put(`/notifications/${id}/read`),
-  markAllRead: () => api.put('/notifications/read-all'),
+  getAll:           ()   => api.get('/notifications'),
+  getNotifications: ()   => api.get('/notifications'),
+  markRead:         (id) => api.put(`/notifications/${id}/read`),
+  markAllRead:      ()   => api.put('/notifications/read-all'),
 };
 
 export const authAPI = {
@@ -153,11 +154,6 @@ export const searchAPI = {
   suggestions: (q) => api.get('/search/suggestions', { params: { q } }),
 };
 
-export const notificationAPI = {
-  getNotifications: () => api.get('/notifications'),
-  markAllRead: () => api.put('/notifications/read-all'),
-  markRead: (id) => api.put(`/notifications/${id}/read`),
-};
 
 export const blogAPI = {
   getPosts: (status) => api.get('/blog/posts', { params: status ? { status } : {} }),
