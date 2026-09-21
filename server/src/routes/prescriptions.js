@@ -64,6 +64,37 @@ router.get(
   })
 );
 
+// Update prescription (doctor only, own prescriptions)
+router.put(
+  '/:id',
+  protect,
+  authorize('DOCTOR'),
+  catchAsyncErrors(async (req, res) => {
+    const prescription = await Prescription.findById(req.params.id);
+
+    if (!prescription) {
+      return res.status(404).json({ message: 'Prescription not found' });
+    }
+
+    if (prescription.doctorId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to edit this prescription' });
+    }
+
+    const { medicines, additionalNotes, validTill } = req.body;
+
+    if (medicines !== undefined) prescription.medicines = medicines;
+    if (additionalNotes !== undefined) prescription.additionalNotes = additionalNotes;
+    if (validTill !== undefined) prescription.validTill = validTill || null;
+
+    await prescription.save();
+
+    const populated = await Prescription.findById(prescription._id)
+      .populate('patientId', 'name email phone');
+
+    res.json({ message: 'Prescription updated successfully', prescription: populated });
+  })
+);
+
 // Get prescription by ID
 router.get(
   '/:id',

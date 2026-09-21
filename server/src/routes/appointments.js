@@ -132,6 +132,40 @@ router.post(
       });
     }
 
+    // Auto-create queue entry so doctor sees it in Live Queue immediately
+    // Normalise queueDate to start-of-day UTC so the GET /doctor/:id filter always matches
+    const queueDateNorm = new Date(appointmentDate);
+    queueDateNorm.setUTCHours(0, 0, 0, 0);
+    const queueEntry = new Queue({
+      doctorId,
+      appointmentId: appointment._id,
+      patientId,
+      tokenNumber,
+      queueDate: queueDateNorm,
+      status: 'WAITING',
+    });
+    await queueEntry.save();
+
+    // Create a notification for the doctor
+    const apptDate = new Date(appointmentDate).toLocaleDateString('en-IN', {
+      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+    });
+    await Notification.create({
+      recipientId: doctorId,
+      recipientModel: 'Doctor',
+      appointmentId: appointment._id,
+      type: 'NEW_APPOINTMENT',
+      title: 'New Appointment Booked',
+      message: `${appointment.patientId.name} booked a ${appointment.appointmentType} on ${apptDate} at ${appointmentTime}. Token #${tokenNumber}.`,
+      data: { patientName: appointment.patientId.name, appointmentTime, appointmentDate, tokenNumber },
+    });
+
+    // Notify doctor via socket — emit to their personal notification room
+    io.emit('queue-update', { doctorId });
+    io.to(`notifications-${doctorId}`).emit('new-notification', {
+      recipientId: String(doctorId),
+    });
+
     res.status(201).json({
       message: `${createdAppointments.length} appointments booked successfully`,
       appointments: createdAppointments,
@@ -339,9 +373,13 @@ router.post(
         status: 'WAITING',
       });
       await queueEntry.save();
+    } else {
+      // Already exists — just mark as WAITING in case it was in another state
+      queueEntry.status = 'WAITING';
+      await queueEntry.save();
     }
 
-    io.to(`queue-${doctorId}`).emit('queue-update', { doctorId });
+    io?.emit?.('queue-update', { doctorId });
 
     res.json({
       message: 'Patient checked in successfully',

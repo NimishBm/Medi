@@ -1,431 +1,636 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../store/slices/authSlice';
-import { queueAPI, consultationAPI, appointmentAPI } from '../../services/api';
+import { queueAPI, consultationAPI } from '../../services/api';
 import { initSocket } from '../../services/socket';
 import toast from 'react-hot-toast';
-import { Heart, LogOut, AlertCircle, CheckCircle, Phone, ArrowLeft } from 'lucide-react';
+import {
+  Heart, LogOut, AlertCircle, Phone, ArrowLeft,
+  Clock, Users, CheckCircle, SkipForward, UserX,
+  Stethoscope, ChevronRight, Activity, Calendar,
+} from 'lucide-react';
+import { NotificationBell } from '../../components/NotificationBell';
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+const calcAge = (dob) =>
+  dob ? Math.floor((Date.now() - new Date(dob)) / (365.25 * 24 * 3600 * 1000)) : null;
+
+const fmt2 = (n) => String(n).padStart(2, '0');
+
+const fmtDuration = (secs) => {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${fmt2(m)}:${fmt2(s)}`;
+};
+
+const STATUS_LABEL = {
+  WAITING: 'Waiting',
+  CALLED: 'Called',
+  CONSULTING: 'In Consultation',
+  COMPLETED: 'Completed',
+  SKIPPED: 'Skipped',
+  NO_SHOW: 'No Show',
+};
+
+const STATUS_PILL = {
+  WAITING:    'bg-teal-100 text-teal-700',
+  CALLED:     'bg-yellow-100 text-yellow-700',
+  CONSULTING: 'bg-green-100 text-green-700',
+  COMPLETED:  'bg-blue-100 text-blue-700',
+  SKIPPED:    'bg-orange-100 text-orange-700',
+  NO_SHOW:    'bg-red-100 text-red-700',
+};
+
+// ─── component ──────────────────────────────────────────────────────────────
 
 export const DoctorQueue = () => {
-  const { user } = useSelector((state) => state.auth);
+  const { user } = useSelector((s) => s.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [queue, setQueue] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentPatient, setCurrentPatient] = useState(null);
-  const [showConsultationNotes, setShowConsultationNotes] = useState(false);
+
+  const [queue, setQueue]                       = useState([]);
+  const [isLoading, setIsLoading]               = useState(true);
+  const [currentPatient, setCurrentPatient]     = useState(null);
   const [isSubmittingNotes, setIsSubmittingNotes] = useState(false);
+  const [isActionLoading, setIsActionLoading]   = useState(false);
   const [consultationNotes, setConsultationNotes] = useState({
-    symptoms: '',
-    diagnosis: '',
-    treatmentPlan: '',
-    followUpDate: '',
+    symptoms: '', diagnosis: '', treatmentPlan: '', followUpDate: '',
   });
 
+  // Live stopwatch for CONSULTING status
+  const [elapsed, setElapsed]   = useState(0);
+  const timerRef                = useRef(null);
+
+  // ── fetch / socket ─────────────────────────────────────────────────────────
+
+  const applyQueue = (raw) => {
+    const sorted = [...raw].sort((a, b) => a.tokenNumber - b.tokenNumber);
+    setQueue(sorted);
+    const active =
+      sorted.find((q) => q.status === 'CONSULTING') ||
+      sorted.find((q) => q.status === 'CALLED');
+    setCurrentPatient(active || null);
+    if (!active) {
+      setConsultationNotes({ symptoms: '', diagnosis: '', treatmentPlan: '', followUpDate: '' });
+    }
+  };
+
   useEffect(() => {
+    let mounted = true;
     const fetchQueue = async () => {
       try {
         const res = await queueAPI.getQueueByDoctorId(user._id);
-        setQueue(res.data.queue);
-        const consulting = res.data.queue.find((q) => q.status === 'CONSULTING');
-        setCurrentPatient(consulting);
-        if (!consulting) {
-          setShowConsultationNotes(false);
-          setConsultationNotes({
-            symptoms: '',
-            diagnosis: '',
-            treatmentPlan: '',
-            followUpDate: '',
-          });
-        }
-      } catch (error) {
-        toast.error('Failed to load queue');
-      } finally {
-        setIsLoading(false);
+        if (mounted) { applyQueue(res.data.queue); setIsLoading(false); }
+      } catch {
+        if (mounted) { toast.error('Failed to load queue'); setIsLoading(false); }
       }
     };
 
     fetchQueue();
     const socket = initSocket();
     socket.on('queue-update', fetchQueue);
-
-    return () => socket.off('queue-update', fetchQueue);
+    return () => { mounted = false; socket.off('queue-update', fetchQueue); };
   }, [user._id]);
 
-  const handleCallNext = async () => {
-    try {
-      await queueAPI.callNextPatient({ doctorId: user._id });
-      toast.success('Next patient called');
-    } catch (error) {
-      toast.error('Failed to call next patient');
+  // ── consultation timer ─────────────────────────────────────────────────────
+
+  useEffect(() => {
+    clearInterval(timerRef.current);
+    if (currentPatient?.status === 'CONSULTING' && currentPatient.consultationStartAt) {
+      const start = new Date(currentPatient.consultationStartAt).getTime();
+      const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
+      tick();
+      timerRef.current = setInterval(tick, 1000);
+    } else {
+      setElapsed(0);
     }
+    return () => clearInterval(timerRef.current);
+  }, [currentPatient?._id, currentPatient?.status]);
+
+  // ── actions ────────────────────────────────────────────────────────────────
+
+  const withLoading = (fn) => async (...args) => {
+    setIsActionLoading(true);
+    try { await fn(...args); }
+    finally { setIsActionLoading(false); }
   };
 
-  const handleStartConsultation = async (queueId) => {
-    try {
-      await queueAPI.startConsultation({ queueId });
-      toast.success('Consultation started');
-    } catch (error) {
-      toast.error('Failed to start consultation');
-    }
-  };
+  const handleCallNext = withLoading(async () => {
+    const waiting = queue.filter((q) => q.status === 'WAITING');
+    if (!waiting.length) { toast.error('No patients waiting'); return; }
+    await queueAPI.callNextPatient({ doctorId: user._id });
+    toast.success(`Calling token #${waiting[0].tokenNumber}`);
+  });
 
-  const handleSkipPatient = async (appointmentId) => {
-    try {
-      await queueAPI.skipPatient({ appointmentId, doctorId: user._id });
-      toast.success('Patient skipped');
-    } catch (error) {
-      toast.error('Failed to skip patient');
-    }
-  };
+  const handleStartConsultation = withLoading(async () => {
+    await queueAPI.startConsultation({ queueId: currentPatient._id });
+    toast.success('Consultation started');
+  });
 
-  const handleNoShow = async (appointmentId) => {
-    if (window.confirm('Mark patient as no-show?')) {
-      try {
-        await queueAPI.markNoShow({ appointmentId, doctorId: user._id });
-        toast.success('Patient marked as no-show');
-      } catch (error) {
-        toast.error('Failed to mark no-show');
-      }
-    }
-  };
+  const handleSkip = withLoading(async () => {
+    await queueAPI.skipPatient({ queueId: currentPatient._id });
+    toast.success('Patient skipped');
+  });
+
+  const handleNoShow = withLoading(async () => {
+    if (!window.confirm(`Mark ${currentPatient.patientId.name} as no-show?`)) return;
+    await queueAPI.markNoShow({ queueId: currentPatient._id });
+    toast.success('Marked as no-show');
+  });
 
   const handleCompleteWithNotes = async () => {
-    if (!consultationNotes.diagnosis.trim()) {
-      toast.error('Please enter diagnosis');
-      return;
-    }
-
+    if (!consultationNotes.diagnosis.trim()) { toast.error('Diagnosis is required'); return; }
     setIsSubmittingNotes(true);
     try {
       await consultationAPI.createConsultation({
         appointmentId: currentPatient.appointmentId,
-        symptoms: consultationNotes.symptoms,
-        diagnosis: consultationNotes.diagnosis,
+        symptoms:      consultationNotes.symptoms,
+        diagnosis:     consultationNotes.diagnosis,
         treatmentPlan: consultationNotes.treatmentPlan,
-        followUpDate: consultationNotes.followUpDate,
+        followUpDate:  consultationNotes.followUpDate || undefined,
       });
-
       await queueAPI.completeConsultation({ queueId: currentPatient._id });
-
-      toast.success('Consultation completed and notes saved!');
-      setShowConsultationNotes(false);
-      setConsultationNotes({
-        symptoms: '',
-        diagnosis: '',
-        treatmentPlan: '',
-        followUpDate: '',
-      });
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to save consultation');
+      toast.success('Consultation completed & notes saved');
+      setConsultationNotes({ symptoms: '', diagnosis: '', treatmentPlan: '', followUpDate: '' });
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to save');
     } finally {
       setIsSubmittingNotes(false);
     }
   };
 
-  const handleCompleteWithoutNotes = async () => {
-    try {
-      await queueAPI.completeConsultation({ queueId: currentPatient._id });
-      toast.success('Consultation completed');
-      setShowConsultationNotes(false);
-    } catch (error) {
-      toast.error('Failed to complete consultation');
-    }
-  };
+  const handleCompleteWithoutNotes = withLoading(async () => {
+    await queueAPI.completeConsultation({ queueId: currentPatient._id });
+    toast.success('Consultation completed');
+    setConsultationNotes({ symptoms: '', diagnosis: '', treatmentPlan: '', followUpDate: '' });
+  });
+
+  // ── derived stats ──────────────────────────────────────────────────────────
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center h-screen gap-3 bg-gray-50">
+        <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-500 text-sm">Loading queue…</p>
+      </div>
+    );
   }
 
-  const queueStats = {
-    waiting: queue.filter((q) => q.status === 'WAITING').length,
-    called: queue.filter((q) => q.status === 'CALLED').length,
+  const stats = {
+    total:     queue.length,
+    waiting:   queue.filter((q) => q.status === 'WAITING').length,
+    called:    queue.filter((q) => q.status === 'CALLED').length,
+    consulting: queue.filter((q) => q.status === 'CONSULTING').length,
     completed: queue.filter((q) => q.status === 'COMPLETED').length,
+    skipped:   queue.filter((q) => q.status === 'SKIPPED' || q.status === 'NO_SHOW').length,
   };
+
+  const progress = stats.total > 0
+    ? Math.round(((stats.completed + stats.skipped) / stats.total) * 100)
+    : 0;
+
+  const waitingList = queue.filter((q) => q.status === 'WAITING');
+
+  // ── render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
+
+      {/* ── Header ── */}
+      <header className="sticky top-0 z-50 bg-[#1E3A5F] border-b border-[#2D4F7C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => navigate('/doctor')}
-              className="sm:hidden text-teal-600 hover:text-teal-700 p-2"
+              className="sm:hidden text-teal-300 hover:text-white p-2"
             >
-              <ArrowLeft size={24} />
+              <ArrowLeft size={22} />
             </button>
-            <div className="w-10 h-10 bg-teal-600 rounded-lg flex items-center justify-center">
-              <Heart className="text-white" size={24} strokeWidth={2.5} />
+            <div className="w-9 h-9 bg-[#0D9488] rounded-lg flex items-center justify-center">
+              <Heart className="text-white" size={20} strokeWidth={2.5} />
             </div>
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900">Live Queue</h1>
+            <div>
+              <h1 className="text-base sm:text-lg font-bold text-white leading-tight">Live Queue</h1>
+              <p className="text-xs text-teal-300 hidden sm:block">Real-time patient management</p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/doctor')}
-              className="text-gray-700 hover:text-teal-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-teal-50 transition hidden sm:block"
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => navigate('/doctor/appointments')}
-              className="text-gray-700 hover:text-teal-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-teal-50 transition hidden sm:block"
-            >
-              Appointments
-            </button>
-            <button
-              onClick={() => navigate('/doctor/profile')}
-              className="text-gray-700 hover:text-teal-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-teal-50 transition hidden sm:block"
-            >
-              My Profile
-            </button>
-            <div className="hidden sm:block h-6 border-l border-gray-300"></div>
-            <div className="hidden sm:flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full">
-              <span className="text-sm font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+          <div className="flex items-center gap-2">
+            {['Dashboard:/doctor', 'Appointments:/doctor/appointments', 'Profile:/doctor/profile'].map((s) => {
+              const [label, path] = s.split(':');
+              return (
+                <button key={label} type="button" onClick={() => navigate(path)}
+                  className="text-slate-200 hover:text-teal-300 text-sm px-3 py-1.5 rounded-lg hover:bg-white/10 transition hidden sm:block">
+                  {label}
+                </button>
+              );
+            })}
+            <div className="hidden sm:block h-5 border-l border-white/20 mx-1" />
+            <div className="bg-white/10 px-3 py-1.5 rounded-full hidden sm:flex items-center gap-1.5">
+              <div className="w-5 h-5 bg-[#0D9488] rounded-full flex items-center justify-center text-white text-xs font-bold">
+                {user?.name?.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-sm font-medium text-white">{user?.name?.split(' ')[0]}</span>
             </div>
-            <button
-              onClick={() => dispatch(logout())}
-              className="text-gray-700 hover:text-red-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-red-50 transition"
-            >
-              <LogOut size={18} />
+            <NotificationBell />
+            <button type="button" onClick={() => dispatch(logout())}
+              className="text-slate-300 hover:text-red-400 p-2 rounded-lg hover:bg-white/10 transition"
+              title="Logout">
+              <LogOut size={17} />
             </button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-4 sm:py-8">
-        {/* Title */}
-        <div className="mb-4 sm:mb-8 hidden sm:block">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Live Queue Management</h2>
-          <p className="text-gray-600">Manage your current patients and consultation queue</p>
+      <div className="max-w-7xl mx-auto px-4 py-5">
+
+        {/* ── Page title + progress ── */}
+        <div className="mb-5 hidden sm:block">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-2xl font-bold text-gray-900">Live Queue Management</h2>
+            <span className="text-sm text-gray-500">{stats.completed} of {stats.total} completed</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-teal-500 h-2 rounded-full transition-all duration-700"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Current Patient - Large Section */}
-          <div className="lg:col-span-2">
-            <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
-              {currentPatient ? (
-                <>
-                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
-                    <Phone size={24} className="text-teal-600" />
-                    Current Patient
-                  </h2>
-                  <div className="bg-gradient-to-br from-teal-50 to-teal-100 p-4 sm:p-8 rounded-lg mb-4 sm:mb-6 border border-teal-200">
-                    <p className="text-xs sm:text-sm text-teal-700 mb-2 font-medium">Token Number</p>
-                    <p className="text-4xl sm:text-6xl font-bold text-teal-600 mb-4 sm:mb-6">#{currentPatient.tokenNumber}</p>
-                    <div className="border-t border-teal-200 pt-4 sm:pt-6">
-                      <p className="text-lg sm:text-2xl font-bold text-gray-900 mb-2">{currentPatient.patientId.name}</p>
-                      <p className="text-sm sm:text-base text-gray-700 mb-3">
-                        <span className="font-medium">Phone:</span> {currentPatient.patientId.phone}
-                      </p>
+        {/* ── Stat bar ── */}
+        <div className="grid grid-cols-4 gap-3 mb-5">
+          {[
+            { label: 'Waiting',    value: stats.waiting,   color: 'teal',   icon: Clock },
+            { label: 'Called',     value: stats.called,    color: 'yellow', icon: Phone },
+            { label: 'Completed',  value: stats.completed, color: 'green',  icon: CheckCircle },
+            { label: 'Skipped',    value: stats.skipped,   color: 'orange', icon: SkipForward },
+          ].map(({ label, value, color, icon: Icon }) => (
+            <div key={label} className={`bg-white rounded-lg border border-${color}-200 p-3 sm:p-4 flex items-center gap-3`}>
+              <div className={`w-9 h-9 bg-${color}-100 rounded-lg flex items-center justify-center flex-shrink-0`}>
+                <Icon size={18} className={`text-${color}-600`} />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">{label}</p>
+                <p className={`text-2xl font-bold text-${color}-600`}>{value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Main grid ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+          {/* ── LEFT: Current Patient ── */}
+          <div className="lg:col-span-2 space-y-5">
+
+            {/* Current Patient Card */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              {/* Card header bar */}
+              <div className={`px-5 py-3 flex items-center justify-between ${
+                currentPatient?.status === 'CONSULTING' ? 'bg-green-600' :
+                currentPatient?.status === 'CALLED'     ? 'bg-yellow-500' :
+                'bg-teal-600'
+              }`}>
+                <div className="flex items-center gap-2 text-white">
+                  <Stethoscope size={18} />
+                  <span className="font-semibold text-sm">
+                    {currentPatient
+                      ? STATUS_LABEL[currentPatient.status] || currentPatient.status
+                      : 'No Active Patient'}
+                  </span>
+                </div>
+                {currentPatient?.status === 'CONSULTING' && (
+                  <div className="flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full text-white text-sm font-mono font-semibold">
+                    <Activity size={14} className="animate-pulse" />
+                    {fmtDuration(elapsed)}
+                  </div>
+                )}
+              </div>
+
+              {/* Card body */}
+              <div className="p-5">
+                {currentPatient ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                    {/* Left: patient info */}
+                    <div>
+                      {/* Token + name */}
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 text-center min-w-[72px]">
+                          <p className="text-xs text-teal-600 font-medium">Token</p>
+                          <p className="text-3xl font-black text-teal-700">#{currentPatient.tokenNumber}</p>
+                        </div>
+                        <div>
+                          <p className="text-xl font-bold text-gray-900">{currentPatient.patientId.name}</p>
+                          <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
+                            <Phone size={12} /> {currentPatient.patientId.phone}
+                          </p>
+                          {currentPatient.calledAt && (
+                            <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                              <Clock size={11} />
+                              Called at {new Date(currentPatient.calledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Demographics */}
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {calcAge(currentPatient.patientId.dateOfBirth) !== null && (
+                          <span className="bg-gray-100 text-gray-700 text-xs px-2.5 py-1 rounded-full font-medium">
+                            {calcAge(currentPatient.patientId.dateOfBirth)} yrs
+                          </span>
+                        )}
+                        {currentPatient.patientId.gender && (
+                          <span className="bg-gray-100 text-gray-700 text-xs px-2.5 py-1 rounded-full font-medium capitalize">
+                            {currentPatient.patientId.gender === 'M' ? 'Male' : currentPatient.patientId.gender === 'F' ? 'Female' : currentPatient.patientId.gender}
+                          </span>
+                        )}
+                        {currentPatient.patientId.bloodGroup && (
+                          <span className="bg-red-50 text-red-700 border border-red-200 text-xs px-2.5 py-1 rounded-full font-bold">
+                            {currentPatient.patientId.bloodGroup}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Allergies */}
                       {currentPatient.patientId.allergies?.length > 0 && (
-                        <div className="mt-4 p-3 bg-red-50 rounded-lg border border-red-200">
-                          <p className="text-xs font-bold text-red-800 mb-2">⚠️ Allergies:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {currentPatient.patientId.allergies.map((allergy, idx) => (
-                              <span key={idx} className="badge bg-red-200 text-red-800 text-xs px-2 py-1 rounded-full">
-                                {allergy}
-                              </span>
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                          <p className="text-xs font-bold text-red-700 mb-1.5">⚠ ALLERGIES</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {currentPatient.patientId.allergies.map((a, i) => (
+                              <span key={i} className="bg-red-200 text-red-800 text-xs px-2 py-0.5 rounded-full font-medium">{a}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Medical history */}
+                      {currentPatient.patientId.medicalHistory?.length > 0 && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <p className="text-xs font-bold text-blue-700 mb-1.5">Medical History</p>
+                          <div className="space-y-1">
+                            {currentPatient.patientId.medicalHistory.map((h, i) => (
+                              <p key={i} className="text-xs text-gray-700">
+                                <span className="font-semibold">{h.condition}</span>
+                                {h.diagnosis && <span className="text-gray-500"> — {h.diagnosis}</span>}
+                              </p>
                             ))}
                           </div>
                         </div>
                       )}
                     </div>
-                  </div>
 
-                  {currentPatient.status === 'CONSULTING' ? (
-                    !showConsultationNotes ? (
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => setShowConsultationNotes(true)}
-                          className="flex-1 bg-green-600 text-white hover:bg-green-700 px-4 py-3 rounded-lg font-medium transition"
-                        >
-                          Complete Consultation
-                        </button>
-                        <button
-                          onClick={() => handleNoShow(currentPatient.appointmentId)}
-                          className="flex-1 bg-red-600 text-white hover:bg-red-700 px-4 py-3 rounded-lg font-medium transition"
-                        >
-                          No-Show
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="border-2 border-teal-300 p-6 rounded-lg bg-teal-50">
-                        <h3 className="font-bold text-gray-900 mb-4 text-lg">📋 Consultation Notes</h3>
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Symptoms</label>
+                    {/* Right: actions + consultation notes */}
+                    <div className="flex flex-col gap-3">
+
+                      {currentPatient.status === 'CALLED' && (
+                        <>
+                          <button type="button" onClick={handleStartConsultation} disabled={isActionLoading}
+                            className="w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2">
+                            <Stethoscope size={16} /> Start Consultation
+                          </button>
+                          <button type="button" onClick={handleSkip} disabled={isActionLoading}
+                            className="w-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 font-medium py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+                            <SkipForward size={15} /> Skip Patient
+                          </button>
+                          <button type="button" onClick={handleNoShow} disabled={isActionLoading}
+                            className="w-full bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 font-medium py-2.5 rounded-lg border border-red-200 transition flex items-center justify-center gap-2">
+                            <UserX size={15} /> Mark No-Show
+                          </button>
+                        </>
+                      )}
+
+                      {currentPatient.status === 'CONSULTING' && (
+                        <>
+                          {/* Consultation notes form */}
+                          <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 space-y-2.5">
+                            <p className="text-xs font-bold text-teal-800">📋 Consultation Notes</p>
                             <input
                               type="text"
-                              placeholder="e.g. Fever, Cough, Headache"
+                              placeholder="Symptoms (e.g. Fever, Cough)"
                               value={consultationNotes.symptoms}
-                              onChange={(e) => setConsultationNotes({
-                                ...consultationNotes,
-                                symptoms: e.target.value,
-                              })}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                              onChange={(e) => setConsultationNotes({ ...consultationNotes, symptoms: e.target.value })}
+                              className="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
                             />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Diagnosis *</label>
                             <textarea
-                              placeholder="Enter diagnosis"
+                              placeholder="Diagnosis *"
                               value={consultationNotes.diagnosis}
-                              onChange={(e) => setConsultationNotes({
-                                ...consultationNotes,
-                                diagnosis: e.target.value,
-                              })}
-                              rows="3"
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                              onChange={(e) => setConsultationNotes({ ...consultationNotes, diagnosis: e.target.value })}
+                              rows={2}
+                              className="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white resize-none"
                             />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Treatment Plan</label>
                             <textarea
-                              placeholder="Medication, lifestyle changes, etc."
+                              placeholder="Treatment plan"
                               value={consultationNotes.treatmentPlan}
-                              onChange={(e) => setConsultationNotes({
-                                ...consultationNotes,
-                                treatmentPlan: e.target.value,
-                              })}
-                              rows="3"
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                              onChange={(e) => setConsultationNotes({ ...consultationNotes, treatmentPlan: e.target.value })}
+                              rows={2}
+                              className="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white resize-none"
                             />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Follow-up Date</label>
                             <input
                               type="date"
                               value={consultationNotes.followUpDate}
-                              onChange={(e) => setConsultationNotes({
-                                ...consultationNotes,
-                                followUpDate: e.target.value,
-                              })}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                              onChange={(e) => setConsultationNotes({ ...consultationNotes, followUpDate: e.target.value })}
+                              className="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
                             />
                           </div>
-                          <div className="flex gap-3">
-                            <button
-                              onClick={handleCompleteWithNotes}
-                              disabled={isSubmittingNotes}
-                              className="flex-1 bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 px-4 py-3 rounded-lg font-medium transition"
-                            >
-                              {isSubmittingNotes ? 'Saving...' : 'Save & Complete'}
-                            </button>
-                            <button
-                              onClick={handleCompleteWithoutNotes}
-                              className="flex-1 bg-gray-400 text-white hover:bg-gray-500 px-4 py-3 rounded-lg font-medium transition"
-                            >
-                              Skip Notes
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  ) : (
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => handleStartConsultation(currentPatient._id)}
-                        className="flex-1 bg-teal-600 text-white hover:bg-teal-700 px-4 py-3 rounded-lg font-medium transition"
-                      >
-                        Start Consultation
-                      </button>
-                      <button
-                        onClick={() => handleSkipPatient(currentPatient.appointmentId)}
-                        className="flex-1 bg-gray-400 text-white hover:bg-gray-500 px-4 py-3 rounded-lg font-medium transition"
-                      >
-                        Skip
-                      </button>
+
+                          <button type="button" onClick={handleCompleteWithNotes} disabled={isSubmittingNotes}
+                            className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2">
+                            <CheckCircle size={16} />
+                            {isSubmittingNotes ? 'Saving…' : 'Complete & Save Notes'}
+                          </button>
+                          <button type="button" onClick={handleCompleteWithoutNotes} disabled={isActionLoading}
+                            className="w-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-600 font-medium py-2.5 rounded-lg transition text-sm">
+                            Complete without notes
+                          </button>
+                          <button type="button" onClick={handleNoShow} disabled={isActionLoading}
+                            className="w-full bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 font-medium py-2 rounded-lg border border-red-200 transition text-sm flex items-center justify-center gap-1.5">
+                            <UserX size={14} /> No-Show
+                          </button>
+                        </>
+                      )}
                     </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-16">
-                  <AlertCircle size={48} className="mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-600 mb-6 text-lg font-medium">No patient currently consulting</p>
-                  <button onClick={handleCallNext} className="bg-teal-600 text-white hover:bg-teal-700 px-8 py-3 rounded-lg font-medium transition">
-                    Call Next Patient
+                  </div>
+                ) : (
+                  /* Empty state */
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Users size={28} className="text-teal-400" />
+                    </div>
+                    <p className="text-gray-700 font-semibold mb-1">No active patient</p>
+                    <p className="text-gray-400 text-sm mb-6">
+                      {waitingList.length > 0
+                        ? `${waitingList.length} patient${waitingList.length > 1 ? 's' : ''} waiting — call the next one to begin`
+                        : 'All patients have been seen for today'}
+                    </p>
+                    {waitingList.length > 0 && (
+                      <button type="button" onClick={handleCallNext} disabled={isActionLoading}
+                        className="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold px-8 py-3 rounded-lg transition inline-flex items-center gap-2">
+                        <ChevronRight size={18} /> Call Next Patient
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer action when there's a current patient and waiting patients exist */}
+              {currentPatient && waitingList.length > 0 && currentPatient.status !== 'CONSULTING' && (
+                <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+                  <p className="text-xs text-gray-500">{waitingList.length} more waiting</p>
+                  <button type="button" onClick={handleCallNext} disabled={isActionLoading}
+                    className="text-xs text-teal-600 hover:text-teal-700 font-semibold flex items-center gap-1">
+                    Call next <ChevronRight size={13} />
                   </button>
                 </div>
               )}
             </div>
+
+            {/* ── Today's Full Queue Table ── */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                  <Calendar size={16} className="text-teal-600" /> Today's Queue
+                </h3>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
+                  {stats.total} total · {stats.waiting} waiting
+                </span>
+              </div>
+              <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+                {queue.length === 0 ? (
+                  <p className="text-center text-gray-400 py-10 text-sm">No patients booked for today</p>
+                ) : (
+                  queue.map((item, idx) => {
+                    const isCurrent = currentPatient?._id === item._id;
+                    const estWait = waitingList.findIndex((w) => w._id === item._id);
+                    const avgMin = user?.averageConsultationTime || 10;
+                    return (
+                      <div key={item._id}
+                        className={`flex items-center justify-between px-5 py-3 transition ${
+                          isCurrent                         ? 'bg-teal-50' :
+                          item.status === 'COMPLETED'       ? 'opacity-50' :
+                          item.status === 'SKIPPED' || item.status === 'NO_SHOW' ? 'opacity-40' : ''
+                        }`}>
+                        <div className="flex items-center gap-3">
+                          {/* Token bubble */}
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                            item.status === 'CONSULTING' ? 'bg-green-100 text-green-700' :
+                            item.status === 'CALLED'     ? 'bg-yellow-100 text-yellow-700' :
+                            item.status === 'COMPLETED'  ? 'bg-blue-100 text-blue-700' :
+                            item.status === 'WAITING'    ? 'bg-teal-100 text-teal-700' :
+                            'bg-gray-100 text-gray-500'
+                          }`}>
+                            {item.tokenNumber}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{item.patientId.name}</p>
+                            <p className="text-xs text-gray-400">
+                              {item.patientId.phone}
+                              {estWait >= 0 && item.status === 'WAITING' && (
+                                <span className="ml-2 text-teal-500">
+                                  ~{estWait === 0 ? 'next' : `${estWait * avgMin} min wait`}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_PILL[item.status] || 'bg-gray-100 text-gray-600'}`}>
+                          {STATUS_LABEL[item.status] || item.status}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Right Sidebar - Stats & Queue Summary */}
-          <div className="space-y-6">
-            {/* Queue Stats */}
-            <div className="bg-white border border-gray-200 rounded-lg p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Queue Stats</h3>
-              <div className="space-y-4">
-                <div className="bg-teal-50 p-4 rounded-lg border border-teal-200">
-                  <p className="text-xs text-gray-600 font-medium mb-1">Waiting</p>
-                  <p className="text-3xl font-bold text-teal-600">{queueStats.waiting}</p>
-                </div>
-                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                  <p className="text-xs text-gray-600 font-medium mb-1">Called</p>
-                  <p className="text-3xl font-bold text-yellow-600">{queueStats.called}</p>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <p className="text-xs text-gray-600 font-medium mb-1">Completed</p>
-                  <p className="text-3xl font-bold text-green-600">{queueStats.completed}</p>
-                </div>
-              </div>
-              {!currentPatient && (
-                <button onClick={handleCallNext} className="w-full bg-teal-600 text-white hover:bg-teal-700 px-4 py-3 rounded-lg font-medium transition mt-4">
-                  Call Next Patient
-                </button>
-              )}
-            </div>
+          {/* ── RIGHT: Sidebar ── */}
+          <div className="space-y-5">
 
-            {/* Next in Queue */}
-            {queue.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Next 3 in Queue</h3>
-                <div className="space-y-2">
-                  {queue.slice(0, 3).map((item, idx) => (
-                    <div key={item._id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-teal-400 transition">
-                      <p className="font-bold text-lg text-teal-600">#{item.tokenNumber}</p>
-                      <p className="text-sm font-medium text-gray-900">{item.patientId.name}</p>
-                      <p className="text-xs text-gray-600 mt-1 capitalize">{item.status}</p>
-                    </div>
-                  ))}
+            {/* Call Next CTA */}
+            {!currentPatient && waitingList.length > 0 && (
+              <button type="button" onClick={handleCallNext} disabled={isActionLoading}
+                className="w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold py-4 rounded-xl transition flex items-center justify-center gap-2 shadow-sm">
+                <ChevronRight size={20} /> Call Next Patient
+              </button>
+            )}
+
+            {/* Next up */}
+            {waitingList.length > 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <h3 className="font-bold text-gray-900 text-sm">Up Next</h3>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {waitingList.slice(0, 5).map((item, idx) => {
+                    const avgMin = user?.averageConsultationTime || 10;
+                    return (
+                      <div key={item._id} className="px-4 py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-xs font-bold text-teal-700">
+                            {item.tokenNumber}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{item.patientId.name}</p>
+                            <p className="text-xs text-gray-400">
+                              {idx === 0 ? 'Next' : `~${idx * avgMin} min`}
+                            </p>
+                          </div>
+                        </div>
+                        {idx === 0 && (
+                          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">Next</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Full Queue List */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 mt-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Full Queue</h3>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {queue.length === 0 ? (
-              <p className="text-center text-gray-600 py-8">No patients in queue</p>
-            ) : (
-              queue.map((item) => (
-                <div
-                  key={item._id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-teal-400 transition"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-xl font-bold text-gray-900 min-w-[50px]">#{item.tokenNumber}</span>
-                    <div>
-                      <p className="font-medium text-gray-900">{item.patientId.name}</p>
-                      <p className="text-xs text-gray-600">{item.patientId.phone}</p>
-                    </div>
+            {/* Summary stats */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+              <h3 className="font-bold text-gray-900 text-sm mb-3">Today's Summary</h3>
+              <div className="space-y-2.5">
+                {[
+                  { label: 'Total booked',  value: stats.total,     color: 'gray' },
+                  { label: 'Waiting',       value: stats.waiting,   color: 'teal' },
+                  { label: 'Completed',     value: stats.completed, color: 'green' },
+                  { label: 'Skipped / NS',  value: stats.skipped,   color: 'orange' },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">{label}</span>
+                    <span className={`text-sm font-bold text-${color}-600`}>{value}</span>
                   </div>
-                  <span className={`badge text-xs px-3 py-1 rounded-full font-medium ${
-                    item.status === 'CONSULTING' ? 'bg-green-100 text-green-700' :
-                    item.status === 'CALLED' ? 'bg-yellow-100 text-yellow-700' :
-                    item.status === 'COMPLETED' ? 'bg-blue-100 text-blue-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {item.status}
-                  </span>
+                ))}
+                <div className="pt-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span>Progress</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="mt-1.5 bg-gray-100 rounded-full h-1.5">
+                    <div className="bg-teal-500 h-1.5 rounded-full transition-all duration-700"
+                      style={{ width: `${progress}%` }} />
+                  </div>
                 </div>
-              ))
+              </div>
+            </div>
+
+            {/* Avg consultation time */}
+            {user?.averageConsultationTime > 0 && (
+              <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-center gap-3">
+                <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
+                  <Clock size={18} className="text-teal-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-teal-600 font-medium">Avg consultation</p>
+                  <p className="text-xl font-bold text-teal-800">{user.averageConsultationTime} min</p>
+                </div>
+              </div>
             )}
           </div>
         </div>

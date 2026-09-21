@@ -75,6 +75,11 @@ app.get('/health', (req, res) => {
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
+  // Doctor/patient joins their personal notification room
+  socket.on('join-notifications', (data) => {
+    socket.join(`notifications-${data.userId}`);
+  });
+
   socket.on('join-queue', (data) => {
     socket.join(`queue-${data.doctorId}`);
   });

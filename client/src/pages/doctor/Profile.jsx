@@ -6,6 +6,7 @@ import { doctorProfileAPI } from '../../services/api';
 import { setUser } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import { Heart, LogOut, Plus, X, Edit2, MapPin, Clock, DollarSign, Globe, Briefcase, Award, Users, Star, CheckCircle, Camera, Upload } from 'lucide-react';
+import { NotificationBell } from '../../components/NotificationBell';
 
 const DAYS_OF_WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const COMMON_QUALIFICATIONS = ['MBBS', 'MD', 'MS', 'DM', 'DNB', 'MCh', 'FRCS', 'MRCP', 'MBA'];
@@ -164,29 +165,33 @@ export const DoctorProfile = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
+      <header className="sticky top-0 z-50 bg-[#1E3A5F] border-b border-[#2D4F7C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-teal-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-[#0D9488] rounded-lg flex items-center justify-center">
               <Heart className="text-white" size={24} strokeWidth={2.5} />
             </div>
-            <h1 className="text-xl font-bold text-gray-900">ClinicFlow</h1>
+            <div>
+              <h1 className="text-base sm:text-lg font-bold text-white leading-tight">ClinicFlow</h1>
+              <p className="text-xs text-teal-300 hidden sm:block">My Profile</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/doctor')}
-              className="text-gray-700 hover:text-teal-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-teal-50 transition hidden sm:block"
+              className="text-slate-200 hover:text-teal-300 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-white/10 transition hidden sm:block"
             >
               Dashboard
             </button>
-            <div className="hidden sm:block h-6 border-l border-gray-300"></div>
-            <div className="hidden sm:flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full">
-              <span className="text-sm font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+            <div className="hidden sm:block h-6 border-l border-white/20"></div>
+            <div className="hidden sm:flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full">
+              <span className="text-sm font-medium text-white">{user?.name?.split(' ')[0]}</span>
             </div>
+            <NotificationBell />
             <button
               onClick={() => dispatch(logout())}
-              className="text-gray-700 hover:text-red-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-red-50 transition"
+              className="text-slate-300 hover:text-red-400 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-white/10 transition"
             >
               <LogOut size={18} />
             </button>

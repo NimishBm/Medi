@@ -1,158 +1,232 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, X, CalendarX, CalendarClock, CheckCheck } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import { Bell, CheckCheck, X } from 'lucide-react';
 import { notificationAPI } from '../services/api';
-import { getSocket } from '../services/socket';
-import toast from 'react-hot-toast';
-
-const T = '#0D9488';
+import { initSocket } from '../services/socket';
 
 const TYPE_ICON = {
-  APPOINTMENT_CANCELLED:   <CalendarX  size={16} color="#EF4444" />,
-  APPOINTMENT_RESCHEDULED: <CalendarClock size={16} color="#F59E0B" />,
+  NEW_APPOINTMENT:        '📅',
+  APPOINTMENT_CANCELLED:  '❌',
+  APPOINTMENT_RESCHEDULED:'🔄',
+  CHECKED_IN:             '✅',
+  QUEUE_UPDATE:           '🔔',
+  CALLED:                 '📢',
+  APPOINTMENT_COMPLETED:  '✔️',
+  PRESCRIPTION_READY:     '💊',
 };
 
-function timeAgo(dateStr) {
-  const diff = (Date.now() - new Date(dateStr)) / 1000;
-  if (diff < 60)   return 'just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
+const fmtTime = (iso) => {
+  const d = new Date(iso);
+  const diffMin = Math.floor((Date.now() - d) / 60000);
+  if (diffMin < 1)  return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24)  return `${diffHr}h ago`;
+  if (diffHr < 48)  return 'yesterday';
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+};
 
-export const NotificationBell = ({ userId }) => {
+export const NotificationBell = () => {
+  const { user } = useSelector((s) => s.auth || {});
   const [notifications, setNotifications] = useState([]);
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [unread, setUnread]               = useState(0);
+  const [open, setOpen]                   = useState(false);
+  const [loading, setLoading]             = useState(false);
+  const panelRef                          = useRef(null);
 
-  const unread = notifications.filter(n => !n.read).length;
+  // ── fetch ──────────────────────────────────────────────────────────────────
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await notificationAPI.getNotifications();
+      const list = res.data?.notifications || res.data || [];
+      setNotifications(list);
+      setUnread(res.data?.unreadCount ?? list.filter((n) => !n.read).length);
+    } catch {
+      // silently fail — bell is non-critical
+    }
+  };
+
+  // ── socket: join personal room & listen ────────────────────────────────────
 
   useEffect(() => {
-    notificationAPI.getAll()
-      .then(r => setNotifications(r.data))
-      .catch(() => {});
-  }, []);
+    fetchNotifications();
 
-  // Join user room + listen for real-time notifications
+    if (!user?._id) return;
+
+    try {
+      const socket = initSocket();
+      if (!socket) return;
+
+      const joinRoom = () => {
+        socket.emit('join-notifications', { userId: user._id });
+      };
+
+      if (socket.connected) {
+        joinRoom();
+      } else {
+        socket.once('connect', joinRoom);
+      }
+
+      socket.on('connect', joinRoom);
+
+      const onNew = () => fetchNotifications();
+      socket.on('new-notification', onNew);
+
+      return () => {
+        socket.off('connect', joinRoom);
+        socket.off('new-notification', onNew);
+      };
+    } catch {
+      // socket init failed or not supported in serverless
+    }
+  }, [user?._id]);
+
+  // ── close on outside click ─────────────────────────────────────────────────
+
   useEffect(() => {
-    if (!userId) return;
-    const socket = getSocket();
-    socket.emit('join-notifications', { userId });
-    const handler = (notification) => {
-      setNotifications(prev => [notification, ...prev]);
-      toast(notification.title, {
-        icon: notification.type === 'APPOINTMENT_CANCELLED' ? '❌' : '📅',
-        duration: 5000,
-      });
+    if (!open) return;
+    const handler = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) {
+        setOpen(false);
+      }
     };
-    socket.on('notification', handler);
-    return () => socket.off('notification', handler);
-  }, [userId]);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  }, [open]);
 
-  const markAllRead = async () => {
+  // ── mark read ──────────────────────────────────────────────────────────────
+
+  const handleMarkAllRead = async () => {
+    setLoading(true);
     try {
       await notificationAPI.markAllRead();
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    } catch {}
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setUnread(0);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const markOneRead = async (id) => {
+  const handleMarkRead = async (id) => {
     try {
       await notificationAPI.markRead(id);
-      setNotifications(prev => prev.map(n => n._id === id ? { ...n, read: true } : n));
-    } catch {}
+      setNotifications((prev) =>
+        prev.map((n) => (n._id === id ? { ...n, read: true } : n))
+      );
+      setUnread((prev) => Math.max(0, prev - 1));
+    } catch {
+      // silently fail
+    }
   };
 
+  // ── render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div className="relative" ref={panelRef}>
+      {/* Bell button */}
       <button
-        onClick={() => setOpen(o => !o)}
-        style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="relative p-2 rounded-lg text-gray-600 hover:text-teal-600 hover:bg-teal-50 transition"
+        title="Notifications"
       >
-        <Bell size={20} color="#374151" strokeWidth={2} />
+        <Bell size={20} />
         {unread > 0 && (
-          <span style={{
-            position: 'absolute', top: 0, right: 0,
-            background: '#EF4444', color: '#fff',
-            fontSize: 10, fontWeight: 800, lineHeight: 1,
-            minWidth: 16, height: 16, borderRadius: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '0 3px',
-          }}>
+          <span className="absolute top-1 right-1 min-w-[17px] h-[17px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none animate-pulse">
             {unread > 9 ? '9+' : unread}
           </span>
         )}
       </button>
 
+      {/* Dropdown panel */}
       {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-          width: 340, maxHeight: 440, overflowY: 'auto',
-          background: '#fff', borderRadius: 16,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
-          border: '1.5px solid #E5E7EB',
-          zIndex: 200,
-        }}>
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl border border-gray-200 shadow-2xl z-[999] overflow-hidden">
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 10px', borderBottom: '1px solid #F3F4F6' }}>
-            <span style={{ fontWeight: 800, fontSize: 14, color: '#111827' }}>
-              Notifications {unread > 0 && <span style={{ color: T }}>({unread})</span>}
-            </span>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
+            <div className="flex items-center gap-2">
+              <Bell size={14} className="text-teal-600" />
+              <span className="font-bold text-gray-800 text-sm">Notifications</span>
               {unread > 0 && (
-                <button onClick={markAllRead}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: T, fontWeight: 600 }}>
-                  <CheckCheck size={13} /> Mark all read
+                <span className="bg-red-100 text-red-600 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                  {unread} new
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              {unread > 0 && (
+                <button
+                  type="button"
+                  onClick={handleMarkAllRead}
+                  disabled={loading}
+                  className="text-xs text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1 px-2 py-1 rounded hover:bg-teal-50 transition disabled:opacity-50"
+                >
+                  <CheckCheck size={12} /> Mark all read
                 </button>
               )}
-              <button onClick={() => setOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex' }}>
-                <X size={16} />
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="p-1 rounded hover:bg-gray-200 transition text-gray-400 hover:text-gray-600 ml-1"
+              >
+                <X size={13} />
               </button>
             </div>
           </div>
 
-          {/* List */}
-          {notifications.length === 0 ? (
-            <div style={{ padding: '32px 16px', textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
-              <Bell size={28} color="#D1D5DB" style={{ marginBottom: 8 }} />
-              <p style={{ margin: 0 }}>No notifications yet</p>
-            </div>
-          ) : (
-            notifications.map(n => (
-              <div
-                key={n._id}
-                onClick={() => !n.read && markOneRead(n._id)}
-                style={{
-                  display: 'flex', gap: 12, padding: '12px 16px',
-                  background: n.read ? '#fff' : '#F0FDF4',
-                  borderBottom: '1px solid #F9FAFB',
-                  cursor: n.read ? 'default' : 'pointer',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => { if (!n.read) e.currentTarget.style.background = '#ECFDF5'; }}
-                onMouseLeave={e => { if (!n.read) e.currentTarget.style.background = '#F0FDF4'; }}
-              >
-                <div style={{ flexShrink: 0, marginTop: 2 }}>{TYPE_ICON[n.type]}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontWeight: n.read ? 500 : 700, fontSize: 13, color: '#111827' }}>{n.title}</p>
-                  <p style={{ margin: '2px 0 0', fontSize: 12, color: '#6B7280', lineHeight: 1.4 }}>{n.message}</p>
-                  <p style={{ margin: '4px 0 0', fontSize: 11, color: '#9CA3AF' }}>{timeAgo(n.createdAt)}</p>
-                </div>
-                {!n.read && (
-                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: T, flexShrink: 0, marginTop: 5 }} />
-                )}
+          {/* Notification list */}
+          <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-50">
+            {notifications.length === 0 ? (
+              <div className="text-center py-12">
+                <Bell size={32} className="mx-auto text-gray-200 mb-3" />
+                <p className="text-sm font-medium text-gray-400">No notifications yet</p>
+                <p className="text-xs text-gray-300 mt-1">New appointment alerts will appear here</p>
               </div>
-            ))
+            ) : (
+              notifications.map((n) => (
+                <div
+                  key={n._id}
+                  onClick={() => !n.read && handleMarkRead(n._id)}
+                  className={`flex gap-3 px-4 py-3.5 cursor-pointer transition hover:bg-gray-50 ${
+                    !n.read ? 'bg-teal-50/70' : ''
+                  }`}
+                >
+                  {/* Emoji icon */}
+                  <div className="w-9 h-9 rounded-full bg-teal-100 flex items-center justify-center text-base flex-shrink-0 mt-0.5">
+                    {TYPE_ICON[n.type] || '🔔'}
+                  </div>
+
+                  {/* Text */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className={`text-sm leading-snug ${!n.read ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                        {n.title}
+                      </p>
+                      {!n.read && (
+                        <span className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0 mt-1.5" />
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed line-clamp-2">
+                      {n.message}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">{fmtTime(n.createdAt)}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Footer */}
+          {notifications.length > 0 && (
+            <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-center">
+              <p className="text-xs text-gray-400">
+                Showing last {notifications.length} notifications
+              </p>
+            </div>
           )}
         </div>
       )}
     </div>
   );
 };
+export default NotificationBell;

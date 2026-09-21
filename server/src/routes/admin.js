@@ -4,6 +4,10 @@ import axios from 'axios';
 import Admin from '../models/Admin.js';
 import Doctor from '../models/Doctor.js';
 import Patient from '../models/Patient.js';
+import Appointment from '../models/Appointment.js';
+import Consultation from '../models/Consultation.js';
+import Prescription from '../models/Prescription.js';
+import Payment from '../models/Payment.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
 const router = express.Router();
@@ -155,6 +159,72 @@ router.post(
   })
 );
 
+// ── POST /api/admin/doctors ───────────────────────────────────────────────────
+
+router.post(
+  '/doctors',
+  requireAdmin,
+  catchAsyncErrors(async (req, res) => {
+    const { name, email, phone, password, specialization, experience, consultationFee,
+            licenseNumber, clinicName, clinicCity, verificationStatus, isActive } = req.body;
+
+    if (!name || !email || !phone || !password || !specialization) {
+      return res.status(400).json({ message: 'name, email, phone, password and specialization are required' });
+    }
+
+    const existing = await Doctor.findOne({ email });
+    if (existing) return res.status(409).json({ message: 'Email already in use' });
+
+    const doctor = await Doctor.create({
+      name, email, phone, password, specialization,
+      experience: experience || 0,
+      consultationFee: consultationFee || 0,
+      licenseNumber: licenseNumber || '',
+      clinicName: clinicName || '',
+      clinicCity: clinicCity || '',
+      verificationStatus: verificationStatus || 'PENDING',
+      isActive: isActive !== undefined ? isActive : true,
+    });
+
+    res.status(201).json({ message: 'Doctor created', doctor: doctor.toJSON() });
+  })
+);
+
+// ── PUT /api/admin/doctors/:id ────────────────────────────────────────────────
+
+router.put(
+  '/doctors/:id',
+  requireAdmin,
+  catchAsyncErrors(async (req, res) => {
+    const doctor = await Doctor.findById(req.params.id);
+    if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+
+    const { password, qualifications, ...rest } = req.body;
+    Object.assign(doctor, rest);
+    if (qualifications !== undefined) {
+      doctor.qualifications = Array.isArray(qualifications)
+        ? qualifications
+        : qualifications.split(',').map((q) => q.trim()).filter(Boolean);
+    }
+    if (password) doctor.password = password;
+    await doctor.save();
+
+    res.json({ message: 'Doctor updated', doctor: doctor.toJSON() });
+  })
+);
+
+// ── DELETE /api/admin/doctors/:id ─────────────────────────────────────────────
+
+router.delete(
+  '/doctors/:id',
+  requireAdmin,
+  catchAsyncErrors(async (req, res) => {
+    const doctor = await Doctor.findByIdAndDelete(req.params.id);
+    if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+    res.json({ message: 'Doctor deleted' });
+  })
+);
+
 // ── GET /api/admin/patients ───────────────────────────────────────────────────
 
 router.get(
@@ -163,6 +233,175 @@ router.get(
   catchAsyncErrors(async (req, res) => {
     const patients = await Patient.find().sort({ createdAt: -1 });
     res.json(patients);
+  })
+);
+
+// ── GET /api/admin/patients/:id ───────────────────────────────────────────────
+
+router.get(
+  '/patients/:id',
+  requireAdmin,
+  catchAsyncErrors(async (req, res) => {
+    const patient = await Patient.findById(req.params.id);
+    if (!patient) return res.status(404).json({ message: 'Patient not found' });
+    res.json(patient);
+  })
+);
+
+// ── POST /api/admin/patients ──────────────────────────────────────────────────
+
+router.post(
+  '/patients',
+  requireAdmin,
+  catchAsyncErrors(async (req, res) => {
+    const { name, email, phone, password, gender, dateOfBirth, bloodGroup, allergies } = req.body;
+
+    if (!name || !email || !phone || !password) {
+      return res.status(400).json({ message: 'name, email, phone and password are required' });
+    }
+
+    const existing = await Patient.findOne({ email });
+    if (existing) return res.status(409).json({ message: 'Email already in use' });
+
+    const patient = await Patient.create({
+      name, email, phone, password,
+      gender: gender || undefined,
+      dateOfBirth: dateOfBirth || undefined,
+      bloodGroup: bloodGroup || undefined,
+      allergies: Array.isArray(allergies) ? allergies : (allergies ? allergies.split(',').map((a) => a.trim()).filter(Boolean) : []),
+    });
+
+    res.status(201).json({ message: 'Patient created', patient: patient.toJSON() });
+  })
+);
+
+// ── PUT /api/admin/patients/:id ───────────────────────────────────────────────
+
+router.put(
+  '/patients/:id',
+  requireAdmin,
+  catchAsyncErrors(async (req, res) => {
+    const patient = await Patient.findById(req.params.id);
+    if (!patient) return res.status(404).json({ message: 'Patient not found' });
+
+    const { password, allergies, ...rest } = req.body;
+    Object.assign(patient, rest);
+    if (allergies !== undefined) {
+      patient.allergies = Array.isArray(allergies)
+        ? allergies
+        : allergies.split(',').map((a) => a.trim()).filter(Boolean);
+    }
+    if (password) patient.password = password;
+    await patient.save();
+
+    res.json({ message: 'Patient updated', patient: patient.toJSON() });
+  })
+);
+
+// ── DELETE /api/admin/patients/:id ────────────────────────────────────────────
+
+router.delete(
+  '/patients/:id',
+  requireAdmin,
+  catchAsyncErrors(async (req, res) => {
+    const patient = await Patient.findByIdAndDelete(req.params.id);
+    if (!patient) return res.status(404).json({ message: 'Patient not found' });
+    res.json({ message: 'Patient deleted' });
+  })
+);
+
+// ── GET /api/admin/doctors/:id/full ──────────────────────────────────────────
+// Returns doctor + all appointments, consultations, unique patients, payments
+
+router.get(
+  '/doctors/:id/full',
+  requireAdmin,
+  catchAsyncErrors(async (req, res) => {
+    const doctor = await Doctor.findById(req.params.id);
+    if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+
+    const [appointments, consultations, payments] = await Promise.all([
+      Appointment.find({ doctorId: req.params.id })
+        .sort({ appointmentDate: -1 })
+        .limit(200)
+        .populate('patientId', 'name email phone'),
+      Consultation.find({ doctorId: req.params.id })
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .populate('patientId', 'name email'),
+      Payment.find({ doctorId: req.params.id })
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .populate('patientId', 'name email'),
+    ]);
+
+    // build unique-patient map
+    const patientMap = new Map();
+    appointments.forEach((a) => {
+      if (a.patientId) {
+        const p = a.patientId;
+        const key = p._id.toString();
+        if (!patientMap.has(key)) {
+          patientMap.set(key, { _id: p._id, name: p.name, email: p.email, phone: p.phone, appointmentCount: 0 });
+        }
+        patientMap.get(key).appointmentCount++;
+      }
+    });
+
+    const revenueStats = {
+      total:    payments.reduce((s, p) => s + p.totalAmount, 0),
+      paid:     payments.filter((p) => p.status === 'PAID').reduce((s, p) => s + p.totalAmount, 0),
+      pending:  payments.filter((p) => p.status === 'PENDING').reduce((s, p) => s + p.totalAmount, 0),
+      refunded: payments.filter((p) => p.status === 'REFUNDED').reduce((s, p) => s + p.totalAmount, 0),
+    };
+
+    res.json({
+      doctor: doctor.toJSON(),
+      appointments,
+      consultations,
+      payments,
+      patients: Array.from(patientMap.values()),
+      revenueStats,
+    });
+  })
+);
+
+// ── GET /api/admin/patients/:id/full ─────────────────────────────────────────
+// Returns patient + all appointments, prescriptions, payments, consultations
+
+router.get(
+  '/patients/:id/full',
+  requireAdmin,
+  catchAsyncErrors(async (req, res) => {
+    const patient = await Patient.findById(req.params.id);
+    if (!patient) return res.status(404).json({ message: 'Patient not found' });
+
+    const [appointments, prescriptions, payments, consultations] = await Promise.all([
+      Appointment.find({ patientId: req.params.id })
+        .sort({ appointmentDate: -1 })
+        .limit(200)
+        .populate('doctorId', 'name specialization clinicName clinicCity'),
+      Prescription.find({ patientId: req.params.id })
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .populate('doctorId', 'name specialization'),
+      Payment.find({ patientId: req.params.id })
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .populate('doctorId', 'name specialization'),
+      Consultation.find({ patientId: req.params.id })
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .populate('doctorId', 'name specialization'),
+    ]);
+
+    res.json({
+      patient: patient.toJSON(),
+      appointments,
+      prescriptions,
+      payments,
+      consultations,
+    });
   })
 );
 

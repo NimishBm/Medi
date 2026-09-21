@@ -15,16 +15,16 @@ router.get(
   protect,
   catchAsyncErrors(async (req, res) => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
 
     const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
     const queue = await Queue.find({
       doctorId: req.params.doctorId,
       queueDate: { $gte: today, $lt: tomorrow },
     })
-      .populate('patientId', 'name phone email')
+      .populate('patientId', 'name phone email dateOfBirth gender bloodGroup allergies medicalHistory')
       .sort({ status: 1, tokenNumber: 1 });
 
     const stats = {
@@ -108,10 +108,10 @@ router.post(
     }
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
 
     const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
     const nextPatient = await Queue.findOne({
       doctorId,
@@ -135,7 +135,7 @@ router.post(
 
     const patientData = await nextPatient.populate(
       'patientId',
-      'name phone email'
+      'name phone email dateOfBirth gender bloodGroup allergies medicalHistory'
     );
 
     io?.emit('queue-update', {

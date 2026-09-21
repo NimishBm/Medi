@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { logout } from '../../store/slices/authSlice';
 import { appointmentAPI, consultationAPI, prescriptionAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { Heart, LogOut, ArrowLeft, FileText, Plus, Trash2, X } from 'lucide-react';
+import { Heart, LogOut, ArrowLeft, FileText, Plus, Trash2, X, CalendarClock } from 'lucide-react';
+import { NotificationBell } from '../../components/NotificationBell';
 
 const FREQUENCIES = ['Once daily', 'Twice daily', 'Three times daily', 'Four times daily', 'Every 6 hours', 'Every 8 hours', 'As needed'];
 const DURATIONS = ['1 day', '2 days', '3 days', '5 days', '1 week', '2 weeks', '1 month', '3 months', 'Ongoing'];
@@ -140,6 +141,94 @@ const TYPE_COLORS = {
 
 const APPOINTMENT_TYPE_FILTERS = ['All Types', 'General Consultation', 'New Patient', 'Follow-up', 'Specialist Consultation', 'Emergency', 'Vaccination', 'Teleconsultation'];
 
+// ─── Reschedule Modal ─────────────────────────────────────────────────────────
+const RescheduleModal = ({ appointment, onClose, onSaved }) => {
+  const [date, setDate] = useState(
+    new Date(appointment.appointmentDate).toISOString().split('T')[0]
+  );
+  const [time, setTime] = useState(appointment.appointmentTime || '');
+  const [saving, setSaving] = useState(false);
+
+  const today = new Date().toISOString().split('T')[0];
+
+  const handleSave = async () => {
+    if (!date || !time) {
+      toast.error('Please select both date and time');
+      return;
+    }
+
+    // 30-minute cutoff: if same day, block changes within 30 min of appointment time
+    const aptDateTime = new Date(`${date}T${time}`);
+    const now = new Date();
+    const diffMs = aptDateTime - now;
+    if (diffMs < 30 * 60 * 1000) {
+      toast.error('Cannot reschedule within 30 minutes of appointment time');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const res = await appointmentAPI.updateAppointment(appointment._id, {
+        appointmentDate: date,
+        appointmentTime: time,
+      });
+      toast.success('Appointment rescheduled');
+      onSaved(res.data.appointment);
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to reschedule');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+          <div>
+            <h3 className="text-base font-bold text-gray-900">Reschedule Appointment</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Patient: <span className="font-medium text-gray-700">{appointment.patientId?.name}</span>
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">New Date</label>
+            <input
+              type="date"
+              value={date}
+              min={today}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">New Time</label>
+            <input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+          </div>
+          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            ⚠️ Rescheduling is blocked within 30 minutes of the original appointment time.
+          </p>
+        </div>
+        <div className="px-5 py-3 border-t border-gray-200 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition">Cancel</button>
+          <button disabled={saving} onClick={handleSave} className="px-4 py-2 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 rounded-lg transition">
+            {saving ? 'Saving...' : 'Reschedule'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const DoctorAppointments = () => {
   const { user } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
@@ -151,6 +240,7 @@ export const DoctorAppointments = () => {
   const [expandedConsultation, setExpandedConsultation] = useState(null);
   const [consultationNotes, setConsultationNotes] = useState({});
   const [prescriptionPatient, setPrescriptionPatient] = useState(null);
+  const [reschedulingApt, setReschedulingApt] = useState(null);
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -166,6 +256,12 @@ export const DoctorAppointments = () => {
 
     fetchAppointments();
   }, []);
+
+  const handleRescheduleSaved = (updated) => {
+    setAppointments((prev) =>
+      prev.map((a) => (a._id === updated._id ? { ...a, appointmentDate: updated.appointmentDate, appointmentTime: updated.appointmentTime } : a))
+    );
+  };
 
   const filteredAppointments = useMemo(() => {
     const now = new Date();
@@ -237,48 +333,61 @@ export const DoctorAppointments = () => {
         />
       )}
 
+      {/* Reschedule modal */}
+      {reschedulingApt && (
+        <RescheduleModal
+          appointment={reschedulingApt}
+          onClose={() => setReschedulingApt(null)}
+          onSaved={handleRescheduleSaved}
+        />
+      )}
+
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
+      <header className="sticky top-0 z-50 bg-[#1E3A5F] border-b border-[#2D4F7C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/doctor')}
-              className="sm:hidden text-teal-600 hover:text-teal-700 p-2"
+              className="sm:hidden text-teal-300 hover:text-white p-2"
             >
               <ArrowLeft size={24} />
             </button>
-            <div className="w-10 h-10 bg-teal-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-[#0D9488] rounded-lg flex items-center justify-center">
               <Heart className="text-white" size={24} strokeWidth={2.5} />
             </div>
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900">Appointments</h1>
+            <div>
+              <h1 className="text-base sm:text-lg font-bold text-white leading-tight">Appointments</h1>
+              <p className="text-xs text-teal-300 hidden sm:block">ClinicFlow</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/doctor')}
-              className="text-gray-700 hover:text-teal-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-teal-50 transition hidden sm:block"
+              className="text-slate-200 hover:text-teal-300 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-white/10 transition hidden sm:block"
             >
               Dashboard
             </button>
             <button
               onClick={() => navigate('/doctor/queue')}
-              className="text-gray-700 hover:text-teal-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-teal-50 transition hidden sm:block"
+              className="text-slate-200 hover:text-teal-300 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-white/10 transition hidden sm:block"
             >
               Live Queue
             </button>
             <button
               onClick={() => navigate('/doctor/profile')}
-              className="text-gray-700 hover:text-teal-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-teal-50 transition hidden sm:block"
+              className="text-slate-200 hover:text-teal-300 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-white/10 transition hidden sm:block"
             >
               My Profile
             </button>
-            <div className="hidden sm:block h-6 border-l border-gray-300"></div>
-            <div className="hidden sm:flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full">
-              <span className="text-sm font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+            <div className="hidden sm:block h-6 border-l border-white/20"></div>
+            <div className="hidden sm:flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full">
+              <span className="text-sm font-medium text-white">{user?.name?.split(' ')[0]}</span>
             </div>
+            <NotificationBell />
             <button
               onClick={() => dispatch(logout())}
-              className="text-gray-700 hover:text-red-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-red-50 transition"
+              className="text-slate-300 hover:text-red-400 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-white/10 transition"
             >
               <LogOut size={18} />
             </button>
@@ -289,8 +398,8 @@ export const DoctorAppointments = () => {
       <div className="max-w-7xl mx-auto px-4 py-4 sm:py-8">
         {/* Title */}
         <div className="mb-4 sm:mb-8 hidden sm:block">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">My Appointments</h2>
-          <p className="text-gray-600">Manage and track all your patient appointments</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-1">My Appointments</h2>
+          <p className="text-gray-500">Manage and track all your patient appointments</p>
         </div>
 
         {/* Stats Cards */}
@@ -401,6 +510,15 @@ export const DoctorAppointments = () => {
                         <span className="text-xs text-teal-600 font-medium hidden sm:inline">
                           {expandedConsultation === apt._id ? '▼' : '▶'} Notes
                         </span>
+                      )}
+                      {!['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(apt.status) && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setReschedulingApt(apt); }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition"
+                        >
+                          <CalendarClock size={13} />
+                          <span className="hidden sm:inline">Reschedule</span>
+                        </button>
                       )}
                       <button
                         onClick={(e) => { e.stopPropagation(); setPrescriptionPatient(apt.patientId); }}
