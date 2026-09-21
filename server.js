@@ -50,16 +50,20 @@ const connectDB = async () => {
     return mongoose.connection;
   }
   if (!process.env.MONGO_URI) {
-    console.warn('MONGO_URI is not defined in environment variables');
-    return null;
+    throw new Error('MONGO_URI is not defined in environment variables');
   }
-  if (!connPromise) {
+  if (!connPromise || mongoose.connection.readyState === 0) {
     connPromise = mongoose.connect(process.env.MONGO_URI, {
-      bufferCommands: false,
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 8000,
+      connectTimeoutMS: 10000,
     });
   }
-  await connPromise;
+  try {
+    await connPromise;
+  } catch (err) {
+    connPromise = null; // reset promise so next request retries fresh connection
+    throw err;
+  }
   return mongoose.connection;
 };
 
