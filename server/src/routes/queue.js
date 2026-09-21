@@ -138,7 +138,7 @@ router.post(
       'name phone email'
     );
 
-    io.emit('queue-update', {
+    io?.emit('queue-update', {
       doctorId,
       nextPatient: patientData,
     });
@@ -177,7 +177,7 @@ router.post(
     appointment.status = 'SKIPPED';
     await appointment.save();
 
-    io.emit('queue-update', {
+    io?.emit('queue-update', {
       doctorId: queueEntry.doctorId,
     });
 
@@ -208,7 +208,7 @@ router.post(
     queueEntry.status = 'WAITING';
     await queueEntry.save();
 
-    io.emit('queue-update', {
+    io?.emit('queue-update', {
       doctorId: queueEntry.doctorId,
     });
 
@@ -246,7 +246,7 @@ router.post(
     appointment.consultationStartTime = new Date();
     await appointment.save();
 
-    io.emit('queue-update', {
+    io?.emit('queue-update', {
       doctorId: queueEntry.doctorId,
     });
 
@@ -316,7 +316,7 @@ router.post(
       await doctor.save();
     }
 
-    io.emit('queue-update', {
+    io?.emit('queue-update', {
       doctorId: queueEntry.doctorId,
     });
 
@@ -354,7 +354,7 @@ router.post(
     appointment.status = 'NO_SHOW';
     await appointment.save();
 
-    io.emit('queue-update', {
+    io?.emit('queue-update', {
       doctorId: queueEntry.doctorId,
     });
 

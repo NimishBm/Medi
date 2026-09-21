@@ -3,10 +3,9 @@ import mongoose from 'mongoose';
 const queuePauseSchema = new mongoose.Schema(
   {
     doctorId: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: 'Doctor',
-  required: true,
-,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Doctor',
+      required: true,
     },
     pauseDate: {
       type: Date,

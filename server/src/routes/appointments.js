@@ -2,6 +2,8 @@ import express from 'express';
 import mongoose from 'mongoose';
 import Appointment from '../models/Appointment.js';
 import Queue from '../models/Queue.js';
+import Notification from '../models/Notification.js';
+import { io } from '../index.js';
 
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
@@ -88,6 +90,38 @@ router.post(
       await appointment.save();
       await appointment.populate(['patientId', 'doctorId']);
       createdAppointments.push(appointment);
+
+      // If the appointment is for today, add to queue immediately (status WAITING)
+      const apptDate    = new Date(appointmentDate);
+      const apptDateStr = apptDate.toISOString().split('T')[0];
+      const todayStr    = new Date().toISOString().split('T')[0];
+      console.log('[Queue] apptDateStr:', apptDateStr, 'todayStr:', todayStr, 'match:', apptDateStr === todayStr);
+      if (apptDateStr === todayStr) {
+        try {
+          await Queue.create({
+            doctorId,
+            appointmentId: appointment._id,
+            patientId,
+            tokenNumber,
+            queueDate: apptDate,
+            status: 'WAITING',
+          });
+          io.to(`queue-${doctorId}`).emit('queue-update', { doctorId });
+          console.log('[Queue] entry created for appointment', appointment._id);
+        } catch (qErr) {
+          console.error('[Queue] failed to create entry:', qErr.message);
+        }
+      }
+
+      // Notify doctor in real-time
+      io.to(`doctor-${doctorId}`).emit('new-appointment', {
+        appointmentId: appointment._id,
+        patientName:   appointment.patientId?.name || 'A patient',
+        date:          appointmentDate,
+        time:          appointmentTime,
+        tokenNumber,
+        bookedFor:     attendee,
+      });
     }
 
     // Return single object for single booking, array for group booking (backward compatible)
@@ -203,18 +237,70 @@ router.post(
   protect,
   catchAsyncErrors(async (req, res) => {
     const appointment = await Appointment.findById(req.params.id);
-
-    if (!appointment) {
-      return res.status(404).json({ message: 'Appointment not found' });
-    }
+    if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
 
     appointment.status = 'CANCELLED';
     await appointment.save();
 
-    res.json({
-      message: 'Appointment cancelled successfully',
-      appointment,
+    // Remove any pending queue entry for this appointment
+    await Queue.deleteOne({ appointmentId: appointment._id, status: 'WAITING' });
+    io.to(`queue-${appointment.doctorId}`).emit('queue-update', { doctorId: appointment.doctorId });
+
+    // Notify patient when a doctor cancels
+    if (req.user.role === 'DOCTOR') {
+      const dateStr = new Date(appointment.appointmentDate).toDateString();
+      const notification = await Notification.create({
+        userId:        appointment.patientId,
+        type:          'APPOINTMENT_CANCELLED',
+        title:         'Appointment Cancelled',
+        message:       `Your appointment on ${dateStr} at ${appointment.appointmentTime} has been cancelled by your doctor.`,
+        appointmentId: appointment._id,
+      });
+      io.to(`patient-${appointment.patientId}`).emit('notification', notification);
+    }
+
+    res.json({ message: 'Appointment cancelled successfully', appointment });
+  })
+);
+
+// Reschedule appointment (doctor only)
+router.put(
+  '/:id/reschedule',
+  protect,
+  authorize('DOCTOR'),
+  catchAsyncErrors(async (req, res) => {
+    const { appointmentDate, appointmentTime } = req.body;
+    if (!appointmentDate || !appointmentTime) {
+      return res.status(400).json({ message: 'New date and time are required' });
+    }
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+    if (String(appointment.doctorId) !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // If rescheduled away from today, remove any existing WAITING queue entry
+    const rescheduledToStr = new Date(appointmentDate).toISOString().split('T')[0];
+    const todayCheckStr    = new Date().toISOString().split('T')[0];
+    if (rescheduledToStr !== todayCheckStr) {
+      await Queue.deleteOne({ appointmentId: appointment._id, status: 'WAITING' });
+    }
+
+    appointment.appointmentDate = appointmentDate;
+    appointment.appointmentTime = appointmentTime;
+    await appointment.save();
+
+    const dateStr = new Date(appointmentDate).toDateString();
+    const notification = await Notification.create({
+      userId:        appointment.patientId,
+      type:          'APPOINTMENT_RESCHEDULED',
+      title:         'Appointment Rescheduled',
+      message:       `Your appointment has been rescheduled to ${dateStr} at ${appointmentTime}.`,
+      appointmentId: appointment._id,
     });
+    io.to(`patient-${appointment.patientId}`).emit('notification', notification);
+
+    res.json({ message: 'Appointment rescheduled successfully', appointment });
   })
 );
 
@@ -254,6 +340,8 @@ router.post(
       });
       await queueEntry.save();
     }
+
+    io.to(`queue-${doctorId}`).emit('queue-update', { doctorId });
 
     res.json({
       message: 'Patient checked in successfully',
