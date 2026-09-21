@@ -5,7 +5,6 @@ const prescriptionSchema = new mongoose.Schema(
     consultationId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Consultation',
-      required: true,
     },
 
     patientId: {

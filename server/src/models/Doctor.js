@@ -39,10 +39,6 @@ organizationIds: [
   }
 ],
 
-experience: {
-  type: Number,
-  required: true
-},
     experience: {
       type: Number,
       default: 0
@@ -187,6 +183,7 @@ experience: {
     timestamps: true
   }
 );
+// Hash password before saving
 doctorSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
   try {

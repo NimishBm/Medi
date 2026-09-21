@@ -82,13 +82,24 @@ export const consultationAPI = {
 };
 
 export const doctorProfileAPI = {
+  getMe: () => api.get('/auth/me'),
   updateMe: (data) => api.put('/doctors/me', data),
+  uploadPhoto: (file) => {
+    const formData = new FormData();
+    formData.append('profilePhoto', file);
+    return api.post('/doctors/upload-photo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
 };
 
 export const prescriptionAPI = {
   createPrescription: (data) => api.post('/prescriptions', data),
   getPrescriptionsByPatient: (patientId) => api.get(`/prescriptions/patient/${patientId}`),
   getPrescriptionById: (id) => api.get(`/prescriptions/${id}`),
+  getByDoctor: () => api.get('/prescriptions/doctor'),
 };
 
 export const paymentAPI = {
@@ -120,4 +131,11 @@ export const searchAPI = {
   suggestions: (q) => api.get('/search/suggestions', { params: { q } }),
 };
 
+export const blogAPI = {
+  getPosts: () => api.get('/blog/posts'),
+  createPost: (data) => api.post('/blog/posts', data),
+  updatePost: (id, data) => api.put(`/blog/posts/${id}`, data),
+  deletePost: (id) => api.delete(`/blog/posts/${id}`),
+  getCategories: () => api.get('/blog/categories'),
+};
 export default api;
