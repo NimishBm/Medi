@@ -32,25 +32,35 @@ app.use(express.json());
 // Reusable connection caching for serverless environments
 let cachedConnection = null;
 
+let connPromise = null;
+
 const connectDB = async () => {
-  if (cachedConnection && mongoose.connection.readyState === 1) {
-    return cachedConnection;
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
   }
   if (!process.env.MONGO_URI) {
-    console.warn('MONGO_URI is not defined in environment variables');
-    return null;
+    throw new Error('MONGO_URI environment variable is missing on serverless environment');
   }
-  cachedConnection = await mongoose.connect(process.env.MONGO_URI);
-  return cachedConnection;
+  if (!connPromise) {
+    connPromise = mongoose.connect(process.env.MONGO_URI, {
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 5000,
+    });
+  }
+  await connPromise;
+  return mongoose.connection;
 };
 
 app.use(async (req, res, next) => {
   try {
     await connectDB();
+    next();
   } catch (err) {
     console.error('MongoDB connection error:', err);
+    res.status(500).json({
+      message: 'Database connection failed: ' + (err.message || err),
+    });
   }
-  next();
 });
 
 // Routes

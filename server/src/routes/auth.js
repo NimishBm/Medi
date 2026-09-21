@@ -7,7 +7,10 @@ import Doctor from '../models/Doctor.js';
 import { protect } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const getGoogleClient = () => {
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+  return new OAuth2Client(clientId);
+};
 
 const router = express.Router();
 
@@ -274,9 +277,15 @@ router.post(
       return res.status(400).json({ message: 'No Google credential provided' });
     }
 
-    const ticket = await googleClient.verifyIdToken({
+    const clientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      return res.status(500).json({ message: 'GOOGLE_CLIENT_ID is not configured in environment variables' });
+    }
+
+    const client = getGoogleClient();
+    const ticket = await client.verifyIdToken({
       idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: clientId,
     });
     const { sub: googleId, email, name } = ticket.getPayload();
 
