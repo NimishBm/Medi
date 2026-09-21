@@ -112,7 +112,7 @@ export const Marketplace = () => {
       return;
     }
 
-    if (query.length < 4) {
+    if (query.length < 3) {
       setSearchResults([]);
       setSearchType(null);
       setSearchLoading(false);
