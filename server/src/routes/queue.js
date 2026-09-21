@@ -40,6 +40,61 @@ router.get(
   })
 );
 
+// Get queue stats for all doctors
+// Public endpoint used by Marketplace
+router.get(
+  '/stats',
+  catchAsyncErrors(async (req, res) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const stats = await Queue.aggregate([
+      {
+        $match: {
+          queueDate: { $gte: today, $lt: tomorrow },
+        },
+      },
+      {
+        $group: {
+          _id: '$doctorId',
+          waiting: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'WAITING'] }, 1, 0],
+            },
+          },
+          total: { $sum: 1 },
+          called: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'CALLED'] }, 1, 0],
+            },
+          },
+          consulting: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'CONSULTING'] }, 1, 0],
+            },
+          },
+        },
+      },
+    ]);
+
+    const result = {};
+
+    for (const item of stats) {
+      result[item._id.toString()] = {
+        waiting: item.waiting,
+        total: item.total,
+        called: item.called,
+        consulting: item.consulting,
+      };
+    }
+
+    res.json(result);
+  })
+);
+
 // Call next patient
 router.post(
   '/call-next',
