@@ -1,514 +1,465 @@
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import {
-  PenSquare,
-  Plus,
-  Trash2,
-  Edit2,
-  ArrowLeft,
-  Eye,
-  Globe,
-  AlertCircle,
-  Settings,
+  Heart, LogOut, ArrowLeft, Plus, Edit2, Eye,
+  Trash2, Calendar, BarChart2, PenSquare, X, ChevronLeft,
 } from 'lucide-react';
-import { doctorProfileAPI } from '../../services/api';
-import { setUser } from '../../store/slices/authSlice';
+import { blogAPI } from '../../services/api';
+import { NotificationBell } from '../../components/NotificationBell';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// ── constants ──────────────────────────────────────────────────────────────
+
+const CATEGORIES = [
+  'General Health', 'Cardiology', 'Dermatology', 'Nutrition',
+  'Mental Health', 'Pediatrics', 'Orthopedics', 'Diabetes',
+  'Women Health', 'Fitness & Wellness',
+];
+
+const STATUS_LABEL = {
+  published:      'Published',
+  pending_review: 'Pending Review',
+  draft:          'Draft',
+  rejected:       'Rejected',
+};
+
+const STATUS_STYLE = {
+  published:      'bg-green-100 text-green-700',
+  pending_review: 'bg-yellow-100 text-yellow-700',
+  draft:          'bg-gray-100 text-gray-600',
+  rejected:       'bg-red-100 text-red-600',
+};
+
+// Pastel cover colours used when no image URL provided
+const COVER_COLORS = [
+  'from-blue-200 to-blue-300',
+  'from-teal-200 to-teal-300',
+  'from-purple-200 to-purple-300',
+  'from-rose-200 to-rose-300',
+  'from-amber-200 to-amber-300',
+  'from-emerald-200 to-emerald-300',
+];
+
+const fmtDate = (iso) =>
+  new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+const fmtViews = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+
+const emptyForm = () => ({
+  title: '', content: '', excerpt: '', category: 'General Health',
+  status: 'draft', coverImage: '',
+});
+
+// ── component ──────────────────────────────────────────────────────────────
 
 export const DoctorBlog = () => {
-  const { user, token } = useSelector((state) => state.auth);
+  const { user } = useSelector((s) => s.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const [view, setView] = useState(user?.wpSiteUrl ? 'posts' : 'setup');
-  const [posts, setPosts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const [posts, setPosts]           = useState([]);
+  const [isLoading, setIsLoading]   = useState(true);
+  const [activeTab, setActiveTab]   = useState('all');
+  const [view, setView]             = useState('list'); // 'list' | 'create' | 'edit'
+  const [editPost, setEditPost]     = useState(null);
+  const [form, setForm]             = useState(emptyForm());
+  const [isSaving, setIsSaving]     = useState(false);
 
-  const [setupData, setSetupData] = useState({
-    wpSiteUrl: user?.wpSiteUrl || '',
-    wpUsername: user?.wpUsername || '',
-    wpAppPassword: user?.wpAppPassword || '',
-  });
-
-  const [newPost, setNewPost] = useState({
-    title: '',
-    content: '',
-    excerpt: '',
-    status: 'draft',
-    categories: [],
-  });
-
-  const [editingPost, setEditingPost] = useState(null);
-
-  useEffect(() => {
-    if (view === 'posts' && user?.wpSiteUrl) {
-      fetchPosts();
-      fetchCategories();
-    }
-  }, [view, user?.wpSiteUrl]);
+  // ── data ───────────────────────────────────────────────────────────────────
 
   const fetchPosts = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/blog/posts`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch posts');
-      const data = await response.json();
-      setPosts(data);
-    } catch (error) {
+      const res = await blogAPI.getPosts();
+      setPosts(res.data);
+    } catch {
       toast.error('Failed to load posts');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch(`${API_URL}/blog/categories`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch categories');
-      const data = await response.json();
-      setCategories(data);
-    } catch (error) {
-      console.error('Failed to load categories');
-    }
+  useEffect(() => { fetchPosts(); }, []);
+
+  // ── filtered list ──────────────────────────────────────────────────────────
+
+  const filtered = activeTab === 'all'
+    ? posts
+    : posts.filter((p) => p.status === activeTab);
+
+  const tabCounts = {
+    all:            posts.length,
+    published:      posts.filter((p) => p.status === 'published').length,
+    pending_review: posts.filter((p) => p.status === 'pending_review').length,
+    draft:          posts.filter((p) => p.status === 'draft').length,
+    rejected:       posts.filter((p) => p.status === 'rejected').length,
   };
 
-  const handleSetupChange = (e) => {
-    const { name, value } = e.target;
-    setSetupData((prev) => ({ ...prev, [name]: value }));
+  // ── form helpers ───────────────────────────────────────────────────────────
+
+  const openCreate = () => {
+    setForm(emptyForm());
+    setEditPost(null);
+    setView('create');
   };
 
-  const handleSaveSetup = async (e) => {
+  const openEdit = (post) => {
+    setForm({
+      title:       post.title,
+      content:     post.content,
+      excerpt:     post.excerpt || '',
+      category:    post.category || 'General Health',
+      status:      post.status,
+      coverImage:  post.coverImage || '',
+    });
+    setEditPost(post);
+    setView('edit');
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    try {
-      const response = await doctorProfileAPI.updateMe(setupData);
-      dispatch(setUser({ user: response.data, token }));
-      toast.success('WordPress configured successfully!');
-      setView('posts');
-      setPosts([]);
-      fetchPosts();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to save WordPress credentials');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handlePostChange = (e) => {
-    const { name, value } = e.target;
-    if (name === 'categories') {
-      const selectedCats = Array.from(e.target.selectedOptions, (option) =>
-        parseInt(option.value)
-      );
-      setNewPost((prev) => ({ ...prev, categories: selectedCats }));
-    } else {
-      setNewPost((prev) => ({ ...prev, [name]: value }));
-    }
-  };
-
-  const handleCreatePost = async (e) => {
-    e.preventDefault();
-    if (!newPost.title.trim() || !newPost.content.trim()) {
+    if (!form.title.trim() || !form.content.trim()) {
       toast.error('Title and content are required');
       return;
     }
-
-    setIsCreating(true);
+    setIsSaving(true);
     try {
-      const response = await fetch(`${API_URL}/blog/posts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(newPost),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create post');
+      if (view === 'edit' && editPost) {
+        await blogAPI.updatePost(editPost._id, form);
+        toast.success('Post updated');
+      } else {
+        await blogAPI.createPost(form);
+        toast.success('Post created');
       }
-
-      toast.success('Post created successfully!');
-      setNewPost({ title: '', content: '', excerpt: '', status: 'draft', categories: [] });
-      setView('posts');
       fetchPosts();
-    } catch (error) {
-      toast.error(error.message || 'Failed to create post');
+      setView('list');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to save post');
     } finally {
-      setIsCreating(false);
+      setIsSaving(false);
     }
   };
 
-  const handleDeletePost = async (postId) => {
-    if (!window.confirm('Are you sure you want to delete this post?')) return;
-
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this post?')) return;
     try {
-      const response = await fetch(`${API_URL}/blog/posts/${postId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) throw new Error('Failed to delete post');
-
-      toast.success('Post deleted successfully');
+      await blogAPI.deletePost(id);
+      toast.success('Post deleted');
       fetchPosts();
-    } catch (error) {
+    } catch {
       toast.error('Failed to delete post');
     }
   };
 
+  // ── render ─────────────────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-teal-200 shadow-md">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+
+      {/* ── Header ── */}
+      <header className="sticky top-0 z-50 bg-[#1E3A5F] border-b border-[#2D4F7C] shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/doctor')}
-              className="text-gray-600 hover:text-gray-900 transition"
-            >
+            <button type="button" onClick={() => view !== 'list' ? setView('list') : navigate('/doctor')}
+              className="text-teal-300 hover:text-white transition p-1">
               <ArrowLeft size={20} />
             </button>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
-                <PenSquare className="text-white" size={20} />
-              </div>
-              <h1 className="text-xl font-bold text-gray-900">My Blog</h1>
+            <div className="w-9 h-9 bg-purple-500 rounded-lg flex items-center justify-center">
+              <PenSquare className="text-white" size={18} />
+            </div>
+            <div>
+              <h1 className="text-base sm:text-lg font-bold text-white leading-tight">My Blog</h1>
+              <p className="text-xs text-teal-300 hidden sm:block">Share health knowledge with your patients</p>
             </div>
           </div>
-          {view === 'posts' && user?.wpSiteUrl && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => setView('new')}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition flex items-center gap-2"
-              >
-                <Plus size={18} />
-                New Post
+          <div className="flex items-center gap-2">
+            {view === 'list' && (
+              <button type="button" onClick={openCreate}
+                className="bg-purple-500 hover:bg-purple-600 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 transition">
+                <Plus size={16} /> Create New Blog
               </button>
-              <button
-                onClick={() => setView('setup')}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition flex items-center gap-2"
-              >
-                <Settings size={18} />
-                Settings
-              </button>
-            </div>
-          )}
+            )}
+            <NotificationBell />
+            <button type="button" onClick={() => dispatch(logout())}
+              className="text-slate-300 hover:text-red-400 p-2 rounded-lg hover:bg-white/10 transition">
+              <LogOut size={17} />
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
-        {/* Setup View */}
-        {view === 'setup' && (
-          <div className="bg-white rounded-lg border border-gray-200 p-8 max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">WordPress Setup</h2>
-            <p className="text-gray-600 mb-6">
-              Configure your WordPress credentials to start publishing blog posts.
-            </p>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex gap-3">
-              <AlertCircle className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
-              <div className="text-sm text-blue-800">
-                <p className="font-semibold mb-1">How to set up:</p>
-                <ol className="list-decimal list-inside space-y-1 text-xs">
-                  <li>Have a WordPress site ready (self-hosted or hosted)</li>
-                  <li>Log in to WordPress admin → Users → Your Profile</li>
-                  <li>Scroll to "Application Passwords" and create a new one</li>
-                  <li>Enter your site URL, username, and the generated password below</li>
-                </ol>
+        {/* ── CREATE / EDIT FORM ── */}
+        {(view === 'create' || view === 'edit') && (
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="bg-purple-600 px-6 py-4 flex items-center justify-between">
+                <h2 className="text-white font-bold text-lg">
+                  {view === 'edit' ? 'Edit Post' : 'Create New Blog Post'}
+                </h2>
+                <button type="button" onClick={() => setView('list')}
+                  className="text-white/80 hover:text-white transition">
+                  <X size={20} />
+                </button>
               </div>
+
+              <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                {/* Cover image URL */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cover Image URL <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <input type="url" placeholder="https://example.com/image.jpg"
+                    value={form.coverImage}
+                    onChange={(e) => setForm({ ...form, coverImage: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                  {form.coverImage && (
+                    <img src={form.coverImage} alt="cover preview"
+                      className="mt-2 w-full h-36 object-cover rounded-lg border border-gray-200"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  )}
+                </div>
+
+                {/* Title */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Title *</label>
+                  <input type="text" placeholder="e.g. 5 Ways to Maintain a Healthy Heart"
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+                    required
+                  />
+                </div>
+
+                {/* Category + Status row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Category</label>
+                    <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400">
+                      {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Status</label>
+                    <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400">
+                      <option value="draft">Draft</option>
+                      <option value="pending_review">Submit for Review</option>
+                      <option value="published">Publish</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Excerpt */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Excerpt <span className="text-gray-400 font-normal">(short summary)</span></label>
+                  <textarea placeholder="A brief summary shown on the card..." value={form.excerpt}
+                    onChange={(e) => setForm({ ...form, excerpt: e.target.value })}
+                    rows={2}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
+                  />
+                </div>
+
+                {/* Content */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Content *</label>
+                  <textarea placeholder="Write your health article here..." value={form.content}
+                    onChange={(e) => setForm({ ...form, content: e.target.value })}
+                    rows={10}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-y"
+                    required
+                  />
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => setView('list')}
+                    className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition text-sm">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={isSaving}
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition text-sm flex items-center justify-center gap-2">
+                    {isSaving ? 'Saving…' : view === 'edit' ? 'Save Changes' : 'Create Post'}
+                  </button>
+                </div>
+              </form>
             </div>
-
-            <form onSubmit={handleSaveSetup} className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  WordPress Site URL
-                </label>
-                <input
-                  type="url"
-                  name="wpSiteUrl"
-                  value={setupData.wpSiteUrl}
-                  onChange={handleSetupChange}
-                  placeholder="https://myblog.com"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  e.g., https://myblog.com or http://localhost:8000
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  WordPress Username
-                </label>
-                <input
-                  type="text"
-                  name="wpUsername"
-                  value={setupData.wpUsername}
-                  onChange={handleSetupChange}
-                  placeholder="Your WordPress username"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Application Password
-                </label>
-                <input
-                  type="password"
-                  name="wpAppPassword"
-                  value={setupData.wpAppPassword}
-                  onChange={handleSetupChange}
-                  placeholder="Your WordPress Application Password"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Never share this password. It's only stored securely.
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full mt-6 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition disabled:opacity-50"
-              >
-                {isLoading ? 'Connecting...' : 'Connect WordPress'}
-              </button>
-            </form>
           </div>
         )}
 
-        {/* Posts List View */}
-        {view === 'posts' && user?.wpSiteUrl && (
-          <div>
-            {isLoading && posts.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="inline-block">
-                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center animate-spin">
-                    <div className="w-8 h-8 bg-purple-600 rounded-full opacity-20"></div>
-                  </div>
+        {/* ── LIST VIEW ── */}
+        {view === 'list' && (
+          <>
+            {/* Hero banner */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-5 mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <PenSquare size={24} className="text-blue-600" />
                 </div>
-                <p className="mt-4 text-gray-600">Loading your posts...</p>
+                <div>
+                  <h2 className="font-bold text-gray-900 text-lg">Create Your Blog</h2>
+                  <p className="text-sm text-gray-500">Write and publish health articles, tips and insights for your patients.</p>
+                  <button type="button" onClick={openCreate}
+                    className="mt-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-1.5 rounded-lg flex items-center gap-1.5 transition w-fit">
+                    <Plus size={14} /> Create New Blog
+                  </button>
+                </div>
               </div>
-            ) : posts.length === 0 ? (
-              <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-                <PenSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No posts yet</h3>
-                <p className="text-gray-600 mb-4">Start sharing your health insights with your patients</p>
-                <button
-                  onClick={() => setView('new')}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition inline-flex items-center gap-2"
-                >
-                  <Plus size={18} />
-                  Write Your First Post
-                </button>
+              {/* Decorative illustration */}
+              <div className="hidden sm:flex items-center justify-center w-24 h-24 opacity-60">
+                <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                  <rect x="10" y="8" width="60" height="64" rx="6" fill="#dbeafe"/>
+                  <rect x="18" y="20" width="28" height="4" rx="2" fill="#3b82f6"/>
+                  <rect x="18" y="30" width="44" height="3" rx="1.5" fill="#93c5fd"/>
+                  <rect x="18" y="38" width="38" height="3" rx="1.5" fill="#93c5fd"/>
+                  <rect x="18" y="46" width="42" height="3" rx="1.5" fill="#93c5fd"/>
+                  <circle cx="62" cy="58" r="14" fill="#bfdbfe"/>
+                  <path d="M56 58l4 4 8-8" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            </div>
+
+            {/* Your Blogs heading + filter tabs */}
+            <div className="mb-4">
+              <h3 className="text-lg font-bold text-gray-900 mb-3">Your Blogs</h3>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: 'all',            label: 'All' },
+                  { key: 'published',      label: 'Published' },
+                  { key: 'pending_review', label: 'Pending Review' },
+                  { key: 'draft',          label: 'Drafts' },
+                  { key: 'rejected',       label: 'Rejected' },
+                ].map(({ key, label }) => (
+                  <button key={key} type="button"
+                    onClick={() => setActiveTab(key)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition border ${
+                      activeTab === key
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                    }`}>
+                    {label}
+                    {tabCounts[key] > 0 && (
+                      <span className={`ml-1.5 text-xs ${activeTab === key ? 'text-blue-100' : 'text-gray-400'}`}>
+                        ({tabCounts[key]})
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Loading */}
+            {isLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {[1,2,3].map((i) => (
+                  <div key={i} className="bg-white rounded-xl border border-gray-200 overflow-hidden animate-pulse">
+                    <div className="h-40 bg-gray-200" />
+                    <div className="p-4 space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-3/4" />
+                      <div className="h-3 bg-gray-200 rounded w-1/2" />
+                      <div className="h-3 bg-gray-200 rounded w-full" />
+                      <div className="h-3 bg-gray-200 rounded w-4/5" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              /* Empty state */
+              <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+                <PenSquare size={48} className="mx-auto text-gray-200 mb-3" />
+                <p className="font-semibold text-gray-500">No posts yet</p>
+                <p className="text-sm text-gray-400 mt-1 mb-4">
+                  {activeTab === 'all'
+                    ? 'Start sharing your health knowledge with patients.'
+                    : `No ${STATUS_LABEL[activeTab]?.toLowerCase() || activeTab} posts.`}
+                </p>
+                {activeTab === 'all' && (
+                  <button type="button" onClick={openCreate}
+                    className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold px-5 py-2 rounded-lg transition">
+                    Write Your First Post
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {posts.map((post) => (
-                  <div
-                    key={post.id}
-                    className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition p-6"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
-                          {post.title.rendered}
-                        </h3>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {new Date(post.date).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          post.status === 'publish'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-yellow-100 text-yellow-700'
-                        }`}
-                      >
-                        {post.status === 'publish' ? 'Published' : 'Draft'}
-                      </span>
+              /* Card grid */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filtered.map((post, idx) => (
+                  <div key={post._id}
+                    className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition flex flex-col">
+
+                    {/* Cover */}
+                    {post.coverImage ? (
+                      <img src={post.coverImage} alt={post.title}
+                        className="w-full h-40 object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`w-full h-40 bg-gradient-to-br ${COVER_COLORS[idx % COVER_COLORS.length]} flex items-center justify-center ${post.coverImage ? 'hidden' : 'flex'}`}>
+                      <PenSquare size={36} className="text-white/60" />
                     </div>
 
-                    {post.excerpt.rendered && (
-                      <p
-                        className="text-sm text-gray-600 mb-4 line-clamp-2"
-                        dangerouslySetInnerHTML={{ __html: post.excerpt.rendered }}
-                      />
-                    )}
+                    {/* Body */}
+                    <div className="p-4 flex flex-col flex-1">
+                      <h4 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2 mb-1">
+                        {post.title}
+                      </h4>
+                      <p className="text-xs text-gray-400 mb-2">{post.category}</p>
+                      <p className="text-xs text-gray-500 line-clamp-3 flex-1">
+                        {post.excerpt || post.content?.substring(0, 140)}
+                      </p>
 
-                    <div className="flex gap-2 pt-4 border-t border-gray-200">
-                      <button
-                        onClick={() =>
-                          window.open(post.link, '_blank')
-                        }
-                        className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition flex items-center justify-center gap-2"
-                      >
-                        <Eye size={16} />
-                        View
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingPost(post);
-                          setView('edit');
-                        }}
-                        className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center justify-center gap-2"
-                      >
-                        <Edit2 size={16} />
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeletePost(post.id)}
-                        className="flex-1 px-3 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-medium hover:bg-red-100 transition flex items-center justify-center gap-2"
-                      >
-                        <Trash2 size={16} />
-                        Delete
-                      </button>
+                      {/* Status badge */}
+                      <div className="mt-3">
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${STATUS_STYLE[post.status] || 'bg-gray-100 text-gray-600'}`}>
+                          {STATUS_LABEL[post.status] || post.status}
+                        </span>
+                      </div>
+
+                      {/* Meta row */}
+                      <div className="flex items-center gap-3 mt-3 text-xs text-gray-400 border-t border-gray-100 pt-3">
+                        <span className="flex items-center gap-1">
+                          <Calendar size={11} /> {fmtDate(post.createdAt)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <BarChart2 size={11} /> {fmtViews(post.views)} views
+                        </span>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-2 mt-3">
+                        <button type="button" onClick={() => openEdit(post)}
+                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 rounded hover:bg-blue-50 transition">
+                          <Edit2 size={12} /> Edit
+                        </button>
+                        <button type="button"
+                          onClick={() => {
+                            blogAPI.incrementView(post._id).catch(() => {});
+                            window.open(post.coverImage || '#', '_blank');
+                          }}
+                          className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium px-2 py-1 rounded hover:bg-teal-50 transition">
+                          <Eye size={12} /> View
+                        </button>
+                        {post.status === 'draft' && (
+                          <button type="button" onClick={() => handleDelete(post._id)}
+                            className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-medium px-2 py-1 rounded hover:bg-red-50 transition ml-auto">
+                            <Trash2 size={12} /> Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
-          </div>
-        )}
-
-        {/* New/Edit Post View */}
-        {(view === 'new' || view === 'edit') && user?.wpSiteUrl && (
-          <div className="bg-white rounded-lg border border-gray-200 p-8 max-w-4xl mx-auto">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              {view === 'new' ? 'Write a New Post' : 'Edit Post'}
-            </h2>
-
-            <form onSubmit={handleCreatePost} className="space-y-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Post Title
-                </label>
-                <input
-                  type="text"
-                  name="title"
-                  value={newPost.title}
-                  onChange={handlePostChange}
-                  placeholder="e.g., 5 Healthy Eating Tips for Diabetic Patients"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Content
-                </label>
-                <textarea
-                  name="content"
-                  value={newPost.content}
-                  onChange={handlePostChange}
-                  placeholder="Share your health insights and expertise..."
-                  rows="12"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Tip: You can use HTML tags like &lt;strong&gt;, &lt;em&gt;, &lt;ul&gt;, &lt;li&gt;,
-                  etc.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Excerpt (optional)
-                </label>
-                <textarea
-                  name="excerpt"
-                  value={newPost.excerpt}
-                  onChange={handlePostChange}
-                  placeholder="A brief summary of your post"
-                  rows="3"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Status
-                  </label>
-                  <select
-                    name="status"
-                    value={newPost.status}
-                    onChange={handlePostChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="publish">Publish Immediately</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Category
-                  </label>
-                  <select
-                    name="categories"
-                    value={newPost.categories[0] || ''}
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        setNewPost((prev) => ({
-                          ...prev,
-                          categories: [parseInt(e.target.value)],
-                        }));
-                      }
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">Select a category</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-6 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setView('posts')}
-                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreating}
-                  className="flex-1 px-6 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isCreating ? 'Publishing...' : 'Publish Post'}
-                </button>
-              </div>
-            </form>
-          </div>
+          </>
         )}
       </main>
     </div>

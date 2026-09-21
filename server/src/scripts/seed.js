@@ -1,7 +1,9 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import Doctor from '../models/Doctor.js';
-import User from '../models/User.js';
+import Doctor from '../models/Doctor.js';
+import Patient from '../models/Patient.js';
+import Receptionist from '../models/Receptionist.js';
 import Appointment from '../models/Appointment.js';
 import Queue from '../models/Queue.js';
 import Consultation from '../models/Consultation.js';
@@ -17,7 +19,6 @@ const seedDatabase = async () => {
 
     // Clear existing data
     await User.deleteMany({});
-    await Doctor.deleteMany({});
     await Appointment.deleteMany({});
     await Queue.deleteMany({});
     await Consultation.deleteMany({});
@@ -25,7 +26,7 @@ const seedDatabase = async () => {
     await Payment.deleteMany({});
 
     // Create doctors
-    const doctors = await Doctor.create([
+    const doctors = await User.create([
       {
         name: 'Dr. Sarah Sharma',
         email: 'dr.sarah@clinic.com',
@@ -36,8 +37,6 @@ const seedDatabase = async () => {
         roomNumber: '1',
         qualifications: ['MBBS', 'MD'],
         experience: 10,
-        verificationStatus: 'APPROVED',
-        licenseVerified: true,
         availability: {
           monday: { start: '09:00', end: '18:00' },
           tuesday: { start: '09:00', end: '18:00' },
@@ -59,8 +58,6 @@ const seedDatabase = async () => {
         roomNumber: '2',
         qualifications: ['MBBS', 'MD', 'DNB'],
         experience: 8,
-        verificationStatus: 'APPROVED',
-        licenseVerified: true,
         availability: {
           monday: { start: '10:00', end: '17:00' },
           tuesday: { start: '10:00', end: '17:00' },
@@ -81,8 +78,6 @@ const seedDatabase = async () => {
         roomNumber: '3',
         qualifications: ['MBBS', 'MD', 'DM'],
         experience: 15,
-        verificationStatus: 'APPROVED',
-        licenseVerified: true,
         availability: {
           monday: { start: '09:00', end: '16:00' },
           tuesday: { start: '09:00', end: '16:00' },
@@ -95,29 +90,40 @@ const seedDatabase = async () => {
         isActive: true,
       },
     ]);
-
     console.log('Doctors created:', doctors.length);
 
-    // Create patients
-    const patients = await User.create([
+    // Create receptionist
+    const receptionist = await User.create({
+      name: 'Priya Singh',
+      email: 'receptionist@clinic.com',
+      phone: '9876543220',
+      password: 'Password123!',
+      role: 'RECEPTIONIST',
+    });
+
+    console.log('Receptionist created');
+
+    // ── Patients ───────────────────────────────────────────────────────────────
+    const patients = await Patient.create([
       {
         name: 'Rahul Kumar',
         email: 'rahul@example.com',
         phone: '9988776655',
         password: 'Password123!',
-        role: 'PATIENT',
         dateOfBirth: new Date('1990-05-15'),
         gender: 'M',
+        bloodGroup: 'O+',
         allergies: ['Penicillin'],
+        medicalHistory: [{ condition: 'Hypertension', diagnosis: 'Stage 1 HTN', date: new Date('2018-01-01') }],
       },
       {
         name: 'Priya Gupta',
         email: 'priya@example.com',
         phone: '9988776654',
         password: 'Password123!',
-        role: 'PATIENT',
         dateOfBirth: new Date('1992-08-20'),
         gender: 'F',
+        bloodGroup: 'A+',
         allergies: [],
       },
       {
@@ -125,19 +131,20 @@ const seedDatabase = async () => {
         email: 'arjun@example.com',
         phone: '9988776653',
         password: 'Password123!',
-        role: 'PATIENT',
         dateOfBirth: new Date('1988-03-10'),
         gender: 'M',
+        bloodGroup: 'B+',
         allergies: ['Aspirin'],
+        medicalHistory: [{ condition: 'Asthma', diagnosis: 'Mild persistent asthma', date: new Date('2015-06-15') }],
       },
       {
         name: 'Ananya Sharma',
         email: 'ananya@example.com',
         phone: '9988776652',
         password: 'Password123!',
-        role: 'PATIENT',
         dateOfBirth: new Date('1995-11-25'),
         gender: 'F',
+        bloodGroup: 'AB+',
         allergies: [],
       },
       {
@@ -145,9 +152,9 @@ const seedDatabase = async () => {
         email: 'rakesh@example.com',
         phone: '9988776651',
         password: 'Password123!',
-        role: 'PATIENT',
         dateOfBirth: new Date('1985-07-12'),
         gender: 'M',
+        bloodGroup: 'O-',
         allergies: [],
       },
       {
@@ -155,9 +162,9 @@ const seedDatabase = async () => {
         email: 'sneha@example.com',
         phone: '9988776650',
         password: 'Password123!',
-        role: 'PATIENT',
         dateOfBirth: new Date('1993-02-18'),
         gender: 'F',
+        bloodGroup: 'B-',
         allergies: ['Ibuprofen'],
       },
       {
@@ -165,9 +172,9 @@ const seedDatabase = async () => {
         email: 'greeshma@example.com',
         phone: '9988776649',
         password: 'Password123!',
-        role: 'PATIENT',
         dateOfBirth: new Date('1998-09-22'),
         gender: 'F',
+        bloodGroup: 'A-',
         allergies: [],
       },
       {
@@ -175,9 +182,9 @@ const seedDatabase = async () => {
         email: 'vikram@example.com',
         phone: '9988776648',
         password: 'Password123!',
-        role: 'PATIENT',
         dateOfBirth: new Date('1987-01-30'),
         gender: 'M',
+        bloodGroup: 'AB-',
         allergies: [],
       },
       {
@@ -185,9 +192,9 @@ const seedDatabase = async () => {
         email: 'divya@example.com',
         phone: '9988776647',
         password: 'Password123!',
-        role: 'PATIENT',
         dateOfBirth: new Date('1991-06-14'),
         gender: 'F',
+        bloodGroup: 'O+',
         allergies: [],
       },
       {
@@ -195,68 +202,62 @@ const seedDatabase = async () => {
         email: 'sanjay@example.com',
         phone: '9988776646',
         password: 'Password123!',
-        role: 'PATIENT',
         dateOfBirth: new Date('1980-12-08'),
         gender: 'M',
+        bloodGroup: 'A+',
         allergies: ['Latex'],
+        medicalHistory: [{ condition: 'Type 2 Diabetes', diagnosis: 'T2DM', date: new Date('2015-03-20') }],
       },
     ]);
-
     console.log('Patients created:', patients.length);
 
-    // Create appointments for today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // ── Appointments & Queue for TODAY ────────────────────────────────────────
+    // Use UTC midnight so the queue filter (setUTCHours 0,0,0,0) always matches
+    const todayUTC = new Date();
+    todayUTC.setUTCHours(0, 0, 0, 0);
 
-    const appointmentTimes = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30'];
+    const appointmentTimes = [
+      '09:00', '09:30', '10:00', '10:30', '11:00',
+      '11:30', '14:00', '14:30', '15:00', '15:30',
+    ];
     const appointmentTypes = [
-      'General Consultation',
-      'New Patient',
-      'Follow-up',
-      'Specialist Consultation',
-      'Emergency',
-      'Vaccination',
-      'Teleconsultation',
-      'Routine Check-up',
-      'General Consultation',
-      'Follow-up',
+      'General Consultation', 'New Patient', 'Follow-up',
+      'Specialist Consultation', 'Emergency', 'Vaccination',
+      'Teleconsultation', 'Routine Check-up', 'General Consultation', 'Follow-up',
     ];
 
-    const appointments = [];
+    const appointmentDocs = [];
     for (let i = 0; i < patients.length; i++) {
-      appointments.push({
+      appointmentDocs.push({
         patientId: patients[i]._id,
         doctorId: doctors[i % 3]._id,
-        appointmentDate: today,
+        appointmentDate: todayUTC,
         appointmentTime: appointmentTimes[i],
         reason: 'Regular checkup',
         appointmentType: appointmentTypes[i],
         tokenNumber: i + 1,
-        status: i < 3 ? 'COMPLETED' : i < 5 ? 'CONSULTING' : i < 7 ? 'CALLED' : 'WAITING',
-        checkInTime: i < 3 ? new Date() : null,
+        // All set to WAITING so they show up in the live queue immediately
+        status: 'WAITING',
       });
     }
 
-    const createdAppointments = await Appointment.create(appointments);
+    const createdAppointments = await Appointment.create(appointmentDocs);
     console.log('Appointments created:', createdAppointments.length);
 
-    // Create queue entries
-    const queueEntries = [];
-    for (let i = 0; i < createdAppointments.length; i++) {
-      queueEntries.push({
-        doctorId: createdAppointments[i].doctorId,
-        appointmentId: createdAppointments[i]._id,
-        patientId: createdAppointments[i].patientId,
-        tokenNumber: createdAppointments[i].tokenNumber,
-        queueDate: today,
-        status: createdAppointments[i].status,
-      });
-    }
+    // ── Queue entries ─────────────────────────────────────────────────────────
+    const queueEntries = createdAppointments.map((appt) => ({
+      doctorId: appt.doctorId,
+      appointmentId: appt._id,
+      patientId: appt.patientId,
+      tokenNumber: appt.tokenNumber,
+      queueDate: todayUTC,   // UTC midnight — matches the GET /doctor/:id filter
+      status: 'WAITING',
+    }));
 
     await Queue.create(queueEntries);
     console.log('Queue entries created:', queueEntries.length);
 
-    // Create sample consultations
+    // ── Sample consultation (first appointment) ───────────────────────────────
     const consultation = await Consultation.create({
       appointmentId: createdAppointments[0]._id,
       patientId: createdAppointments[0].patientId,
@@ -266,10 +267,9 @@ const seedDatabase = async () => {
       notes: 'Patient has mild fever. Prescribed rest and fluids.',
       treatmentPlan: 'Rest, fluids, and over-the-counter medications',
     });
-
     console.log('Consultation created');
 
-    // Create sample prescription
+    // ── Sample prescription ───────────────────────────────────────────────────
     await Prescription.create({
       consultationId: consultation._id,
       patientId: consultation.patientId,
@@ -292,7 +292,6 @@ const seedDatabase = async () => {
       ],
       additionalNotes: 'Drink plenty of fluids',
     });
-
     console.log('Prescription created');
 
     // Create sample payments
@@ -306,7 +305,7 @@ const seedDatabase = async () => {
         paymentMethod: 'CASH',
         status: 'PAID',
         paymentDate: new Date(),
-        processedBy: createdAppointments[0].doctorId,
+        processedBy: receptionist._id,
       },
     ]);
 
