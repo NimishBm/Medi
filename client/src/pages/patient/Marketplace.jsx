@@ -24,6 +24,7 @@ const CATEGORIES = [
 
 const SORT_OPTIONS = [
   { id: 'relevant',   label: 'Most Relevant' },
+  { id: 'rating',     label: 'Highest Rated' },
   { id: 'fee_low',    label: 'Price: Low to High' },
   { id: 'fee_high',   label: 'Price: High to Low' },
   { id: 'wait',       label: 'Shortest Wait' },
@@ -126,6 +127,7 @@ export const Marketplace = () => {
     return [...r].sort((a, b) => {
       const wA = (queueStats[a._id]?.waiting || 0) * (a.averageConsultationTime || 10);
       const wB = (queueStats[b._id]?.waiting || 0) * (b.averageConsultationTime || 10);
+      if (sortBy === 'rating') return (b.averageRating || 0) - (a.averageRating || 0);
       if (sortBy === 'fee_low') return a.consultationFee - b.consultationFee;
       if (sortBy === 'fee_high') return b.consultationFee - a.consultationFee;
       if (sortBy === 'wait') return wA - wB;

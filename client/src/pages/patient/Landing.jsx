@@ -51,7 +51,9 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
     const loadDoctors = async () => {
       try {
         const res = await doctorAPI.getDoctors();
-        const top8 = (res.data || []).slice(0, 8);
+        const top8 = (res.data || [])
+          .sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0))
+          .slice(0, 8);
         setDoctors(top8);
         const statsMap = {};
         await Promise.all(
@@ -101,9 +103,10 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
     return (s.waiting || 0) * (d.averageConsultationTime || 10);
   };
 
-  const visibleDoctors = activeSpec === 'all'
+  const visibleDoctors = (activeSpec === 'all'
     ? doctors
-    : doctors.filter(d => d.specialization === activeSpec);
+    : doctors.filter(d => d.specialization === activeSpec)
+  ).sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0));
 
   return (
     <div className="min-h-screen" style={{ background: '#F5F7FA', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
