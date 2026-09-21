@@ -82,20 +82,45 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const clientDistPath = path.join(__dirname, 'client/dist');
 app.use(express.static(clientDistPath));
 
-// API Routes
+// API Routes (supports both /api/* and /* fallback)
 app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
+
 app.use('/api/doctors', doctorRoutes);
+app.use('/doctors', doctorRoutes);
+
 app.use('/api/appointments', appointmentRoutes);
+app.use('/appointments', appointmentRoutes);
+
 app.use('/api/queue', queueRoutes);
+app.use('/queue', queueRoutes);
+
 app.use('/api/consultations', consultationRoutes);
+app.use('/consultations', consultationRoutes);
+
 app.use('/api/prescriptions', prescriptionRoutes);
+app.use('/prescriptions', prescriptionRoutes);
+
 app.use('/api/payments', paymentRoutes);
+app.use('/payments', paymentRoutes);
+
 app.use('/api/analytics', analyticsRoutes);
+app.use('/analytics', analyticsRoutes);
+
 app.use('/api/search', searchRoutes);
+app.use('/search', searchRoutes);
+
 app.use('/api/organizations', organizationRoutes);
+app.use('/organizations', organizationRoutes);
+
 app.use('/api/admin', adminRoutes);
+app.use('/admin', adminRoutes);
+
 app.use('/api/blog', blogRoutes);
+app.use('/blog', blogRoutes);
+
 app.use('/api/notifications', notificationRoutes);
+app.use('/notifications', notificationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
