@@ -23,8 +23,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      const isAuthEndpoint = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register');
-      if (!isAuthEndpoint) {
+      const url = error.config?.url || '';
+      const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register');
+      const isAdminEndpoint = url.includes('/admin/');
+      if (!isAuthEndpoint && !isAdminEndpoint) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
@@ -36,6 +38,7 @@ api.interceptors.response.use(
 
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
+  registerDoctor: (data) => api.post('/auth/register/doctor', data),
   login: (data) => api.post('/auth/login', data),
   getMe: () => api.get('/auth/me'),
 };
@@ -62,6 +65,7 @@ export const appointmentAPI = {
 
 export const queueAPI = {
   getQueueByDoctorId: (doctorId) => api.get(`/queue/doctor/${doctorId}`),
+  getQueueStats: () => api.get('/queue/stats'),
   callNextPatient: (data) => api.post('/queue/call-next', data),
   skipPatient: (data) => api.post('/queue/skip', data),
   recallPatient: (data) => api.post('/queue/recall', data),
@@ -79,13 +83,24 @@ export const consultationAPI = {
 };
 
 export const doctorProfileAPI = {
+  getMe: () => api.get('/auth/me'),
   updateMe: (data) => api.put('/doctors/me', data),
+  uploadPhoto: (file) => {
+    const formData = new FormData();
+    formData.append('profilePhoto', file);
+    return api.post('/doctors/upload-photo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
 };
 
 export const prescriptionAPI = {
   createPrescription: (data) => api.post('/prescriptions', data),
   getPrescriptionsByPatient: (patientId) => api.get(`/prescriptions/patient/${patientId}`),
   getPrescriptionById: (id) => api.get(`/prescriptions/${id}`),
+  getByDoctor: () => api.get('/prescriptions/doctor'),
 };
 
 export const paymentAPI = {
@@ -95,10 +110,33 @@ export const paymentAPI = {
   refundPayment: (id, data) => api.post(`/payments/${id}/refund`, data),
 };
 
+export const adminAPI = {
+  login: (data) => api.post('/admin/login', data),
+  getStats: () => api.get('/admin/stats'),
+  getDoctors: (status) => api.get('/admin/doctors', { params: status ? { status } : {} }),
+  getDoctorById: (id) => api.get(`/admin/doctors/${id}`),
+  approveDoctor: (id, note) => api.post(`/admin/doctors/${id}/approve`, { note }),
+  rejectDoctor: (id, note) => api.post(`/admin/doctors/${id}/reject`, { note }),
+  verifyLicense: (id) => api.post(`/admin/doctors/${id}/verify-license`),
+  getPatients: () => api.get('/admin/patients'),
+};
+
 export const analyticsAPI = {
   getTodayAnalytics: () => api.get('/analytics/today'),
   getDoctorAnalytics: (doctorId) => api.get(`/analytics/doctor/${doctorId}`),
   getClinicAnalytics: () => api.get('/analytics/clinic/overview'),
 };
 
+export const searchAPI = {
+  search: (q) => api.get('/search', { params: { q } }),
+  suggestions: (q) => api.get('/search/suggestions', { params: { q } }),
+};
+
+export const blogAPI = {
+  getPosts: () => api.get('/blog/posts'),
+  createPost: (data) => api.post('/blog/posts', data),
+  updatePost: (id, data) => api.put(`/blog/posts/${id}`, data),
+  deletePost: (id) => api.delete(`/blog/posts/${id}`),
+  getCategories: () => api.get('/blog/categories'),
+};
 export default api;

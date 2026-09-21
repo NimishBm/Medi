@@ -5,18 +5,20 @@ const prescriptionSchema = new mongoose.Schema(
     consultationId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Consultation',
-      required: true,
     },
+
     patientId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Patient',
       required: true,
     },
+
     doctorId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Doctor',
       required: true,
     },
+
     medicines: [
       {
         name: String,
@@ -26,7 +28,9 @@ const prescriptionSchema = new mongoose.Schema(
         instructions: String,
       },
     ],
+
     additionalNotes: String,
+
     validTill: Date,
   },
   {
@@ -35,6 +39,7 @@ const prescriptionSchema = new mongoose.Schema(
 );
 
 prescriptionSchema.index({ patientId: 1, createdAt: -1 });
+
 prescriptionSchema.index({ doctorId: 1, createdAt: -1 });
 
 export default mongoose.model('Prescription', prescriptionSchema);

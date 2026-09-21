@@ -1,7 +1,7 @@
 import express from 'express';
 import Queue from '../models/Queue.js';
 import Appointment from '../models/Appointment.js';
-import User from '../models/User.js';
+import Doctor from '../models/Doctor.js';
 import Consultation from '../models/Consultation.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
@@ -16,6 +16,7 @@ router.get(
   catchAsyncErrors(async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -39,11 +40,66 @@ router.get(
   })
 );
 
+// Get queue stats for all doctors
+// Public endpoint used by Marketplace
+router.get(
+  '/stats',
+  catchAsyncErrors(async (req, res) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const stats = await Queue.aggregate([
+      {
+        $match: {
+          queueDate: { $gte: today, $lt: tomorrow },
+        },
+      },
+      {
+        $group: {
+          _id: '$doctorId',
+          waiting: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'WAITING'] }, 1, 0],
+            },
+          },
+          total: { $sum: 1 },
+          called: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'CALLED'] }, 1, 0],
+            },
+          },
+          consulting: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'CONSULTING'] }, 1, 0],
+            },
+          },
+        },
+      },
+    ]);
+
+    const result = {};
+
+    for (const item of stats) {
+      result[item._id.toString()] = {
+        waiting: item.waiting,
+        total: item.total,
+        called: item.called,
+        consulting: item.consulting,
+      };
+    }
+
+    res.json(result);
+  })
+);
+
 // Call next patient
 router.post(
   '/call-next',
   protect,
-  authorize('DOCTOR', 'RECEPTIONIST'),
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const { doctorId } = req.body;
 
@@ -53,6 +109,7 @@ router.post(
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -71,11 +128,15 @@ router.post(
     await nextPatient.save();
 
     const appointment = await Appointment.findById(nextPatient.appointmentId);
+
     appointment.status = 'CALLED';
     appointment.calledTime = new Date();
     await appointment.save();
 
-    const patientData = await nextPatient.populate('patientId', 'name phone email');
+    const patientData = await nextPatient.populate(
+      'patientId',
+      'name phone email'
+    );
 
     io.emit('queue-update', {
       doctorId,
@@ -93,7 +154,7 @@ router.post(
 router.post(
   '/skip',
   protect,
-  authorize('DOCTOR', 'RECEPTIONIST'),
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const { queueId } = req.body;
 
@@ -102,6 +163,7 @@ router.post(
     }
 
     const queueEntry = await Queue.findById(queueId);
+
     if (!queueEntry) {
       return res.status(404).json({ message: 'Queue entry not found' });
     }
@@ -111,12 +173,17 @@ router.post(
     await queueEntry.save();
 
     const appointment = await Appointment.findById(queueEntry.appointmentId);
+
     appointment.status = 'SKIPPED';
     await appointment.save();
 
-    io.emit('queue-update', { doctorId: queueEntry.doctorId });
+    io.emit('queue-update', {
+      doctorId: queueEntry.doctorId,
+    });
 
-    res.json({ message: 'Patient skipped' });
+    res.json({
+      message: 'Patient skipped',
+    });
   })
 );
 
@@ -124,7 +191,7 @@ router.post(
 router.post(
   '/recall',
   protect,
-  authorize('RECEPTIONIST'),
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const { queueId } = req.body;
 
@@ -133,6 +200,7 @@ router.post(
     }
 
     const queueEntry = await Queue.findById(queueId);
+
     if (!queueEntry) {
       return res.status(404).json({ message: 'Queue entry not found' });
     }
@@ -140,9 +208,13 @@ router.post(
     queueEntry.status = 'WAITING';
     await queueEntry.save();
 
-    io.emit('queue-update', { doctorId: queueEntry.doctorId });
+    io.emit('queue-update', {
+      doctorId: queueEntry.doctorId,
+    });
 
-    res.json({ message: 'Patient recalled' });
+    res.json({
+      message: 'Patient recalled',
+    });
   })
 );
 
@@ -159,6 +231,7 @@ router.post(
     }
 
     const queueEntry = await Queue.findById(queueId);
+
     if (!queueEntry) {
       return res.status(404).json({ message: 'Queue entry not found' });
     }
@@ -168,13 +241,18 @@ router.post(
     await queueEntry.save();
 
     const appointment = await Appointment.findById(queueEntry.appointmentId);
+
     appointment.status = 'CONSULTING';
     appointment.consultationStartTime = new Date();
     await appointment.save();
 
-    io.emit('queue-update', { doctorId: queueEntry.doctorId });
+    io.emit('queue-update', {
+      doctorId: queueEntry.doctorId,
+    });
 
-    res.json({ message: 'Consultation started' });
+    res.json({
+      message: 'Consultation started',
+    });
   })
 );
 
@@ -191,28 +269,34 @@ router.post(
     }
 
     const queueEntry = await Queue.findById(queueId);
+
     if (!queueEntry) {
       return res.status(404).json({ message: 'Queue entry not found' });
     }
 
     const consultationEndTime = new Date();
+
     queueEntry.status = 'COMPLETED';
     queueEntry.consultationEndAt = consultationEndTime;
 
     if (queueEntry.consultationStartAt) {
-      const duration = (consultationEndTime - queueEntry.consultationStartAt) / 60000;
+      const duration =
+        (consultationEndTime - queueEntry.consultationStartAt) / 60000;
+
       queueEntry.consultationDuration = Math.round(duration);
     }
 
     await queueEntry.save();
 
     const appointment = await Appointment.findById(queueEntry.appointmentId);
+
     appointment.status = 'COMPLETED';
     appointment.consultationEndTime = consultationEndTime;
     await appointment.save();
 
     // Update doctor's average consultation time
-    const doctor = await User.findById(queueEntry.doctorId);
+    const doctor = await Doctor.findById(queueEntry.doctorId);
+
     if (doctor && queueEntry.consultationDuration) {
       const consultations = await Queue.find({
         doctorId: queueEntry.doctorId,
@@ -220,12 +304,21 @@ router.post(
         consultationDuration: { $exists: true },
       });
 
-      const totalDuration = consultations.reduce((sum, q) => sum + q.consultationDuration, 0);
-      doctor.averageConsultationTime = Math.round(totalDuration / consultations.length);
+      const totalDuration = consultations.reduce(
+        (sum, q) => sum + q.consultationDuration,
+        0
+      );
+
+      doctor.averageConsultationTime = Math.round(
+        totalDuration / consultations.length
+      );
+
       await doctor.save();
     }
 
-    io.emit('queue-update', { doctorId: queueEntry.doctorId });
+    io.emit('queue-update', {
+      doctorId: queueEntry.doctorId,
+    });
 
     res.json({
       message: 'Consultation completed',
@@ -238,7 +331,7 @@ router.post(
 router.post(
   '/no-show',
   protect,
-  authorize('DOCTOR', 'RECEPTIONIST'),
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const { queueId } = req.body;
 
@@ -247,6 +340,7 @@ router.post(
     }
 
     const queueEntry = await Queue.findById(queueId);
+
     if (!queueEntry) {
       return res.status(404).json({ message: 'Queue entry not found' });
     }
@@ -256,12 +350,17 @@ router.post(
     await queueEntry.save();
 
     const appointment = await Appointment.findById(queueEntry.appointmentId);
+
     appointment.status = 'NO_SHOW';
     await appointment.save();
 
-    io.emit('queue-update', { doctorId: queueEntry.doctorId });
+    io.emit('queue-update', {
+      doctorId: queueEntry.doctorId,
+    });
 
-    res.json({ message: 'Patient marked as no-show' });
+    res.json({
+      message: 'Patient marked as no-show',
+    });
   })
 );
 

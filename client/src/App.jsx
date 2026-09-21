@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast';
 import { Register } from './pages/Register';
 import { PatientLogin } from './pages/PatientLogin';
 import { DoctorLogin } from './pages/DoctorLogin';
+import { DoctorRegister } from './pages/DoctorRegister';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { authAPI } from './services/api';
 import { setUser } from './store/slices/authSlice';
@@ -22,17 +23,23 @@ import { LiveQueue } from './pages/patient/LiveQueue';
 import { Prescriptions } from './pages/patient/Prescriptions';
 import { History } from './pages/patient/History';
 import { Payments } from './pages/patient/Payments';
+import { PatientProfile } from './pages/patient/Profile';
 
 // Doctor Pages
+import { DoctorLanding } from './pages/doctor/Landing';
 import { DoctorDashboard } from './pages/doctor/Dashboard';
 import { DoctorProfile } from './pages/doctor/Profile';
 import { DoctorQueue } from './pages/doctor/Queue';
 import { DoctorAppointments } from './pages/doctor/Appointments';
+import { DoctorPatients } from './pages/doctor/Patients';
+import { DoctorSchedule } from './pages/doctor/Schedule';
+import { DoctorBlog } from './pages/doctor/Blog';
+import { SetupProfile } from './pages/doctor/SetupProfile';
 
-// Receptionist Pages
-import { ReceptionistDashboard } from './pages/receptionist/Dashboard';
-import { ReceptionistAppointments } from './pages/receptionist/Appointments';
-import { ReceptionistQueue } from './pages/receptionist/Queue';
+
+// Admin Pages
+import { AdminLogin } from './pages/admin/Login';
+import { AdminDashboard } from './pages/admin/Dashboard';
 
 // Display
 import { WaitingRoomDisplay } from './pages/WaitingRoomDisplay';
@@ -40,9 +47,11 @@ import { WaitingRoomDisplay } from './pages/WaitingRoomDisplay';
 export default function App() {
   const dispatch = useDispatch();
   const { user, token } = useSelector((state) => state.auth);
+  const fetchingRef = useRef(false);
 
   useEffect(() => {
-    if (token && !user) {
+    if (token && !user && !fetchingRef.current) {
+      fetchingRef.current = true;
       const fetchUser = async () => {
         try {
           const response = await authAPI.getMe();
@@ -52,11 +61,13 @@ export default function App() {
           }));
         } catch (error) {
           console.error('Failed to fetch user', error);
+        } finally {
+          fetchingRef.current = false;
         }
       };
       fetchUser();
     }
-  }, [token, user, dispatch]);
+  }, [token, dispatch]);
 
   return (
     <>
@@ -67,7 +78,19 @@ export default function App() {
           <Route path="/login" element={<Navigate to="/login/patient" replace />} />
           <Route path="/login/patient" element={<PatientLogin />} />
           <Route path="/login/doctor" element={<DoctorLogin />} />
+          <Route path="/register/doctor" element={<DoctorRegister />} />
           <Route path="/register" element={<Register />} />
+
+          {/* Admin Routes */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute requiredRoles={['ADMIN']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Display Routes */}
           <Route path="/display" element={<WaitingRoomDisplay />} />
@@ -176,8 +199,28 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/patient/profile"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <PatientProfile />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Doctor Routes */}
+          <Route
+            path="/doctor-landing"
+            element={<DoctorLanding />}
+          />
+          <Route
+            path="/doctor/setup-profile"
+            element={
+              <ProtectedRoute requiredRoles={['DOCTOR']}>
+                <SetupProfile />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/doctor"
             element={
@@ -210,32 +253,31 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/doctor/patients"
+            element={
+              <ProtectedRoute requiredRoles={['DOCTOR']}>
+                <DoctorPatients />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/schedule"
+            element={
+              <ProtectedRoute requiredRoles={['DOCTOR']}>
+                <DoctorSchedule />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/blog"
+            element={
+              <ProtectedRoute requiredRoles={['DOCTOR']}>
+                <DoctorBlog />
+              </ProtectedRoute>
+            }
+          />
 
-          {/* Receptionist Routes */}
-          <Route
-            path="/receptionist"
-            element={
-              <ProtectedRoute requiredRoles={['RECEPTIONIST']}>
-                <ReceptionistDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/receptionist/appointments"
-            element={
-              <ProtectedRoute requiredRoles={['RECEPTIONIST']}>
-                <ReceptionistAppointments />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/receptionist/queue"
-            element={
-              <ProtectedRoute requiredRoles={['RECEPTIONIST']}>
-                <ReceptionistQueue />
-              </ProtectedRoute>
-            }
-          />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

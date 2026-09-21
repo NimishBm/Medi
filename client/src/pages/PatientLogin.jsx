@@ -4,148 +4,162 @@ import { useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import { setUser } from '../store/slices/authSlice';
 import toast from 'react-hot-toast';
-import { Heart, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { Stethoscope, Eye, EyeOff, CheckCircle, Calendar, Clock, Users } from 'lucide-react';
+
+const T = '#0D9488';
+
+const FEATURES = [
+  { icon: Stethoscope, title: 'Find Verified Doctors',   sub: 'Search by specialty, location and availability' },
+  { icon: Calendar,    title: 'Book Appointments',        sub: 'Instant booking with no waiting on hold' },
+  { icon: Clock,       title: 'Live Queue Tracking',      sub: 'Know your wait time before you leave home' },
+  { icon: Users,       title: 'Family Health Management', sub: 'Manage appointments for your whole family' },
+];
 
 export const PatientLogin = () => {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const dispatch  = useDispatch();
+  const navigate  = useNavigate();
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [showPw, setShowPw]     = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-
+    if (!email || !password) { toast.error('Please fill in all fields'); return; }
+    setLoading(true);
     try {
-      setLoading(true);
-      const response = await authAPI.login({ email, password });
-      dispatch(setUser({ user: response.data.user, token: response.data.token }));
-      toast.success('Login successful!');
+      const res = await authAPI.login({ email, password });
+      if (res.data.user.role !== 'PATIENT') {
+        toast.error('Please use your patient account.');
+        return;
+      }
+      dispatch(setUser({ user: res.data.user, token: res.data.token }));
+      toast.success('Welcome back!');
       navigate('/patient');
-    } catch (error) {
-      const message = error.response?.data?.message || 'Login failed';
-      toast.error(message);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="grid grid-cols-1 md:grid-cols-2 h-screen">
-        {/* Left Panel - Branding */}
-        <div className="hidden md:flex flex-col justify-center items-start p-12 bg-gradient-to-br from-blue-700 via-blue-600 to-blue-500 text-white">
-          <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center mb-6">
-            <Heart className="text-white" size={28} strokeWidth={2.5} />
-          </div>
-          <h1 className="text-4xl font-bold mb-2">ClinicFlow</h1>
-          <p className="text-blue-100 text-lg mb-12">Your Health, Simplified</p>
+    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: 'system-ui,-apple-system,sans-serif' }}>
 
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <CheckCircle size={20} className="text-green-300 mt-1 flex-shrink-0" />
-              <div>
-                <p className="font-semibold text-base">Book Appointments</p>
-                <p className="text-blue-100 text-sm">Find and book with verified doctors instantly</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <CheckCircle size={20} className="text-green-300 mt-1 flex-shrink-0" />
-              <div>
-                <p className="font-semibold text-base">Track Queue Live</p>
-                <p className="text-blue-100 text-sm">Know your wait time before you leave home</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <CheckCircle size={20} className="text-green-300 mt-1 flex-shrink-0" />
-              <div>
-                <p className="font-semibold text-base">Manage Family Health</p>
-                <p className="text-blue-100 text-sm">Book appointments for family members too</p>
-              </div>
-            </div>
+      {/* Left panel — desktop only */}
+      <div style={{ display: 'none', flex: '0 0 45%', background: `linear-gradient(145deg,${T},#0F766E,#115E59)`, flexDirection: 'column', justifyContent: 'center', padding: '48px 52px' }}
+        className="login-left-panel">
+        <style>{`.login-left-panel{display:none} @media(min-width:768px){.login-left-panel{display:flex!important}}`}</style>
+
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 48 }}>
+          <div style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.2)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Stethoscope size={24} color="#fff" strokeWidth={2.5} />
           </div>
+          <span style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '-0.5px' }}>ClinicFlow</span>
         </div>
 
-        {/* Right Panel - Login Form */}
-        <div className="flex flex-col justify-center items-center p-6 md:p-12 bg-gray-50">
-          <div className="w-full max-w-sm">
-            {/* Mobile Logo */}
-            <div className="md:hidden flex items-center gap-2 mb-8">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Heart className="text-white" size={22} strokeWidth={2.5} />
+        <h2 style={{ fontSize: 32, fontWeight: 900, color: '#fff', lineHeight: 1.2, marginBottom: 8 }}>
+          Your Health,<br />Simplified.
+        </h2>
+        <p style={{ fontSize: 15, color: '#99F6E4', marginBottom: 44 }}>
+          Everything you need to manage your healthcare in one place.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+          {FEATURES.map(({ icon: Icon, title, sub }) => (
+            <div key={title} style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+              <div style={{ width: 38, height: 38, background: 'rgba(255,255,255,0.15)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon size={18} color="#fff" strokeWidth={2} />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">ClinicFlow</h1>
-            </div>
-
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome back</h2>
-            <p className="text-gray-600 mb-8">Patient Login</p>
-
-            <form onSubmit={handleLogin} className="space-y-4">
-              {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <p style={{ fontWeight: 700, color: '#fff', fontSize: 14, marginBottom: 2 }}>{title}</p>
+                <p style={{ fontSize: 13, color: '#CCFBF1' }}>{sub}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginTop: 52, padding: '16px 20px', background: 'rgba(255,255,255,0.1)', borderRadius: 14, borderLeft: '3px solid rgba(255,255,255,0.4)' }}>
+          <p style={{ color: '#E0FDF4', fontSize: 13, fontStyle: 'italic', lineHeight: 1.6 }}>
+            "ClinicFlow cut my waiting room time in half. I knew exactly when to arrive."
+          </p>
+          <p style={{ color: '#99F6E4', fontSize: 12, fontWeight: 600, marginTop: 8 }}>— Patient, Mumbai</p>
+        </div>
+      </div>
+
+      {/* Right panel — form */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: '#F5F7FA', padding: '32px 16px' }}>
+        <div style={{ width: '100%', maxWidth: 400 }}>
+
+          {/* Mobile logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 32, justifyContent: 'center' }}
+            className="mobile-logo">
+            <style>{`.mobile-logo{display:flex} @media(min-width:768px){.mobile-logo{display:none!important}}`}</style>
+            <div style={{ width: 38, height: 38, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Stethoscope size={20} color="#fff" strokeWidth={2.5} />
+            </div>
+            <span style={{ fontSize: 20, fontWeight: 900, color: T }}>ClinicFlow</span>
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 20, padding: '36px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)', border: '1.5px solid #E5E7EB' }}>
+            <h2 style={{ fontSize: 24, fontWeight: 900, color: '#111827', marginBottom: 4 }}>Welcome back</h2>
+            <p style={{ fontSize: 14, color: '#6B7280', marginBottom: 28 }}>Sign in to your patient account</p>
+
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              <div>
+                <label style={labelStyle}>Email address</label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="your@email.com" style={inputStyle}
+                  onFocus={e => e.target.style.borderColor = T}
+                  onBlur={e => e.target.style.borderColor = '#E5E7EB'}
                 />
               </div>
 
-              {/* Password */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-                <div className="relative">
+                <label style={labelStyle}>Password</label>
+                <div style={{ position: 'relative' }}>
                   <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    type={showPw ? 'text' : 'password'} value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••" style={{ ...inputStyle, paddingRight: 40 }}
+                    onFocus={e => e.target.style.borderColor = T}
+                    onBlur={e => e.target.style.borderColor = '#E5E7EB'}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <button type="button" onClick={() => setShowPw(p => !p)}
+                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex' }}>
+                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
 
-              {/* Login Button */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2.5 rounded-lg font-bold transition-colors mt-6"
-              >
-                {loading ? 'Logging in...' : 'Login'}
+              <button type="submit" disabled={loading}
+                style={{ width: '100%', background: loading ? '#9CA3AF' : T, color: '#fff', fontWeight: 800, fontSize: 15, padding: '13px', borderRadius: 11, border: 'none', cursor: loading ? 'not-allowed' : 'pointer', marginTop: 6, transition: 'background 0.15s' }}>
+                {loading ? 'Signing in…' : 'Sign In'}
               </button>
             </form>
 
-            {/* Links */}
-            <div className="mt-6 space-y-3 text-center">
-              <p className="text-gray-600 text-sm">
+            <div style={{ textAlign: 'center', marginTop: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <p style={{ fontSize: 13, color: '#6B7280' }}>
                 Don't have an account?{' '}
-                <Link to="/register" className="text-blue-600 hover:text-blue-700 font-medium">
-                  Register here
-                </Link>
+                <Link to="/register" style={{ color: T, fontWeight: 700, textDecoration: 'none' }}>Create account</Link>
               </p>
-              <p className="text-gray-500 text-xs">
-                <Link to="/login/doctor" className="text-blue-600 hover:text-blue-700 font-medium">
-                  Are you a doctor? Login here →
-                </Link>
-              </p>
+              <Link to="/login/doctor" style={{ fontSize: 12, color: '#9CA3AF', textDecoration: 'none' }}>
+                Are you a doctor? Login here →
+              </Link>
             </div>
           </div>
         </div>
       </div>
     </div>
   );
+};
+
+const labelStyle = { display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 };
+const inputStyle = {
+  width: '100%', padding: '11px 14px', border: '1.5px solid #E5E7EB', borderRadius: 10,
+  fontSize: 14, color: '#111827', background: '#FAFAFA', outline: 'none', boxSizing: 'border-box',
+  transition: 'border-color 0.15s',
 };

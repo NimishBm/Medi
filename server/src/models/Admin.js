@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-const receptionistSchema = new mongoose.Schema(
+const adminSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -17,20 +17,10 @@ const receptionistSchema = new mongoose.Schema(
       trim: true
     },
 
-    phone: {
-      type: String,
-      required: true
-    },
-
     password: {
       type: String,
       required: true,
       minlength: 6
-    },
-
-    isActive: {
-      type: Boolean,
-      default: true
     }
   },
   {
@@ -38,9 +28,8 @@ const receptionistSchema = new mongoose.Schema(
   }
 );
 
-receptionistSchema.pre('save', async function (next) {
+adminSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
-
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -50,14 +39,14 @@ receptionistSchema.pre('save', async function (next) {
   }
 });
 
-receptionistSchema.methods.comparePassword = async function (enteredPassword) {
+adminSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-receptionistSchema.methods.toJSON = function () {
+adminSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
   return obj;
 };
 
-export default mongoose.model('Receptionist', receptionistSchema);
+export default mongoose.model('Admin', adminSchema, 'Admins');

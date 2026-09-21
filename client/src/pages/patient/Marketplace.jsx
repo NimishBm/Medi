@@ -1,362 +1,346 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useSelector } from 'react-redux';
-import { useDispatch } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
-import { doctorAPI, queueAPI } from '../../services/api';
+import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { doctorAPI, queueAPI, searchAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
-import { ChevronLeft, Search, Heart, Activity, Star, SearchX, MapPin } from 'lucide-react';
+import {
+  ChevronLeft, Search, Heart, Activity, Star, SearchX, MapPin, Stethoscope,
+  Eye, Smile, Thermometer, Layers, Shield, Zap, SlidersHorizontal, ChevronDown,
+} from 'lucide-react';
+import { useIsMobile } from '../../hooks/useIsMobile';
+
+const T = '#0D9488';
 
 const CATEGORIES = [
-  { id: 'all', name: 'All', icon: '⭐' },
-  { id: 'general', name: 'General', icon: '⚕️', specialization: 'General Physician' },
-  { id: 'cardio', name: 'Cardio', icon: '❤️', specialization: 'Cardiologist' },
-  { id: 'skin', name: 'Skin', icon: '💆', specialization: 'Dermatologist' },
+  { id: 'all',        name: 'All Doctors',       icon: '⭐' },
+  { id: 'general',   name: 'General Physician',  icon: null, specializations: ['General Physician'] },
+  { id: 'cardio',    name: 'Cardiology',          icon: null, specializations: ['Cardiologist'] },
+  { id: 'derma',     name: 'Dermatology',         icon: null, specializations: ['Dermatologist'] },
+  { id: 'eye',       name: 'Ophthalmology',       icon: null, specializations: ['Ophthalmologist'] },
+  { id: 'dental',    name: 'Dental',              icon: null, specializations: ['Dentist'] },
+  { id: 'pediatrics',name: 'Pediatrics',          icon: null, specializations: ['Pediatrician', 'Paediatrician'] },
+  { id: 'ortho',     name: 'Orthopedics',         icon: null, specializations: ['Orthopedic', 'Orthopedic Surgeon'] },
+  { id: 'neuro',     name: 'Neurology',            icon: null, specializations: ['Neurologist', 'Neurosurgeon'] },
 ];
 
 const SORT_OPTIONS = [
-  { id: 'relevant', label: 'Most Relevant' },
-  { id: 'fee_low', label: 'Price: Low to High' },
-  { id: 'fee_high', label: 'Price: High to Low' },
-  { id: 'wait', label: 'Shortest Wait Time' },
+  { id: 'relevant',   label: 'Most Relevant' },
+  { id: 'rating',     label: 'Highest Rated' },
+  { id: 'fee_low',    label: 'Price: Low to High' },
+  { id: 'fee_high',   label: 'Price: High to Low' },
+  { id: 'wait',       label: 'Shortest Wait' },
   { id: 'experience', label: 'Most Experienced' },
 ];
 
-const SYMPTOM_MAP = {
-  fever: 'General Physician',
-  'skin issues': 'Dermatologist',
-  'heart pain': 'Cardiologist',
-  'eye problem': 'General Physician',
-  'bone pain': 'General Physician',
-  cough: 'General Physician',
-  cold: 'General Physician',
+
+const LOCATIONS = ['Current Location', 'Mumbai', 'Delhi', 'Bangalore', 'Pune', 'Hyderabad'];
+
+const S = {
+  page: { minHeight: '100vh', background: '#F5F7FA', fontFamily: 'system-ui,-apple-system,sans-serif' },
+  header: { background: '#fff', borderBottom: '1px solid #E8ECF0', position: 'sticky', top: 0, zIndex: 50 },
+  headerInner: { maxWidth: 1100, margin: '0 auto', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', gap: 10 },
+  logo: { width: 32, height: 32, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  logoText: { fontWeight: 800, fontSize: 16, color: T, letterSpacing: '-0.3px' },
+  navBar: { background: T },
+  navBarInner: { maxWidth: 1100, margin: '0 auto', padding: '0 16px', display: 'flex', gap: 2, overflowX: 'auto' },
+  body: { maxWidth: 1100, margin: '0 auto', padding: '20px 16px 48px' },
 };
 
 export const Marketplace = () => {
-  const user = useSelector((state) => state.auth.user);
+  const isMobile = useIsMobile();
+  const user = useSelector(s => s.auth.user);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [doctors, setDoctors] = useState([]);
-  const [doctorQueueStats, setDoctorQueueStats] = useState({});
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [sortBy, setSortBy] = useState('relevant');
-  const [loading, setLoading] = useState(true);
-  const [selectedLocation, setSelectedLocation] = useState('Current Location');
+  const location = useLocation();
+
+  const [doctors, setDoctors]             = useState([]);
+  const [queueStats, setQueueStats]       = useState({});
+  const [search, setSearch]               = useState(location.state?.search || '');
+  const [selectedCategory, setSelected]  = useState('all');
+  const [sortBy, setSortBy]               = useState('relevant');
+  const [loading, setLoading]             = useState(true);
+  const [selectedLocation, setLocation]  = useState('Current Location');
+  const [searchResults, setSearchResults] = useState(null);
+  const [searchType, setSearchType]       = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
+    if (location.state?.category) {
+      setSelected(location.state.category);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    if (location.state?.search) setSearch(location.state.search);
+  }, [location.state]);
+
+  useEffect(() => {
+    const fetch = async () => {
       try {
         setLoading(true);
-        const doctorsRes = await doctorAPI.getDoctors();
-        setDoctors(doctorsRes.data);
 
-        const queueStatsMap = {};
-        for (const doctor of doctorsRes.data) {
-          try {
-            const queueRes = await queueAPI.getQueueByDoctorId(doctor._id);
-            queueStatsMap[doctor._id] = queueRes.data;
-          } catch (error) {
-            queueStatsMap[doctor._id] = { waiting: 0, called: 0, consulting: 0, total: 0 };
+        const [doctorsResult, queueResult] = await Promise.allSettled([
+          doctorAPI.getDoctors(),
+          queueAPI.getQueueStats(),
+        ]);
+
+        if (doctorsResult.status === 'fulfilled') {
+          setDoctors(Array.isArray(doctorsResult.value.data) ? doctorsResult.value.data : []);
+        } else {
+          setDoctors([]);
+          if (doctorsResult.reason?.response?.status !== 401) {
+            toast.error('Failed to load doctors');
           }
         }
-        setDoctorQueueStats(queueStatsMap);
-      } catch (error) {
-        if (error.response?.status === 401) {
-          setDoctors([]);
-          setDoctorQueueStats({});
-        } else {
-          toast.error('Failed to load doctors');
-        }
+
+        setQueueStats(
+          queueResult.status === 'fulfilled' ? (queueResult.value.data || {}) : {}
+        );
       } finally {
         setLoading(false);
       }
     };
-
-    fetchData();
+    fetch();
   }, []);
 
-  const filteredAndSortedDoctors = useMemo(() => {
-    let result = doctors;
+  useEffect(() => {
+    const query = search.trim();
 
-    // Filter by category
-    if (selectedCategory !== 'all') {
-      const cat = CATEGORIES.find((c) => c.id === selectedCategory);
-      if (cat?.specialization) {
-        result = result.filter((d) => d.specialization === cat.specialization);
-      }
+    if (!query) {
+      setSearchResults(null);
+      setSearchType(null);
+      setSearchLoading(false);
+      return;
     }
 
-    // Filter by search
-    if (search.trim()) {
-      const searchLower = search.toLowerCase();
-      result = result.filter(
-        (d) =>
-          d.name.toLowerCase().includes(searchLower) ||
-          d.specialization.toLowerCase().includes(searchLower)
-      );
-
-      if (result.length === 0) {
-        const symptomMatch = SYMPTOM_MAP[searchLower.trim()];
-        if (symptomMatch) {
-          result = doctors.filter((d) => d.specialization === symptomMatch);
-        }
-      }
+    if (query.length < 4) {
+      setSearchResults([]);
+      setSearchType(null);
+      setSearchLoading(false);
+      return;
     }
 
-    // Sort
-    const sorted = [...result].sort((a, b) => {
-      const waitA = (doctorQueueStats[a._id]?.waiting || 0) * (a.averageConsultationTime || 10);
-      const waitB = (doctorQueueStats[b._id]?.waiting || 0) * (b.averageConsultationTime || 10);
-
-      switch (sortBy) {
-        case 'fee_low':
-          return a.consultationFee - b.consultationFee;
-        case 'fee_high':
-          return b.consultationFee - a.consultationFee;
-        case 'wait':
-          return waitA - waitB;
-        case 'experience':
-          return b.experience - a.experience;
-        default:
-          return 0;
+    const timer = setTimeout(async () => {
+      try {
+        setSearchLoading(true);
+        const res = await searchAPI.search(query);
+        setSearchResults(res.data.doctors || []);
+        setSearchType(res.data.searchType || null);
+      } catch {
+        setSearchResults(null);
+        setSearchType(null);
+      } finally {
+        setSearchLoading(false);
       }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const filtered = useMemo(() => {
+    const base = searchResults !== null ? searchResults : doctors;
+    let r = base;
+    if (!search.trim() && selectedCategory !== 'all') {
+      const cat = CATEGORIES.find(c => c.id === selectedCategory);
+      if (cat?.specializations) {
+        r = r.filter(d => cat.specializations.includes(d.specialization));
+      }
+    }
+    return [...r].sort((a, b) => {
+      const wA = (queueStats[a._id]?.waiting || 0) * (a.averageConsultationTime || 10);
+      const wB = (queueStats[b._id]?.waiting || 0) * (b.averageConsultationTime || 10);
+      if (sortBy === 'rating') return (b.averageRating || 0) - (a.averageRating || 0);
+      if (sortBy === 'fee_low') return a.consultationFee - b.consultationFee;
+      if (sortBy === 'fee_high') return b.consultationFee - a.consultationFee;
+      if (sortBy === 'wait') return wA - wB;
+      if (sortBy === 'experience') return b.experience - a.experience;
+      return 0;
     });
+  }, [doctors, searchResults, search, selectedCategory, sortBy, queueStats]);
 
-    return sorted;
-  }, [doctors, search, selectedCategory, sortBy, doctorQueueStats]);
-
-  const getEstimatedWait = (doctorId) => {
-    const stats = doctorQueueStats[doctorId] || { waiting: 0 };
-    const avgTime = doctors.find((d) => d._id === doctorId)?.averageConsultationTime || 10;
-    return stats.waiting * avgTime;
+  const getWait = id => {
+    const s = queueStats[id] || { waiting: 0 };
+    return (s.waiting || 0) * (doctors.find(d => d._id === id)?.averageConsultationTime || 10);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mx-auto mb-3"></div>
-          <p className="text-gray-700 font-medium">Loading doctors...</p>
-        </div>
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F5F7FA' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 44, height: 44, border: `4px solid ${T}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+        <p style={{ color: '#374151', fontWeight: 600 }}>Loading doctors...</p>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={S.page}>
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/patient')} className="text-gray-600 hover:text-gray-900 p-1">
-              <ChevronLeft size={22} />
-            </button>
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Heart className="text-white" size={18} strokeWidth={2.5} />
-            </div>
-            <h1 className="text-base font-bold text-gray-900">ClinicFlow</h1>
+      <header style={S.header}>
+        <div style={S.headerInner}>
+          <button onClick={() => navigate(user ? '/patient' : '/')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6B7280', display: 'flex' }}>
+            <ChevronLeft size={22} />
+          </button>
+          <div onClick={() => navigate(user ? '/patient' : '/')} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <div style={S.logo}><Stethoscope size={16} color="#fff" strokeWidth={2.5} /></div>
+            <span style={S.logoText}>ClinicFlow</span>
           </div>
-          <h2 className="text-base font-bold text-gray-900">Browse Doctors</h2>
+          {!isMobile && <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginLeft: 8 }}>/ Browse Doctors</span>}
 
-          {user ? (
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate('/patient/my-appointments')}
-                className="text-gray-700 hover:text-blue-600 font-medium text-xs px-3 py-1.5 rounded-lg hover:bg-blue-50 transition hidden sm:block"
-              >
-                My Appointments
-              </button>
-              <div className="hidden sm:flex items-center bg-gray-100 px-3 py-1.5 rounded-full">
-                <span className="text-xs font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
-              </div>
-              <button
-                onClick={() => dispatch(logout())}
-                className="text-gray-700 hover:text-red-600 font-medium text-xs px-3 py-1.5"
-              >
-                Logout
-              </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 20, padding: '4px 10px', marginLeft: 12 }}>
+            <MapPin size={12} color={T} />
+            <select value={selectedLocation} onChange={e => setLocation(e.target.value)}
+              style={{ fontSize: 12, fontWeight: 600, color: T, background: 'transparent', border: 'none', outline: 'none', cursor: 'pointer' }}>
+              {LOCATIONS.map(l => <option key={l}>{l}</option>)}
+            </select>
+          </div>
+
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {user ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F3F4F6', padding: '5px 10px', borderRadius: 20 }}>
+                  <div style={{ width: 24, height: 24, background: T, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12 }}>
+                    {user.name?.charAt(0)}
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{user.name?.split(' ')[0]}</span>
+                </div>
+                <button onClick={() => dispatch(logout())} style={{ fontSize: 12, fontWeight: 600, color: '#6B7280', background: 'none', border: 'none', cursor: 'pointer' }}>Logout</button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => navigate('/login/patient')} style={{ fontSize: 12, fontWeight: 600, color: '#374151', background: 'none', border: '1.5px solid #D1D5DB', borderRadius: 8, padding: '5px 12px', cursor: 'pointer' }}>Login</button>
+                <button onClick={() => navigate('/login/doctor')} style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: T, border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>For Doctors</button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Search + filter bar */}
+        <div style={{ background: '#fff', borderTop: '1px solid #F3F4F6', padding: '10px 16px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+              <input type="text" placeholder="Search doctors, symptoms, specialties..."
+                value={search} onChange={e => { setSearch(e.target.value); if (!e.target.value.trim()) { setSearchResults(null); setSearchType(null); } }}
+                style={{ width: '100%', paddingLeft: 36, paddingRight: searchLoading ? 80 : 14, paddingTop: 9, paddingBottom: 9, background: '#F5F7FA', border: '1.5px solid #E5E7EB', borderRadius: 24, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              {searchLoading && (
+                <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: T, fontWeight: 600 }}>Searching…</span>
+              )}
+              {searchType === 'symptom' && search.trim() && !searchLoading && (
+                <div style={{ position: 'absolute', left: 12, top: 'calc(100% + 4px)', fontSize: 11, color: T, fontWeight: 600, background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '3px 10px', whiteSpace: 'nowrap' }}>
+                  Showing doctors for symptom: {search}
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <MapPin size={16} className="text-gray-500" />
-              <select
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
-              >
-                <option value="Current Location">Current Location</option>
-                <option value="Mumbai">Mumbai</option>
-                <option value="Delhi">Delhi</option>
-                <option value="Bangalore">Bangalore</option>
-                <option value="Pune">Pune</option>
-                <option value="Hyderabad">Hyderabad</option>
+            <div style={{ position: 'relative' }}>
+              <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+                style={{ fontSize: 12, fontWeight: 600, color: '#374151', background: '#F5F7FA', border: '1.5px solid #E5E7EB', borderRadius: 10, padding: '8px 28px 8px 10px', appearance: 'none', outline: 'none', cursor: 'pointer' }}>
+                {SORT_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
               </select>
-              <button
-                onClick={() => navigate('/login/patient')}
-                className="text-gray-700 hover:text-blue-600 font-medium text-xs px-3 py-1.5 rounded-lg hover:bg-blue-50 transition"
-              >
-                Login as Patient
-              </button>
-              <button
-                onClick={() => navigate('/login/doctor')}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-3 py-1.5 rounded-lg transition"
-              >
-                Login as Doctor
-              </button>
+              <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6B7280' }} />
             </div>
-          )}
+          </div>
+        </div>
+
+        {/* Category pills */}
+        <div style={{ background: '#FAFAFA', borderTop: '1px solid #F3F4F6', padding: '8px 16px', overflowX: 'auto' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', gap: 8 }}>
+            {CATEGORIES.map(cat => (
+              <button key={cat.id} onClick={() => {
+                setSelected(cat.id);
+                setSearch('');
+                setSearchResults(null);
+                setSearchType(null);
+              }}
+                style={{
+                  fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 20, whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
+                  background: selectedCategory === cat.id ? T : '#fff',
+                  color: selectedCategory === cat.id ? '#fff' : '#374151',
+                  border: `1.5px solid ${selectedCategory === cat.id ? T : '#E5E7EB'}`,
+                }}>
+                {cat.name}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
-      {/* Search Bar */}
-      <div className="bg-white border-b border-gray-200 sticky z-40">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="relative">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search doctors, symptoms..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-            />
-          </div>
-        </div>
-      </div>
+      <div style={S.body}>
+        <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
+          <span style={{ fontWeight: 700, color: '#111827' }}>{filtered.length}</span> doctor{filtered.length !== 1 ? 's' : ''} available
+          {selectedCategory !== 'all' && <span> in <span style={{ color: T, fontWeight: 600 }}>{CATEGORIES.find(c => c.id === selectedCategory)?.name}</span></span>}
+        </p>
 
-      <div className="max-w-7xl mx-auto px-4">
-        {/* Filters Section */}
-        <div className="py-4 border-b border-gray-200 flex items-center justify-between gap-4 overflow-x-auto">
-          {/* Categories */}
-          <div className="flex gap-2 min-w-max">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-4 py-2 rounded-full font-medium text-sm transition-all whitespace-nowrap ${
-                  selectedCategory === cat.id
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {cat.icon} {cat.name}
-              </button>
-            ))}
-          </div>
-
-          {/* Sort */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white whitespace-nowrap"
-          >
-            {SORT_OPTIONS.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Results Info */}
-        <div className="py-4">
-          <p className="text-sm text-gray-600">
-            {filteredAndSortedDoctors.length} doctor{filteredAndSortedDoctors.length !== 1 ? 's' : ''} available
-          </p>
-        </div>
-
-        {/* Doctor Cards */}
-        {filteredAndSortedDoctors.length === 0 ? (
-          <div className="text-center py-16">
-            <SearchX size={48} className="mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600 font-medium">No doctors found</p>
-            <p className="text-gray-500 text-sm">Try different filters or search</p>
+        {filtered.length === 0 ? (
+          <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '56px 16px', textAlign: 'center' }}>
+            <SearchX size={48} color="#D1D5DB" style={{ margin: '0 auto 16px' }} />
+            <p style={{ fontWeight: 700, color: '#111827', marginBottom: 6 }}>No doctors found</p>
+            <p style={{ fontSize: 13, color: '#6B7280' }}>Try adjusting filters or searching differently</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-12">
-            {filteredAndSortedDoctors.map((doctor) => {
-              const stats = doctorQueueStats[doctor._id] || { waiting: 0 };
-              const waitTime = getEstimatedWait(doctor._id);
-
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 16 }}>
+            {filtered.map(doc => {
+              const stats = queueStats[doc._id] || { waiting: 0 };
+              const wait = getWait(doc._id);
+              const rating = doc.averageRating > 0 ? doc.averageRating.toFixed(1) : null;
               return (
-                <Link
-                  key={doctor._id}
-                  to={user ? `/patient/doctors/${doctor._id}` : `/doctors/${doctor._id}`}
-                  className="bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all duration-200 overflow-hidden group"
-                >
-                  {/* Card Header with Avatar */}
-                  <div className="h-20 bg-gradient-to-br from-blue-500 to-blue-700 flex items-end px-4 pb-3">
-                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-2xl font-bold text-blue-600 shadow-md">
-                      {doctor.name.charAt(0)}
+                <div key={doc._id}
+                  style={{ background: '#fff', borderRadius: 16, border: '1.5px solid #E5E7EB', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer', transition: 'box-shadow 0.15s, border-color 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.09)'; e.currentTarget.style.borderColor = '#99F6E4'; }}
+                  onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#E5E7EB'; }}
+                  onClick={() => navigate(user ? `/patient/doctors/${doc._id}` : `/doctors/${doc._id}`)}>
+                  {/* Accent strip */}
+                  <div style={{ height: 6, background: `linear-gradient(90deg,${T},#14B8A6)` }} />
+                  <div style={{ padding: '14px 16px 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                      <div style={{ width: 50, height: 50, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 20 }}>
+                        {doc.name.charAt(0)}
+                      </div>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 20,
+                        background: wait === 0 ? '#D1FAE5' : wait <= 20 ? '#FEF9C3' : '#FEE2E2',
+                        color: wait === 0 ? '#065F46' : wait <= 20 ? '#92400E' : '#991B1B',
+                      }}>
+                        {wait === 0 ? 'Available' : `~${wait}m wait`}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: 2 }}>
+                      <p style={{ fontWeight: 800, fontSize: 15, color: '#111827', lineHeight: 1.3, margin: 0 }}>
+                        Dr. {doc.name.replace(/^Dr\.?\s+/, '')}
+                      </p>
+                      {doc.isVerified && (
+                        <div title="Verified Doctor" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, background: '#059669', borderRadius: '50%', flexShrink: 0 }}>
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+                            <path d="M5 12L10 17L19 8" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <p style={{ fontSize: 12, color: T, fontWeight: 600, marginBottom: 10 }}>{doc.specialization}</p>
+                    <div style={{ display: 'flex', gap: 10, fontSize: 12, color: '#6B7280', marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span>{doc.experience}yr</span>
+                      <span style={{ color: '#D1D5DB' }}>·</span>
+                      <span>₹{doc.consultationFee}</span>
+                      {rating && <>
+                        <span style={{ color: '#D1D5DB' }}>·</span>
+                        <span style={{ color: '#F59E0B', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Star size={11} fill="#F59E0B" color="#F59E0B" /> {rating}
+                        </span>
+                      </>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }}>
+                      <span style={{ background: '#F3F4F6', color: '#374151', padding: '3px 8px', borderRadius: 6 }}>{stats.waiting || 0} waiting</span>
                     </div>
                   </div>
-
-                  {/* Card Content */}
-                  <div className="p-4 -mt-4 relative">
-                    {/* Doctor Info */}
-                    <div className="mb-3">
-                      <h3 className="text-sm font-bold text-gray-900 line-clamp-1">
-                        {doctor.name.replace(/^Dr\.?\s+/, 'Dr. ')}
-                      </h3>
-                      <p className="text-xs text-blue-600 font-semibold mt-0.5">{doctor.specialization}</p>
-                    </div>
-
-                    {/* Rating & Info */}
-                    <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
-                      <div>
-                        <p className="text-xs text-gray-500">Experience</p>
-                        <p className="font-bold text-gray-900 text-sm">{doctor.experience}y</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Fees</p>
-                        <p className="font-bold text-gray-900 text-sm">₹{doctor.consultationFee}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Rating</p>
-                        <div className="flex items-center gap-1">
-                          <Star size={14} className="text-yellow-400 fill-yellow-400" />
-                          <p className="font-bold text-gray-900 text-sm">4.5</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Queue Status - Redesigned */}
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-gray-600">Queue Status</span>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                            stats.waiting > 5 ? 'bg-red-100 text-red-700' : stats.waiting > 2 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
-                          }`}>
-                            {stats.waiting || 0} waiting
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-center bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg py-2 border border-green-200">
-                        <p className="text-xs text-gray-600">Est. Wait Time</p>
-                        <p className="text-lg font-bold text-green-600">{waitTime || 0}m</p>
-                      </div>
-                    </div>
-
-                    {/* Book Button */}
+                  <div style={{ padding: '0 16px 16px', marginTop: 'auto' }}>
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
+                      onClick={e => {
                         e.stopPropagation();
-                        if (user) {
-                          navigate(`/patient/doctors/${doctor._id}/book`);
-                        } else {
-                          toast.error('Login to book an appointment');
-                          navigate('/login/patient');
-                        }
+                        if (user) navigate(`/patient/doctors/${doc._id}/book`);
+                        else { toast.error('Login to book'); navigate('/login/patient'); }
                       }}
-                      className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-2.5 rounded-lg font-semibold text-xs transition-all shadow-sm hover:shadow-md"
-                    >
+                      style={{ width: '100%', background: T, color: '#fff', fontWeight: 700, fontSize: 13, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer' }}>
                       Book Appointment
                     </button>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>

@@ -1,8 +1,8 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import axios from 'axios';
 import Patient from '../models/Patient.js';
 import Doctor from '../models/Doctor.js';
-import Receptionist from '../models/Receptionist.js';
 import { protect } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
@@ -68,6 +68,62 @@ router.post(
   })
 );
 
+// REGISTER DOCTOR
+router.post(
+  '/register/doctor',
+  catchAsyncErrors(async (req, res) => {
+    const { name, email, phone, password, specialization, licenseNumber, officeLocation, experience, qualifications, consultationFee } = req.body;
+
+    if (!name || !email || !phone || !password || !specialization || !licenseNumber) {
+      return res.status(400).json({ message: 'Please provide all required fields' });
+    }
+
+    const existingDoctor = await Doctor.findOne({ email });
+    if (existingDoctor) {
+      return res.status(400).json({ message: 'Doctor already exists with this email' });
+    }
+
+    // Call AskMyDoc license verification API (non-blocking — failure just leaves licenseVerified false)
+    let licenseVerified = false;
+    try {
+      const verifyRes = await axios.get(
+        `https://api.askmydoc.in/api/verify?reg_number=${licenseNumber}`,
+        { timeout: 10000 }
+      );
+      licenseVerified = verifyRes.data?.verified === true && verifyRes.data?.success === true;
+    } catch {
+      licenseVerified = false;
+    }
+
+    const doctor = new Doctor({
+      name,
+      email,
+      phone,
+      password,
+      specialization,
+      licenseNumber,
+      officeLocation,
+      experience: experience ? Number(experience) : 0,
+      qualifications: qualifications
+        ? (Array.isArray(qualifications) ? qualifications : qualifications.split(',').map(q => q.trim()).filter(Boolean))
+        : [],
+      consultationFee: consultationFee ? Number(consultationFee) : 0,
+      licenseVerified,
+      verificationStatus: 'PENDING',
+    });
+
+    await doctor.save();
+
+    const token = generateToken(doctor, 'DOCTOR');
+
+    res.status(201).json({
+      message: 'Registration successful. Your account is under review. You will be able to login once an admin approves your account.',
+      token,
+      user: { ...doctor.toJSON(), role: 'DOCTOR' },
+    });
+  })
+);
+
 // LOGIN
 router.post(
   '/login',
@@ -96,15 +152,6 @@ router.post(
 
       if (user) {
         role = 'DOCTOR';
-      }
-    }
-
-    // Check RECEPTIONIST
-    if (!user) {
-      user = await Receptionist.findOne({ email });
-
-      if (user) {
-        role = 'RECEPTIONIST';
       }
     }
 
@@ -146,8 +193,6 @@ router.get(
       user = await Patient.findById(req.user.id);
     } else if (req.user.role === 'DOCTOR') {
       user = await Doctor.findById(req.user.id);
-    } else if (req.user.role === 'RECEPTIONIST') {
-      user = await Receptionist.findById(req.user.id);
     }
 
     if (!user) {
@@ -174,8 +219,6 @@ router.put(
       Model = Patient;
     } else if (req.user.role === 'DOCTOR') {
       Model = Doctor;
-    } else if (req.user.role === 'RECEPTIONIST') {
-      Model = Receptionist;
     }
 
     if (!Model) {
@@ -186,7 +229,7 @@ router.put(
 
     const allowedFields =
       req.user.role === 'PATIENT'
-        ? ['familyMembers', 'phone', 'dateOfBirth', 'gender', 'allergies']
+        ? ['name', 'phone', 'dateOfBirth', 'gender', 'bloodGroup', 'allergies', 'familyMembers']
         : ['phone'];
 
     const updateData = {};

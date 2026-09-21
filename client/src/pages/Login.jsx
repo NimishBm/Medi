@@ -88,7 +88,6 @@ export const Login = () => {
           <p className="font-medium mb-2">Demo Accounts:</p>
           <p>Patient: rahul@example.com / Password123!</p>
           <p>Doctor: dr.sarah@clinic.com / Password123!</p>
-          <p>Receptionist: receptionist@clinic.com / Password123!</p>
         </div>
       </div>
     </div>

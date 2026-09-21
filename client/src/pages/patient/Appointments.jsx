@@ -1,337 +1,250 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSelector } from 'react-redux';
-import { useDispatch } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate, Link } from 'react-router-dom';
 import { appointmentAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
-import { ChevronLeft, Heart, Star } from 'lucide-react';
+import { ChevronLeft, Stethoscope, Star, Calendar, Clock, MapPin } from 'lucide-react';
+import { useIsMobile } from '../../hooks/useIsMobile';
+
+const T = '#0D9488';
 
 const TABS = ['Upcoming', 'Completed', 'Cancelled'];
 
+const statusColor = s => ({
+  BOOKED:     { bg: '#DBEAFE', color: '#1D4ED8' },
+  COMPLETED:  { bg: '#D1FAE5', color: '#065F46' },
+  CANCELLED:  { bg: '#F3F4F6', color: '#4B5563' },
+  CHECKED_IN: { bg: '#EDE9FE', color: '#5B21B6' },
+  WAITING:    { bg: '#EDE9FE', color: '#5B21B6' },
+  CALLED:     { bg: '#FEF9C3', color: '#92400E' },
+  CONSULTING: { bg: '#EDE9FE', color: '#5B21B6' },
+}[s] || { bg: '#F3F4F6', color: '#4B5563' });
+
 export const Appointments = () => {
-  const user = useSelector((state) => state.auth.user);
+  const user = useSelector(s => s.auth.user);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Upcoming');
   const [cancelingId, setCancelingId] = useState(null);
+  const isMobile = useIsMobile();
   const [reviews, setReviews] = useState({});
 
   useEffect(() => {
-    const fetchAppointments = async () => {
-      try {
-        setIsLoading(true);
-        const response = await appointmentAPI.getAppointments();
-        setAppointments(response.data);
-      } catch (error) {
-        toast.error('Failed to load appointments');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAppointments();
+    appointmentAPI.getAppointments()
+      .then(r => setAppointments(r.data))
+      .catch(() => toast.error('Failed to load appointments'))
+      .finally(() => setIsLoading(false));
   }, []);
 
-  const filteredAppointments = useMemo(() => {
-    const now = new Date();
-    return appointments.filter((apt) => {
-      const aptDate = new Date(apt.appointmentDate);
-      aptDate.setHours(0, 0, 0, 0);
-      const todayDate = new Date();
-      todayDate.setHours(0, 0, 0, 0);
-
-      if (activeTab === 'Upcoming') {
-        return aptDate >= todayDate && apt.status !== 'CANCELLED' && apt.status !== 'COMPLETED';
-      }
-      if (activeTab === 'Completed') {
-        return apt.status === 'COMPLETED';
-      }
-      if (activeTab === 'Cancelled') {
-        return apt.status === 'CANCELLED';
-      }
+  const filtered = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return appointments.filter(a => {
+      const d = new Date(a.appointmentDate); d.setHours(0, 0, 0, 0);
+      if (activeTab === 'Upcoming')   return d >= today && a.status !== 'CANCELLED' && a.status !== 'COMPLETED';
+      if (activeTab === 'Completed')  return a.status === 'COMPLETED';
+      if (activeTab === 'Cancelled')  return a.status === 'CANCELLED';
       return true;
     });
   }, [appointments, activeTab]);
 
-  const handleCancel = async (appointmentId) => {
+  const handleCancel = async id => {
+    setCancelingId(id);
     try {
-      setCancelingId(appointmentId);
-      await appointmentAPI.cancelAppointment(appointmentId);
+      await appointmentAPI.cancelAppointment(id);
       toast.success('Appointment cancelled');
-      setAppointments(appointments.map((apt) =>
-        apt._id === appointmentId ? { ...apt, status: 'CANCELLED' } : apt
-      ));
-    } catch (error) {
-      toast.error('Failed to cancel appointment');
-    } finally {
-      setCancelingId(null);
-    }
+      setAppointments(prev => prev.map(a => a._id === id ? { ...a, status: 'CANCELLED' } : a));
+    } catch { toast.error('Failed to cancel'); }
+    finally { setCancelingId(null); }
   };
 
-  const updateReview = (appointmentId, field, value) => {
-    setReviews((prev) => ({
-      ...prev,
-      [appointmentId]: {
-        ...(prev[appointmentId] || { rating: 0, comment: '', submitted: false }),
-        [field]: value,
-      },
-    }));
-  };
+  const updateReview = (id, field, val) =>
+    setReviews(p => ({ ...p, [id]: { ...(p[id] || { rating: 0, comment: '', submitted: false }), [field]: val } }));
 
-  const submitReview = (appointmentId) => {
-    const review = reviews[appointmentId];
-    if (!review || (review.rating === 0 && !review.comment)) {
-      toast.error('Please add a rating or comment');
-      return;
-    }
-    updateReview(appointmentId, 'submitted', true);
+  const submitReview = id => {
+    const r = reviews[id];
+    if (!r || (!r.rating && !r.comment)) { toast.error('Add a rating or comment'); return; }
+    updateReview(id, 'submitted', true);
     toast.success('Thank you for your review!');
-    // TODO: Call API when backend supports reviews
   };
 
-  const getStatusBadgeColor = (status) => {
-    switch (status) {
-      case 'BOOKED':
-        return 'bg-blue-100 text-blue-700';
-      case 'COMPLETED':
-        return 'bg-green-100 text-green-700';
-      case 'CANCELLED':
-        return 'bg-gray-100 text-gray-700';
-      case 'CHECKED_IN':
-      case 'WAITING':
-      case 'CALLED':
-      case 'CONSULTING':
-        return 'bg-purple-100 text-purple-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mx-auto mb-3"></div>
-          <p className="text-gray-700 font-medium">Loading appointments...</p>
-        </div>
+  if (isLoading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F5F7FA' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 44, height: 44, border: `4px solid ${T}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+        <p style={{ color: '#374151', fontWeight: 600 }}>Loading appointments...</p>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: '100vh', background: '#F5F7FA', fontFamily: 'system-ui,-apple-system,sans-serif' }}>
+
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/patient')} className="text-gray-600 hover:text-gray-900 p-1">
-              <ChevronLeft size={22} />
-            </button>
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Heart className="text-white" size={18} strokeWidth={2.5} />
+      <header style={{ background: '#fff', borderBottom: '1px solid #E8ECF0', position: 'sticky', top: 0, zIndex: 50 }}>
+        <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={() => navigate('/patient')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', display: 'flex', padding: 4 }}>
+            <ChevronLeft size={22} />
+          </button>
+          <div onClick={() => navigate('/patient')} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <div style={{ width: 32, height: 32, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Stethoscope size={16} color="#fff" strokeWidth={2.5} />
             </div>
-            <h1 className="text-base font-bold text-gray-900">ClinicFlow</h1>
+            <span style={{ fontWeight: 800, fontSize: 16, color: T }}>ClinicFlow</span>
           </div>
-          <h2 className="text-base font-bold text-gray-900">My Appointments</h2>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center bg-gray-100 px-3 py-1.5 rounded-full">
-              <span className="text-xs font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+          {!isMobile && <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginLeft: 4 }}>/ My Appointments</span>}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F3F4F6', padding: '5px 10px', borderRadius: 20 }}>
+              <div style={{ width: 24, height: 24, background: T, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12 }}>
+                {user?.name?.charAt(0)}
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{user?.name?.split(' ')[0]}</span>
             </div>
-            <button
-              onClick={() => dispatch(logout())}
-              className="text-gray-700 hover:text-red-600 font-medium text-xs px-3 py-1.5"
-            >
-              Logout
-            </button>
+            <button onClick={() => dispatch(logout())} style={{ fontSize: 12, fontWeight: 600, color: '#6B7280', background: 'none', border: 'none', cursor: 'pointer' }}>Logout</button>
           </div>
         </div>
+        {/* Teal strip */}
+        <div style={{ background: T, height: 4 }} />
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 py-6">
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 16px 48px' }}>
+
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 bg-white p-3 rounded-lg shadow-sm">
-          {TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-6 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
-                activeTab === tab
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, background: '#fff', padding: '8px', borderRadius: 14, border: '1.5px solid #E5E7EB', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {TABS.map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '8px 20px', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+                background: activeTab === tab ? T : 'transparent',
+                color: activeTab === tab ? '#fff' : '#6B7280',
+              }}>
               {tab}
             </button>
           ))}
         </div>
 
-        {/* Appointments List */}
-        {filteredAppointments.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-lg shadow-sm">
-            <p className="text-gray-600 text-lg mb-4">No {activeTab.toLowerCase()} appointments</p>
-            <Link to="/patient" className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium">
-              Browse Doctors
-            </Link>
+        {/* Count */}
+        <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
+          <span style={{ fontWeight: 700, color: '#111827' }}>{filtered.length}</span> {activeTab.toLowerCase()} appointment{filtered.length !== 1 ? 's' : ''}
+        </p>
+
+        {filtered.length === 0 ? (
+          <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '56px 16px', textAlign: 'center' }}>
+            <Calendar size={48} color="#D1D5DB" style={{ margin: '0 auto 16px' }} />
+            <p style={{ fontWeight: 700, color: '#111827', marginBottom: 6 }}>No {activeTab.toLowerCase()} appointments</p>
+            <button onClick={() => navigate('/patient/marketplace')}
+              style={{ background: T, color: '#fff', fontWeight: 700, fontSize: 13, padding: '10px 24px', borderRadius: 10, border: 'none', cursor: 'pointer', marginTop: 8 }}>
+              Find a Doctor
+            </button>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredAppointments.map((appointment) => {
-              const aptDate = new Date(appointment.appointmentDate);
-              const review = reviews[appointment._id] || { rating: 0, comment: '', submitted: false };
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {filtered.map(apt => {
+              const aptDate = new Date(apt.appointmentDate);
+              const review = reviews[apt._id] || { rating: 0, comment: '', submitted: false };
+              const doctorName = apt.doctorId?.name || 'Doctor';
+              const sc = statusColor(apt.status);
 
               return (
-                <div key={appointment._id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden">
-                  {/* Main Card Content */}
-                  <div className="flex">
-                    {/* LEFT PANEL - Doctor & Booking Details (65%) */}
-                    <div className="flex-1 p-5">
-                      {/* Doctor Header */}
-                      <div className="flex items-start gap-3 mb-4">
-                        <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-2xl font-bold text-white flex-shrink-0">
-                          {appointment.doctorId.name.charAt(0)}
+                <div key={apt._id} style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, overflow: 'hidden' }}>
+                  {/* Top strip by status */}
+                  <div style={{ height: 5, background: apt.status === 'BOOKED' ? T : apt.status === 'COMPLETED' ? '#10B981' : '#9CA3AF' }} />
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+                    {/* Left: doctor info */}
+                    <div style={{ flex: 1, minWidth: 260, padding: '18px 20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
+                        <div style={{ width: 52, height: 52, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 20, flexShrink: 0 }}>
+                          {doctorName.charAt(0)}
                         </div>
-                        <div className="flex-1">
-                          <h3 className="font-bold text-gray-900 text-base">Dr. {appointment.doctorId.name.replace(/^Dr\.?\s+/, '')}</h3>
-                          <p className="text-sm text-blue-600 font-semibold">{appointment.doctorId.specialization}</p>
-                          <p className="text-xs text-gray-600 mt-1">{appointment.doctorId.experience}y exp • ₹{appointment.doctorId.consultationFee}</p>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontWeight: 800, fontSize: 15, color: '#111827', marginBottom: 2 }}>
+                            Dr. {doctorName.replace(/^Dr\.?\s+/, '')}
+                          </p>
+                          {apt.doctorId?.specialization && <p style={{ fontSize: 13, color: T, fontWeight: 600, marginBottom: 4 }}>{apt.doctorId.specialization}</p>}
+                          {apt.doctorId && <p style={{ fontSize: 12, color: '#6B7280' }}>{apt.doctorId.experience}yr exp · ₹{apt.doctorId.consultationFee}</p>}
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: sc.bg, color: sc.color, flexShrink: 0 }}>{apt.status}</span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div style={{ background: '#F5F7FA', borderRadius: 10, padding: '10px 12px' }}>
+                          <p style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>Date</p>
+                          <p style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>
+                            {aptDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
+                        </div>
+                        <div style={{ background: '#F5F7FA', borderRadius: 10, padding: '10px 12px' }}>
+                          <p style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>Time</p>
+                          <p style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{apt.appointmentTime}</p>
+                        </div>
+                        <div style={{ background: '#F5F7FA', borderRadius: 10, padding: '10px 12px' }}>
+                          <p style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>Token</p>
+                          <p style={{ fontSize: 18, fontWeight: 900, color: T }}>#{apt.tokenNumber}</p>
+                        </div>
+                        <div style={{ background: '#F5F7FA', borderRadius: 10, padding: '10px 12px' }}>
+                          <p style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>Room</p>
+                          <p style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Room {apt.doctorId?.roomNumber || 'N/A'}</p>
                         </div>
                       </div>
 
-                      <hr className="my-4 border-gray-200" />
-
-                      {/* Booking Details */}
-                      <div className="space-y-2 text-sm">
-                        <div>
-                          <p className="text-xs text-gray-500 font-medium">PATIENT</p>
-                          {appointment.bookedFor?.isFamilyMember ? (
-                            <p className="text-gray-900 font-semibold">
-                              {appointment.bookedFor.name}
-                              <span className="text-xs text-gray-500 font-normal ml-1">({appointment.bookedFor.relationship})</span>
-                            </p>
-                          ) : (
-                            <p className="text-gray-900 font-semibold">Self</p>
-                          )}
+                      {apt.bookedFor?.isFamilyMember && (
+                        <div style={{ marginTop: 10, background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
+                          <span style={{ color: '#065F46', fontWeight: 600 }}>Booked for: </span>
+                          <span style={{ color: '#374151' }}>{apt.bookedFor.name} ({apt.bookedFor.relationship})</span>
                         </div>
+                      )}
 
-                        {appointment.reason && (
-                          <div>
-                            <p className="text-xs text-gray-500 font-medium">REASON</p>
-                            <p className="text-gray-900">{appointment.reason}</p>
-                          </div>
-                        )}
+                      {apt.reason && (
+                        <p style={{ marginTop: 10, fontSize: 12, color: '#6B7280' }}>
+                          <span style={{ fontWeight: 600 }}>Reason: </span>{apt.reason}
+                        </p>
+                      )}
 
-                        <div>
-                          <p className="text-xs text-gray-500 font-medium">TYPE</p>
-                          <p className="text-gray-900">{appointment.appointmentType}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* RIGHT PANEL - Receipt Style (35%) */}
-                    <div className="w-56 bg-gray-50 border-l border-dashed border-gray-300 p-4 flex flex-col justify-between">
-                      {/* Receipt Content */}
-                      <div className="space-y-3">
-                        {/* Token */}
-                        <div className="text-center pb-3 border-b border-dashed border-gray-300">
-                          <p className="text-xs text-gray-500 font-medium">TOKEN</p>
-                          <p className="text-3xl font-black text-gray-800">#{appointment.tokenNumber}</p>
-                        </div>
-
-                        {/* Date, Time, Room */}
-                        <div className="space-y-2">
-                          <div>
-                            <p className="text-xs text-gray-500">Date</p>
-                            <p className="text-sm font-semibold text-gray-900">{aptDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Time</p>
-                            <p className="text-sm font-semibold text-gray-900">{appointment.appointmentTime}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Room</p>
-                            <p className="text-sm font-semibold text-gray-900">Room {appointment.doctorId.roomNumber}</p>
-                          </div>
-                        </div>
-
-                        {/* Status Badge */}
-                        <div className="pt-2">
-                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${getStatusBadgeColor(appointment.status)}`}>
-                            {appointment.status}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Action Button */}
-                      <div className="pt-3 border-t border-dashed border-gray-300">
-                        {appointment.status === 'BOOKED' && (
-                          <button
-                            onClick={() => handleCancel(appointment._id)}
-                            disabled={cancelingId === appointment._id}
-                            className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white py-2 rounded-lg font-semibold text-xs transition-colors"
-                          >
-                            {cancelingId === appointment._id ? 'Cancelling...' : 'Cancel'}
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                        {apt.status === 'BOOKED' && (
+                          <button onClick={() => handleCancel(apt._id)} disabled={cancelingId === apt._id}
+                            style={{ fontSize: 12, fontWeight: 700, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#FEE2E2', color: '#991B1B' }}>
+                            {cancelingId === apt._id ? 'Cancelling...' : 'Cancel Appointment'}
                           </button>
                         )}
-                        {(appointment.status === 'CHECKED_IN' || appointment.status === 'WAITING' || appointment.status === 'CALLED' || appointment.status === 'CONSULTING') && (
-                          <Link
-                            to="/patient/queue"
-                            className="block text-center bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-semibold text-xs transition-colors"
-                          >
-                            Track Queue →
+                        {['CHECKED_IN', 'WAITING', 'CALLED', 'CONSULTING'].includes(apt.status) && (
+                          <Link to="/patient/queue"
+                            style={{ fontSize: 12, fontWeight: 700, padding: '8px 16px', borderRadius: 8, background: '#D1FAE5', color: '#065F46', textDecoration: 'none' }}>
+                            Track Live Queue →
                           </Link>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* REVIEW SECTION (COMPLETED only) */}
-                  {appointment.status === 'COMPLETED' && (
-                    <div className="border-t border-gray-200 bg-blue-50 p-5">
-                      <h4 className="font-bold text-gray-900 mb-3 text-sm">How was your visit?</h4>
-
+                  {/* Review section */}
+                  {apt.status === 'COMPLETED' && (
+                    <div style={{ borderTop: '1.5px solid #F3F4F6', background: '#FAFAFA', padding: '16px 20px' }}>
+                      <p style={{ fontWeight: 700, fontSize: 13, color: '#111827', marginBottom: 12 }}>How was your visit?</p>
                       {!review.submitted ? (
-                        <div className="space-y-3">
-                          {/* Star Rating */}
-                          <div className="flex gap-2">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <button
-                                key={star}
-                                onClick={() => updateReview(appointment._id, 'rating', star)}
-                                className="transition-transform hover:scale-110"
-                              >
-                                <Star
-                                  size={24}
-                                  className={review.rating >= star ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}
-                                />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            {[1,2,3,4,5].map(star => (
+                              <button key={star} onClick={() => updateReview(apt._id, 'rating', star)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+                                <Star size={22} fill={review.rating >= star ? '#F59E0B' : 'none'} color={review.rating >= star ? '#F59E0B' : '#D1D5DB'} />
                               </button>
                             ))}
                           </div>
-
-                          {/* Comment Textarea */}
-                          <textarea
-                            placeholder="Share your feedback (optional)"
-                            value={review.comment}
-                            onChange={(e) => updateReview(appointment._id, 'comment', e.target.value)}
-                            rows="2"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder-gray-500 resize-none"
-                          />
-
-                          {/* Submit Button */}
-                          <button
-                            onClick={() => submitReview(appointment._id)}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold text-xs transition-colors"
-                          >
+                          <textarea placeholder="Share your feedback (optional)" value={review.comment}
+                            onChange={e => updateReview(apt._id, 'comment', e.target.value)} rows={2}
+                            style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 13, outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+                          <button onClick={() => submitReview(apt._id)}
+                            style={{ width: 'fit-content', background: T, color: '#fff', fontWeight: 700, fontSize: 13, padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer' }}>
                             Submit Review
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 text-green-700">
-                          <span className="text-lg">✅</span>
-                          <p className="text-sm font-medium">Thank you for your review!</p>
-                        </div>
+                        <p style={{ fontSize: 13, color: '#065F46', fontWeight: 600 }}>✓ Thank you for your review!</p>
                       )}
                     </div>
                   )}

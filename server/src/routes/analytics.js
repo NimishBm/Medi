@@ -11,7 +11,7 @@ const router = express.Router();
 router.get(
   '/today',
   protect,
-  authorize('DOCTOR', 'RECEPTIONIST'),
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -44,7 +44,7 @@ router.get(
 router.get(
   '/doctor/:doctorId',
   protect,
-  authorize('DOCTOR', 'RECEPTIONIST'),
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -87,7 +87,7 @@ router.get(
 router.get(
   '/clinic/overview',
   protect,
-  authorize('RECEPTIONIST'),
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);

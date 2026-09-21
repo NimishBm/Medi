@@ -5,6 +5,8 @@ import 'express-async-errors';
 import http from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Routes
 import authRoutes from './routes/auth.js';
@@ -16,7 +18,14 @@ import prescriptionRoutes from './routes/prescriptions.js';
 import paymentRoutes from './routes/payments.js';
 import analyticsRoutes from './routes/analytics.js';
 import searchRoutes from './routes/search.js';
+import organizationRoutes from './routes/organizations.js';
+import adminRoutes from './routes/admin.js';
+import blogRoutes from './routes/blog.js';
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 console.log('Mongo URI loaded:', !!process.env.MONGO_URI);
 const app = express();
 const server = http.createServer(app);
@@ -33,8 +42,11 @@ export const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/clinicflow').then(async () => {
+mongoose.connect(process.env.MONGO_URI).then(async () => {
   console.log('MongoDB connected');
   console.log('Database:', mongoose.connection.name);
   console.log('Doctors count:', await mongoose.connection.collection('Doctors').countDocuments());
@@ -49,6 +61,9 @@ app.use('/api/prescriptions', prescriptionRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/organizations', organizationRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/blog', blogRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK' });

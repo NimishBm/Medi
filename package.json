@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
     "build": "npm run server:build && npm run client:build",
-    "start": "node server/dist/index.js",
+    "start": "node server/src/index.js",
     "server:dev": "cd server && npm run dev",
     "server:build": "cd server && npm run build",
     "server:start": "cd server && npm run start",
@@ -22,6 +22,7 @@
     "concurrently": "^8.2.2"
   },
   "dependencies": {
+    "mongod": "^2.0.0",
     "mongodb": "^7.6.0"
   }
 }

@@ -35,6 +35,11 @@ const patientSchema = new mongoose.Schema(
       enum: ['M', 'F', 'Other']
     },
 
+    bloodGroup: {
+      type: String,
+      enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+    },
+
     medicalHistory: [
       {
         condition: String,
@@ -60,7 +65,21 @@ const patientSchema = new mongoose.Schema(
           type: String,
           enum: ['M', 'F', 'Other']
         },
-        allergies: [String]
+        bloodGroup: {
+          type: String,
+          enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+        },
+        phone: {
+          type: String
+        },
+        allergies: [String],
+        medicalHistory: [
+          {
+            condition: String,
+            diagnosis: String,
+            date: Date
+          }
+        ]
       }
     ]
   },
@@ -91,4 +110,4 @@ patientSchema.methods.toJSON = function () {
   return obj;
 };
 
-export default mongoose.model('Patient', patientSchema);
+export default mongoose.model('Patient', patientSchema, 'Patients');

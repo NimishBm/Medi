@@ -7,22 +7,31 @@ const consultationSchema = new mongoose.Schema(
       ref: 'Appointment',
       required: true,
     },
+
     patientId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Patient',
       required: true,
     },
+
     doctorId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Doctor',
       required: true,
     },
+
     symptoms: [String],
+
     diagnosis: String,
+
     notes: String,
+
     treatmentPlan: String,
+
     followUpDate: Date,
+
     followUpNotes: String,
+
     consultationDuration: Number,
   },
   {
@@ -31,6 +40,7 @@ const consultationSchema = new mongoose.Schema(
 );
 
 consultationSchema.index({ patientId: 1, createdAt: -1 });
+
 consultationSchema.index({ doctorId: 1, createdAt: -1 });
 
 export default mongoose.model('Consultation', consultationSchema);

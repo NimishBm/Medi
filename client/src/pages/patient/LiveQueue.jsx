@@ -1,205 +1,217 @@
 import { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
-import { Sidebar } from '../../components/Sidebar';
-import { patientNav } from '../../components/PatientNav';
+import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { appointmentAPI, queueAPI } from '../../services/api';
+import { logout } from '../../store/slices/authSlice';
 import { initSocket } from '../../services/socket';
 import toast from 'react-hot-toast';
+import { ChevronLeft, Stethoscope, Clock, Users, CheckCircle, AlertCircle, Activity } from 'lucide-react';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
-const getStatusColor = (status) => {
-  switch (status) {
-    case 'COMPLETED': return 'bg-green-100 text-green-800';
-    case 'CONSULTING': return 'bg-blue-100 text-blue-800';
-    case 'CALLED': return 'bg-yellow-100 text-yellow-800';
-    case 'WAITING': return 'bg-gray-100 text-gray-800';
-    case 'SKIPPED': return 'bg-red-100 text-red-800';
-    default: return 'bg-gray-100 text-gray-800';
-  }
+const T = '#0D9488';
+
+const STATUS_COLORS = {
+  COMPLETED:  { bg: '#D1FAE5', color: '#065F46' },
+  CONSULTING: { bg: '#DBEAFE', color: '#1D4ED8' },
+  CALLED:     { bg: '#FEF9C3', color: '#92400E' },
+  WAITING:    { bg: '#F3F4F6', color: '#4B5563' },
+  SKIPPED:    { bg: '#FEE2E2', color: '#991B1B' },
 };
 
 export const LiveQueue = () => {
-  const { user } = useSelector((state) => state.auth);
-  const [nextAppointment, setNextAppointment] = useState(null);
-  const [queue, setQueue] = useState([]);
+  const { user } = useSelector(s => s.auth);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const [nextAppt, setNextAppt]   = useState(null);
+  const [queue, setQueue]         = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchQueue = async () => {
     try {
       const appRes = await appointmentAPI.getAppointments();
       const upcoming = appRes.data
-        .filter((a) => a.status !== 'CANCELLED' && a.status !== 'NO_SHOW')
+        .filter(a => a.status !== 'CANCELLED' && a.status !== 'NO_SHOW')
         .sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate))[0];
-
       if (upcoming) {
-        setNextAppointment(upcoming);
-        const queueRes = await queueAPI.getQueueByDoctorId(upcoming.doctorId._id);
-        setQueue(queueRes.data.queue);
+        setNextAppt(upcoming);
+        const qRes = await queueAPI.getQueueByDoctorId(upcoming.doctorId._id);
+        setQueue(qRes.data.queue || []);
       }
-    } catch (error) {
-      toast.error('Failed to load queue');
-    } finally {
-      setIsLoading(false);
-    }
+    } catch { toast.error('Failed to load queue'); }
+    finally { setIsLoading(false); }
   };
 
-  useEffect(() => {
-    fetchQueue();
-  }, []);
+  useEffect(() => { fetchQueue(); }, []);
 
   useEffect(() => {
-    if (!nextAppointment?._id) return;
-
+    if (!nextAppt?._id) return;
     const socket = initSocket();
-    socket.emit('join-queue', { doctorId: nextAppointment.doctorId._id });
-
-    const handleQueueUpdate = () => {
-      fetchQueue();
-    };
-
-    socket.on('queue-update', handleQueueUpdate);
-
+    socket.emit('join-queue', { doctorId: nextAppt.doctorId._id });
+    socket.on('queue-update', fetchQueue);
     return () => {
-      socket.off('queue-update', handleQueueUpdate);
-      socket.emit('leave-queue', { doctorId: nextAppointment.doctorId._id });
+      socket.off('queue-update', fetchQueue);
+      socket.emit('leave-queue', { doctorId: nextAppt.doctorId._id });
     };
-  }, [nextAppointment?._id]);
+  }, [nextAppt?._id]);
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
-  }
+  if (isLoading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F5F7FA' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 44, height: 44, border: `4px solid ${T}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+        <p style={{ color: '#374151', fontWeight: 600 }}>Loading queue...</p>
+      </div>
+    </div>
+  );
 
-  if (!nextAppointment) {
-    return (
-      <div className="flex bg-gray-100 min-h-screen">
-        <Sidebar navItems={patientNav} />
-        <div className="flex-1 flex flex-col">
-          <Navbar title="Live Queue" />
-          <div className="p-8 flex items-center justify-center">
-            <div className="card text-center py-12 bg-blue-50">
-              <p className="text-gray-600 mb-4">No upcoming appointments</p>
-              <a href="/patient/book-appointment" className="btn-primary inline-block">
-                Book an Appointment
-              </a>
+  const myPos       = queue.find(q => q.patientId?._id === user._id);
+  const consulting  = queue.find(q => q.status === 'CONSULTING');
+  const waiting     = queue.filter(q => q.status === 'WAITING');
+  const ahead       = waiting.filter(q => q.tokenNumber < (myPos?.tokenNumber || 0)).length;
+  const avgTime     = nextAppt?.doctorId?.averageConsultationTime || 10;
+  const estWait     = ahead * avgTime;
+
+  const Header = () => (
+    <header style={{ background: '#fff', borderBottom: '1px solid #E8ECF0', position: 'sticky', top: 0, zIndex: 50 }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button onClick={() => navigate('/patient')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', display: 'flex', padding: 4 }}>
+          <ChevronLeft size={22} />
+        </button>
+        <div onClick={() => navigate('/patient')} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <div style={{ width: 32, height: 32, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Stethoscope size={16} color="#fff" strokeWidth={2.5} />
+          </div>
+          <span style={{ fontWeight: 800, fontSize: 16, color: T }}>ClinicFlow</span>
+        </div>
+        {!isMobile && <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginLeft: 4 }}>/ Live Queue</span>}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F3F4F6', padding: '5px 10px', borderRadius: 20 }}>
+            <div style={{ width: 24, height: 24, background: T, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12 }}>
+              {user?.name?.charAt(0)}
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{user?.name?.split(' ')[0]}</span>
+          </div>
+          <button onClick={() => dispatch(logout())} style={{ fontSize: 12, fontWeight: 600, color: '#6B7280', background: 'none', border: 'none', cursor: 'pointer' }}>Logout</button>
+        </div>
+      </div>
+      <div style={{ background: T, height: 4 }} />
+    </header>
+  );
+
+  if (!nextAppt) return (
+    <div style={{ minHeight: '100vh', background: '#F5F7FA', fontFamily: 'system-ui,-apple-system,sans-serif' }}>
+      <Header />
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '48px 16px', textAlign: 'center' }}>
+        <Activity size={48} color="#D1D5DB" style={{ margin: '0 auto 16px' }} />
+        <p style={{ fontWeight: 700, color: '#111827', marginBottom: 6 }}>No upcoming appointments</p>
+        <button onClick={() => navigate('/patient/marketplace')}
+          style={{ background: T, color: '#fff', fontWeight: 700, fontSize: 13, padding: '10px 24px', borderRadius: 10, border: 'none', cursor: 'pointer', marginTop: 8 }}>
+          Book an Appointment
+        </button>
+      </div>
+    </div>
+  );
+
+  const myStatus = myPos?.status;
+  const statusMsg = {
+    CALLED:     { text: "It's your turn!", sub: 'Please proceed to the consultation room.', color: '#065F46', bg: '#D1FAE5' },
+    CONSULTING: { text: 'In Consultation',  sub: 'Your consultation is in progress.',         color: '#1D4ED8', bg: '#DBEAFE' },
+    WAITING:    { text: `You're #${ahead + 1} in line`, sub: `~${estWait} minutes estimated wait`, color: '#92400E', bg: '#FEF9C3' },
+    COMPLETED:  { text: 'Consultation done', sub: 'Thank you for visiting.',                  color: '#065F46', bg: '#D1FAE5' },
+  }[myStatus] || { text: 'Tracking queue', sub: 'Waiting for status update.', color: '#374151', bg: '#F3F4F6' };
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#F5F7FA', fontFamily: 'system-ui,-apple-system,sans-serif' }}>
+      <Header />
+
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 16px 48px' }}>
+
+        {/* Doctor card */}
+        <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, overflow: 'hidden', marginBottom: 16 }}>
+          <div style={{ height: 5, background: `linear-gradient(90deg,${T},#14B8A6)` }} />
+          <div style={{ padding: '16px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+              <div style={{ width: 50, height: 50, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 20 }}>
+                {nextAppt.doctorId?.name?.charAt(0)}
+              </div>
+              <div>
+                <p style={{ fontWeight: 800, fontSize: 15, color: '#111827' }}>Dr. {(nextAppt.doctorId?.name || '').replace(/^Dr\.?\s+/, '')}</p>
+                <p style={{ fontSize: 13, color: T, fontWeight: 600 }}>{nextAppt.doctorId?.specialization}</p>
+                {nextAppt.doctorId?.roomNumber && <p style={{ fontSize: 12, color: '#6B7280' }}>Room {nextAppt.doctorId.roomNumber}</p>}
+              </div>
+            </div>
+
+            {/* 4 stat tiles */}
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 10 }}>
+              {[
+                { label: 'Now Serving', value: `#${consulting?.tokenNumber || '—'}`, bg: '#DBEAFE', color: '#1D4ED8' },
+                { label: 'Your Token',  value: `#${myPos?.tokenNumber || '—'}`,      bg: '#D1FAE5', color: '#065F46' },
+                { label: 'Ahead',       value: `${ahead}`,                           bg: '#FEF9C3', color: '#92400E' },
+                { label: 'Est. Wait',   value: `~${estWait}m`,                        bg: '#F3E8FF', color: '#7C3AED' },
+              ].map(({ label, value, bg, color }) => (
+                <div key={label} style={{ background: bg, borderRadius: 12, padding: '12px 10px', textAlign: 'center' }}>
+                  <p style={{ fontSize: 10, color: '#6B7280', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>{label}</p>
+                  <p style={{ fontSize: 22, fontWeight: 900, color }}>{value}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
 
-  const myPosition = queue.find((q) => q.patientId._id === user._id);
-  const consulting = queue.find((q) => q.status === 'CONSULTING');
-  const waiting = queue.filter((q) => q.status === 'WAITING');
-  const patientsAhead = waiting.filter((q) => q.tokenNumber < (myPosition?.tokenNumber || 0)).length;
-  const avgConsultTime = nextAppointment?.doctorId?.averageConsultationTime || 10;
-  const estimatedWait = patientsAhead * avgConsultTime;
+        {/* My status */}
+        {myPos && (
+          <div style={{ background: statusMsg.bg, border: `1.5px solid ${statusMsg.color}30`, borderRadius: 16, padding: '16px 20px', marginBottom: 16 }}>
+            <p style={{ fontWeight: 800, fontSize: 16, color: statusMsg.color, marginBottom: 4 }}>{statusMsg.text}</p>
+            <p style={{ fontSize: 13, color: '#374151' }}>{statusMsg.sub}</p>
+          </div>
+        )}
 
-  return (
-    <div className="flex bg-gray-100 min-h-screen">
-      <Sidebar navItems={patientNav} />
-      <div className="flex-1 flex flex-col">
-        <Navbar title="Live Queue Status" />
-        <div className="p-8">
-          <div className="mb-8">
-            <div className="card border-b-4 border-blue-600">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Dr. {nextAppointment.doctorId.name}</h2>
-                  <p className="text-gray-600">{nextAppointment.doctorId.specialization} • Room {nextAppointment.doctorId.roomNumber}</p>
-                </div>
-              </div>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,1fr) 260px', gap: 16, alignItems: 'start' }}>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <p className="text-xs text-gray-600 uppercase">Currently Serving</p>
-                  <p className="text-3xl font-bold text-blue-600">#{consulting?.tokenNumber || '—'}</p>
-                </div>
-
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <p className="text-xs text-gray-600 uppercase">Your Token</p>
-                  <p className="text-3xl font-bold text-green-600">#{myPosition?.tokenNumber || '—'}</p>
-                </div>
-
-                <div className="bg-yellow-50 p-4 rounded-lg">
-                  <p className="text-xs text-gray-600 uppercase">Ahead of You</p>
-                  <p className="text-3xl font-bold text-yellow-600">{patientsAhead}</p>
-                </div>
-
-                <div className="bg-purple-50 p-4 rounded-lg">
-                  <p className="text-xs text-gray-600 uppercase">Est. Wait Time</p>
-                  <p className="text-3xl font-bold text-purple-600">~{estimatedWait}m</p>
-                </div>
-              </div>
+          {/* Queue list */}
+          <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid #F3F4F6' }}>
+              <p style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>Queue List</p>
+            </div>
+            <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+              {queue.length === 0 ? (
+                <p style={{ padding: '24px 18px', color: '#9CA3AF', fontSize: 13, textAlign: 'center' }}>Queue is empty</p>
+              ) : queue.map(item => {
+                const isMe = item.patientId?._id === user._id;
+                const sc = STATUS_COLORS[item.status] || STATUS_COLORS.WAITING;
+                return (
+                  <div key={item._id} style={{ padding: '12px 18px', borderBottom: '1px solid #F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: isMe ? '#F0FDF4' : '#fff', borderLeft: isMe ? `4px solid ${T}` : '4px solid transparent' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontSize: 18, fontWeight: 900, color: isMe ? T : '#374151', minWidth: 36 }}>#{item.tokenNumber}</span>
+                      <div>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{item.patientId?.name || 'Patient'}</p>
+                        {isMe && <p style={{ fontSize: 11, color: T, fontWeight: 700 }}>You</p>}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 12, background: sc.bg, color: sc.color }}>{item.status}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <div className="card">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Queue List</h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {queue.map((item, index) => (
-                    <div
-                      key={item._id}
-                      className={`p-3 rounded-lg flex items-center justify-between border ${
-                        item.patientId._id === user._id
-                          ? 'border-blue-600 bg-blue-50'
-                          : 'border-gray-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <span className="text-2xl font-bold text-gray-900">#{item.tokenNumber}</span>
-                        <div>
-                          <p className="font-medium text-gray-900">{item.patientId.name}</p>
-                          {item.patientId._id === user._id && (
-                            <p className="text-xs text-blue-600 font-medium">You</p>
-                          )}
-                        </div>
-                      </div>
-                      <span className={`badge ${getStatusColor(item.status)} text-xs`}>
-                        {item.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+          {/* Stats card */}
+          <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '16px 18px' }}>
+            <p style={{ fontSize: 14, fontWeight: 800, color: '#111827', marginBottom: 14 }}>Queue Stats</p>
+            {[
+              { label: 'Total in Queue', value: queue.length },
+              { label: 'Currently Waiting', value: waiting.length },
+              { label: 'In Consultation', value: queue.filter(q => q.status === 'CONSULTING').length },
+              { label: 'Completed Today', value: queue.filter(q => q.status === 'COMPLETED').length },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #F3F4F6' }}>
+                <span style={{ fontSize: 13, color: '#6B7280' }}>{label}</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>{value}</span>
               </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="card bg-green-50 border-l-4 border-green-600">
-                <h3 className="font-semibold text-gray-900 mb-2">Status</h3>
-                <p className="text-2xl font-bold text-green-600 mb-2">
-                  {myPosition?.status === 'CALLED' && '✓ Your Turn!'}
-                  {myPosition?.status === 'CONSULTING' && '🔵 In Consultation'}
-                  {myPosition?.status === 'WAITING' && `⏳ Waiting`}
-                  {myPosition?.status === 'COMPLETED' && '✓ Completed'}
-                </p>
-                <p className="text-sm text-gray-700">
-                  {myPosition?.status === 'CALLED' && 'Please proceed to the consultation room.'}
-                  {myPosition?.status === 'WAITING' && `You are #${patientsAhead + 1} in line.`}
-                  {myPosition?.status === 'CONSULTING' && 'Your consultation is in progress.'}
-                </p>
-              </div>
-
-              <div className="card">
-                <h3 className="font-semibold text-gray-900 mb-3">Queue Stats</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Total in Queue:</span>
-                    <span className="font-medium text-gray-900">{queue.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Waiting:</span>
-                    <span className="font-medium text-gray-900">{waiting.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Completed:</span>
-                    <span className="font-medium text-gray-900">
-                      {queue.filter((q) => q.status === 'COMPLETED').length}
-                    </span>
-                  </div>
-                </div>
-              </div>
+            ))}
+            <div style={{ marginTop: 14, padding: '12px', background: '#F0FDF4', borderRadius: 10, textAlign: 'center' }}>
+              <p style={{ fontSize: 11, color: T, fontWeight: 700, marginBottom: 2 }}>AUTO-UPDATING</p>
+              <p style={{ fontSize: 12, color: '#6B7280' }}>Queue updates in real-time via live connection</p>
             </div>
           </div>
         </div>

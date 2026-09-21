@@ -1,317 +1,337 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { useDispatch } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { doctorAPI, appointmentAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
-import { ChevronLeft, Heart } from 'lucide-react';
+import { ChevronLeft, Stethoscope, Calendar, Clock, User, Users, Paperclip, X } from 'lucide-react';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
-const appointmentTypes = [
-  'General Consultation',
-  'New Patient',
-  'Follow-up',
-  'Specialist Consultation',
-  'Routine Check-up',
-  'Emergency',
-  'Vaccination',
-  'Teleconsultation',
+const T = '#0D9488';
+
+const APPOINTMENT_TYPES = [
+  'General Consultation', 'New Patient', 'Follow-up',
+  'Specialist Consultation', 'Routine Check-up', 'Emergency', 'Vaccination', 'Teleconsultation',
 ];
 
-// Dummy time slots for testing - will be replaced with doctor's availableTimeSlots
-const DUMMY_TIME_SLOTS = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30'];
+const DEFAULT_SLOTS = ['09:00','09:30','10:00','10:30','11:00','11:30','14:00','14:30','15:00','15:30'];
 
 export const BookingPage = () => {
   const { doctorId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const user = useSelector((state) => state.auth.user);
+  const user = useSelector(s => s.auth.user);
 
-  const [doctor, setDoctor] = useState(null);
+  const isMobile = useIsMobile();
+  const [doctor, setDoctor]   = useState(null);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
-
-  const [formData, setFormData] = useState({
+  const [form, setForm] = useState({
     appointmentDate: new Date().toISOString().split('T')[0],
     appointmentTime: '',
     appointmentType: 'General Consultation',
     reason: '',
-    bookFor: 'self',
-    selectedFamilyMember: '',
+    prescriptionFile: null,
   });
 
-  useEffect(() => {
-    const fetchDoctor = async () => {
-      try {
-        setLoading(true);
-        const docRes = await doctorAPI.getDoctorById(doctorId);
-        setDoctor(docRes.data);
-      } catch (error) {
-        toast.error('Failed to load doctor details');
-        navigate('/patient/marketplace');
-      } finally {
-        setLoading(false);
+  // attendees: set of keys — 'self' or the index of the family member as a string
+  const [selectedAttendees, setSelectedAttendees] = useState(new Set(['self']));
+
+  const toggleAttendee = (key) => {
+    setSelectedAttendees(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        // always keep at least one selected
+        if (next.size === 1) return prev;
+        next.delete(key);
+      } else {
+        next.add(key);
       }
-    };
+      return next;
+    });
+  };
 
-    fetchDoctor();
-  }, [doctorId, navigate]);
+  useEffect(() => {
+    doctorAPI.getDoctorById(doctorId)
+      .then(r => setDoctor(r.data))
+      .catch(() => { toast.error('Failed to load doctor'); navigate('/patient/marketplace'); })
+      .finally(() => setLoading(false));
+  }, [doctorId]);
 
-  const handleSubmit = async (e) => {
+  const set = (key, val) => setForm(p => ({ ...p, [key]: val }));
+
+  const handleSubmit = async e => {
     e.preventDefault();
-
-    if (!formData.appointmentDate || !formData.appointmentTime) {
-      toast.error('Please select date and time');
-      return;
-    }
-
+    if (!form.appointmentDate || !form.appointmentTime) { toast.error('Select date and time'); return; }
+    setBooking(true);
     try {
-      setBooking(true);
+      // Build attendees list from selected checkboxes
+      const attendees = [];
+      if (selectedAttendees.has('self')) {
+        attendees.push({ isFamilyMember: false });
+      }
+      if (user?.familyMembers?.length > 0) {
+        user.familyMembers.forEach((fm, i) => {
+          if (selectedAttendees.has(String(i))) {
+            attendees.push({
+              isFamilyMember: true,
+              name: fm.name,
+              relationship: fm.relationship,
+              dateOfBirth: fm.dateOfBirth,
+              gender: fm.gender,
+              bloodGroup: fm.bloodGroup,
+              phone: fm.phone,
+              allergies: fm.allergies,
+              medicalHistory: fm.medicalHistory,
+            });
+          }
+        });
+      }
+
       const payload = {
         patientId: user._id,
         doctorId,
-        appointmentDate: formData.appointmentDate,
-        appointmentTime: formData.appointmentTime,
-        appointmentType: formData.appointmentType,
-        reason: formData.reason || 'Consultation',
+        appointmentDate: form.appointmentDate,
+        appointmentTime: form.appointmentTime,
+        appointmentType: form.appointmentType,
+        reason: form.reason || 'Consultation',
+        bookedBy: user._id,
+        attendees,
       };
-
-      if (formData.bookFor === 'family' && formData.selectedFamilyMember) {
-        const familyMember = user.familyMembers[parseInt(formData.selectedFamilyMember)];
-        payload.bookedFor = {
-          name: familyMember.name,
-          relationship: familyMember.relationship,
-          isFamilyMember: true,
-        };
-        payload.bookedBy = user._id;
-      }
-
       await appointmentAPI.createAppointment(payload);
-      toast.success('Appointment booked successfully!');
-      navigate('/patient/my-appointments');
-    } catch (error) {
-      console.error('Booking error:', error.response?.data);
-      const message = error.response?.data?.message || error.response?.data?.error || 'Failed to book appointment';
-      toast.error(message);
-    } finally {
-      setBooking(false);
-    }
+      toast.success('Appointment booked!');
+      navigate('/patient/payments');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to book appointment');
+    } finally { setBooking(false); }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mx-auto mb-3"></div>
-          <p className="text-gray-700 font-medium">Loading...</p>
-        </div>
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F5F7FA' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 44, height: 44, border: `4px solid ${T}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+        <p style={{ color: '#374151', fontWeight: 600 }}>Loading...</p>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (!doctor) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-white">
-        <p className="text-gray-600">Doctor not found</p>
-      </div>
-    );
-  }
+  if (!doctor) return null;
+
+  const slots = doctor.availableTimeSlots?.length ? doctor.availableTimeSlots : DEFAULT_SLOTS;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: '100vh', background: '#F5F7FA', fontFamily: 'system-ui,-apple-system,sans-serif' }}>
+
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate(`/patient/doctors/${doctorId}`)} className="text-gray-600 hover:text-gray-900 p-1">
-              <ChevronLeft size={22} />
-            </button>
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Heart className="text-white" size={18} strokeWidth={2.5} />
+      <header style={{ background: '#fff', borderBottom: '1px solid #E8ECF0', position: 'sticky', top: 0, zIndex: 50 }}>
+        <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={() => navigate(`/patient/doctors/${doctorId}`)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', display: 'flex', padding: 4 }}>
+            <ChevronLeft size={22} />
+          </button>
+          <div onClick={() => navigate('/patient')} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <div style={{ width: 32, height: 32, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Stethoscope size={16} color="#fff" strokeWidth={2.5} />
             </div>
-            <h1 className="text-base font-bold text-gray-900">ClinicFlow</h1>
+            <span style={{ fontWeight: 800, fontSize: 16, color: T }}>ClinicFlow</span>
           </div>
-          <h2 className="text-base font-bold text-gray-900">Book Appointment</h2>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center bg-gray-100 px-3 py-1.5 rounded-full">
-              <span className="text-xs font-medium text-gray-700">{user?.name?.split(' ')[0]}</span>
+          {!isMobile && <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginLeft: 4 }}>/ Book Appointment</span>}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F3F4F6', padding: '5px 10px', borderRadius: 20 }}>
+              <div style={{ width: 24, height: 24, background: T, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12 }}>
+                {user?.name?.charAt(0)}
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{user?.name?.split(' ')[0]}</span>
             </div>
-            <button
-              onClick={() => dispatch(logout())}
-              className="text-gray-700 hover:text-red-600 font-medium text-xs px-3 py-1.5"
-            >
-              Logout
-            </button>
+            <button onClick={() => dispatch(logout())} style={{ fontSize: 12, fontWeight: 600, color: '#6B7280', background: 'none', border: 'none', cursor: 'pointer' }}>Logout</button>
           </div>
         </div>
+        <div style={{ background: T, height: 4 }} />
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        {/* Doctor Summary Card */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6 flex items-center gap-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-2xl font-bold text-white">
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px 48px' }}>
+
+        {/* Doctor summary */}
+        <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '16px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 54, height: 54, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 22, flexShrink: 0 }}>
             {doctor.name.charAt(0)}
           </div>
-          <div className="flex-1">
-            <h3 className="font-bold text-gray-900">Dr. {doctor.name.replace(/^Dr\.?\s+/, '')}</h3>
-            <p className="text-sm text-blue-600 font-semibold">{doctor.specialization}</p>
-            <p className="text-xs text-gray-600 mt-1">₹{doctor.consultationFee} • {doctor.experience}y experience</p>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontWeight: 800, fontSize: 15, color: '#111827', marginBottom: 2 }}>Dr. {doctor.name.replace(/^Dr\.?\s+/, '')}</p>
+            <p style={{ fontSize: 13, color: T, fontWeight: 600, marginBottom: 2 }}>{doctor.specialization}</p>
+            <p style={{ fontSize: 12, color: '#6B7280' }}>₹{doctor.consultationFee} · {doctor.experience}yr experience</p>
           </div>
         </div>
 
-        {/* Booking Form */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Select Date & Time</h2>
+        {/* Form */}
+        <form onSubmit={handleSubmit}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Appointment Type */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-3">What's your concern?</label>
-              <select
-                value={formData.appointmentType}
-                onChange={(e) => setFormData({ ...formData, appointmentType: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {appointmentTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
+            {/* Appointment type */}
+            <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '18px 20px' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 10 }}>What's your concern?</p>
+              <select value={form.appointmentType} onChange={e => set('appointmentType', e.target.value)}
+                style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 13, outline: 'none', background: '#F5F7FA', cursor: 'pointer' }}>
+                {APPOINTMENT_TYPES.map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
 
             {/* Reason */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-3">Describe your symptoms (optional)</label>
-              <textarea
-                value={formData.reason}
-                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                placeholder="Tell us more about your symptoms or health concern..."
-                rows="3"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '18px 20px' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 10 }}>Describe your symptoms <span style={{ color: '#9CA3AF', fontWeight: 400 }}>(optional)</span></p>
+              <textarea value={form.reason} onChange={e => set('reason', e.target.value)}
+                placeholder="Tell us about your symptoms or health concern..."
+                rows={3} style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 13, outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
             </div>
 
             {/* Date */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-3">Select Date</label>
-              <input
-                type="date"
-                value={formData.appointmentDate}
-                onChange={(e) => setFormData({ ...formData, appointmentDate: e.target.value })}
-                min={new Date().toISOString().split('T')[0]}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
+            <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '18px 20px' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Calendar size={15} color={T} /> Select Date
+              </p>
+              <input type="date" value={form.appointmentDate} onChange={e => set('appointmentDate', e.target.value)}
+                min={new Date().toISOString().split('T')[0]} required
+                style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
             </div>
 
-            {/* Time Slots - From Doctor Profile */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-3">Select Time Slot</label>
-              {doctor?.availableTimeSlots && doctor.availableTimeSlots.length > 0 ? (
-                <div className="grid grid-cols-4 gap-3">
-                  {doctor.availableTimeSlots.map((slot) => (
-                    <button
-                      key={slot}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, appointmentTime: slot })}
-                      className={`py-3 rounded-lg font-medium transition-all ${
-                        formData.appointmentTime === slot
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
-                      }`}
-                    >
-                      {slot}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-4 gap-3">
-                    {DUMMY_TIME_SLOTS.map((slot) => (
-                      <button
-                        key={slot}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, appointmentTime: slot })}
-                        className={`py-3 rounded-lg font-medium transition-all ${
-                          formData.appointmentTime === slot
-                            ? 'bg-blue-600 text-white shadow-md'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
-                        }`}
-                      >
-                        {slot}
-                      </button>
-                    ))}
-                </div>
-              )}
+            {/* Time slots */}
+            <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '18px 20px' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Clock size={15} color={T} /> Select Time Slot
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(80px,1fr))', gap: 8 }}>
+                {slots.map(slot => (
+                  <button key={slot} type="button" onClick={() => set('appointmentTime', slot)}
+                    style={{
+                      padding: '10px 6px', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', border: `1.5px solid ${form.appointmentTime === slot ? T : '#E5E7EB'}`,
+                      background: form.appointmentTime === slot ? T : '#F5F7FA',
+                      color: form.appointmentTime === slot ? '#fff' : '#374151',
+                      transition: 'all 0.15s',
+                    }}>
+                    {slot}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Booking For */}
-            <div className="border-t pt-6">
-              <label className="block text-sm font-semibold text-gray-900 mb-4">Booking for</label>
-              <div className="space-y-3">
-                <label className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
-                  <input
-                    type="radio"
-                    name="bookFor"
-                    value="self"
-                    checked={formData.bookFor === 'self'}
-                    onChange={(e) => setFormData({ ...formData, bookFor: e.target.value })}
-                    className="mr-3 w-4 h-4"
-                  />
+            {/* Booking for */}
+            <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '18px 20px' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 4 }}>Booking for</p>
+              <p style={{ fontSize: 12, color: '#6B7280', marginBottom: 12 }}>Select everyone you want to book an appointment for.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+                {/* Myself */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', border: `1.5px solid ${selectedAttendees.has('self') ? T : '#E5E7EB'}`, borderRadius: 12, cursor: 'pointer', background: selectedAttendees.has('self') ? '#F0FDF4' : '#fff' }}>
+                  <input type="checkbox" checked={selectedAttendees.has('self')} onChange={() => toggleAttendee('self')} style={{ width: 16, height: 16, accentColor: T }} />
+                  <User size={18} color={T} />
                   <div>
-                    <p className="font-medium text-gray-900">Myself</p>
-                    <p className="text-xs text-gray-600">{user.name}</p>
+                    <p style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>Myself</p>
+                    <p style={{ fontSize: 12, color: '#6B7280' }}>{user?.name}</p>
                   </div>
                 </label>
 
-                {user.familyMembers && user.familyMembers.length > 0 && (
-                  <label className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
-                    <input
-                      type="radio"
-                      name="bookFor"
-                      value="family"
-                      checked={formData.bookFor === 'family'}
-                      onChange={(e) => setFormData({ ...formData, bookFor: e.target.value })}
-                      className="mr-3 w-4 h-4"
-                    />
-                    <p className="font-medium text-gray-900">Family Member</p>
+                {/* Family members — each as its own checkbox */}
+                {user?.familyMembers?.map((fm, i) => (
+                  <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', border: `1.5px solid ${selectedAttendees.has(String(i)) ? T : '#E5E7EB'}`, borderRadius: 12, cursor: 'pointer', background: selectedAttendees.has(String(i)) ? '#F0FDF4' : '#fff' }}>
+                    <input type="checkbox" checked={selectedAttendees.has(String(i))} onChange={() => toggleAttendee(String(i))} style={{ width: 16, height: 16, accentColor: T }} />
+                    <Users size={18} color={T} />
+                    <div>
+                      <p style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{fm.name}</p>
+                      <p style={{ fontSize: 12, color: '#6B7280' }}>{fm.relationship}{fm.gender ? ` · ${fm.gender}` : ''}{fm.bloodGroup ? ` · ${fm.bloodGroup}` : ''}</p>
+                    </div>
                   </label>
+                ))}
+
+                {(!user?.familyMembers || user.familyMembers.length === 0) && (
+                  <p style={{ fontSize: 12, color: '#9CA3AF', padding: '8px 2px' }}>
+                    No family members added yet.{' '}
+                    <span onClick={() => navigate('/patient/family')} style={{ color: T, cursor: 'pointer', fontWeight: 600 }}>Add one →</span>
+                  </p>
                 )}
               </div>
 
-              {formData.bookFor === 'family' && user.familyMembers && user.familyMembers.length > 0 && (
-                <select
-                  value={formData.selectedFamilyMember}
-                  onChange={(e) => setFormData({ ...formData, selectedFamilyMember: e.target.value })}
-                  className="w-full mt-3 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select a family member</option>
-                  {user.familyMembers.map((member, idx) => (
-                    <option key={idx} value={idx}>
-                      {member.name} ({member.relationship})
-                    </option>
-                  ))}
-                </select>
+              {selectedAttendees.size > 1 && (
+                <div style={{ marginTop: 12, padding: '10px 14px', background: '#EFF6FF', border: '1.5px solid #BFDBFE', borderRadius: 10 }}>
+                  <p style={{ fontSize: 12, color: '#1D4ED8', fontWeight: 600 }}>
+                    {selectedAttendees.size} appointments will be created — one per person, each with their own token number.
+                  </p>
+                </div>
               )}
             </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={booking || !formData.appointmentTime}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-400 text-white py-4 rounded-lg font-bold transition-all"
-            >
-              {booking ? 'Booking...' : 'Confirm Booking'}
-            </button>
-          </form>
+            {/* Previous Prescription Upload */}
+            <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '18px 20px' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Paperclip size={15} color={T} /> Upload Previous Prescription
+                <span style={{ fontSize: 11, fontWeight: 400, color: '#9CA3AF', marginLeft: 4 }}>(optional)</span>
+              </p>
+              <p style={{ fontSize: 12, color: '#6B7280', marginBottom: 12 }}>Help the doctor review your history before the visit.</p>
 
-          {/* Cancellation Policy */}
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs text-blue-800">
-              <span className="font-semibold">Note:</span> You can cancel or reschedule your appointment up to 24 hours before the scheduled time.
+              {!form.prescriptionFile ? (
+                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, border: '2px dashed #D1D5DB', borderRadius: 12, padding: '20px', cursor: 'pointer', background: '#FAFAFA', transition: 'border-color 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = T}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = '#D1D5DB'}>
+                  <Paperclip size={22} color="#9CA3AF" />
+                  <p style={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>Click to browse or drag & drop</p>
+                  <p style={{ fontSize: 11, color: '#9CA3AF' }}>PDF, JPG, PNG — max 5MB</p>
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 5 * 1024 * 1024) { toast.error('File too large (max 5MB)'); return; }
+                      set('prescriptionFile', file);
+                    }}
+                  />
+                </label>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F0FDF4', border: '1.5px solid #BBF7D0', borderRadius: 10, padding: '10px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Paperclip size={16} color={T} />
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{form.prescriptionFile.name}</p>
+                      <p style={{ fontSize: 11, color: '#6B7280' }}>{(form.prescriptionFile.size / 1024).toFixed(0)} KB</p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => set('prescriptionFile', null)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex', padding: 2 }}>
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Summary + submit */}
+            {form.appointmentTime && (
+              <div style={{ background: '#F0FDF4', border: '1.5px solid #BBF7D0', borderRadius: 16, padding: '16px 20px', marginBottom: 4 }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: T, marginBottom: 6 }}>Booking Summary</p>
+                <p style={{ fontSize: 13, color: '#374151' }}>Dr. {doctor.name.replace(/^Dr\.?\s+/, '')} · {form.appointmentDate} · {form.appointmentTime}</p>
+                <p style={{ fontSize: 13, color: '#374151' }}>
+                  Fee: ₹{doctor.consultationFee}{selectedAttendees.size > 1 ? ` × ${selectedAttendees.size} people = ₹${doctor.consultationFee * selectedAttendees.size}` : ''}
+                </p>
+                {selectedAttendees.size > 1 && (
+                  <p style={{ fontSize: 12, color: '#6B7280', marginTop: 4 }}>
+                    Booking for: {[
+                      selectedAttendees.has('self') ? user?.name : null,
+                      ...(user?.familyMembers || []).map((fm, i) => selectedAttendees.has(String(i)) ? fm.name : null)
+                    ].filter(Boolean).join(', ')}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <button type="submit" disabled={booking || !form.appointmentTime}
+              style={{ width: '100%', background: booking || !form.appointmentTime ? '#9CA3AF' : T, color: '#fff', fontWeight: 800, fontSize: 15, padding: '14px', borderRadius: 14, border: 'none', cursor: form.appointmentTime ? 'pointer' : 'not-allowed', transition: 'background 0.15s' }}>
+              {booking ? 'Confirming...' : `Confirm Booking${selectedAttendees.size > 1 ? ` (${selectedAttendees.size})` : ''}`}
+            </button>
+
+            <p style={{ fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginTop: -6 }}>
+              You can cancel or reschedule up to 24 hours before the appointment.
             </p>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
