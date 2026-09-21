@@ -216,6 +216,22 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
         {isMobile && <div style={{ background: '#0D9488', height: 4 }} />}
       </header>
 
+      {/* ── Incomplete Profile Banner ── */}
+      {!user?.phone && (
+        <div style={{ background: '#FFF7ED', borderBottom: '1px solid #FED7AA' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, color: '#92400E', flex: 1, minWidth: 200 }}>
+              <strong>Complete your profile</strong> — add your phone, date of birth and gender so doctors can serve you better.
+            </span>
+            <button
+              onClick={() => navigate('/patient/complete-profile')}
+              style={{ flexShrink: 0, background: '#D97706', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              Complete now →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Mobile Sidebar ── */}
       {isMobile && (
         <>

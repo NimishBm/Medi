@@ -14,15 +14,29 @@ export const Register = () => {
   const [showPw, setShowPw]       = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState({
-    name: '', email: '', phone: '', password: '', dateOfBirth: '', gender: '',
+    name: '', email: '', phone: '+91', password: '', dateOfBirth: '', gender: '',
   });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const handlePhoneChange = (e) => {
+    const val = e.target.value;
+    if (!val.startsWith('+91')) return;
+    const digits = val.slice(3).replace(/\D/g, '').slice(0, 10);
+    let formatted = '+91';
+    if (digits.length > 0) formatted += ' ' + digits.slice(0, 5);
+    if (digits.length > 5)  formatted += ' ' + digits.slice(5);
+    set('phone', formatted);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.phone || !form.password) {
+    if (!form.name || !form.email || !form.password) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+    if (form.phone.replace(/\D/g, '').length !== 12) {
+      toast.error('Enter a valid 10-digit phone number');
       return;
     }
     setIsLoading(true);
@@ -110,7 +124,7 @@ export const Register = () => {
 
               <div>
                 <label style={labelStyle}>Phone Number <Req /></label>
-                <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)}
+                <input type="tel" value={form.phone} onChange={handlePhoneChange}
                   placeholder="+91 99999 99999" style={inputStyle}
                   onFocus={e => e.target.style.borderColor = T}
                   onBlur={e => e.target.style.borderColor = '#E5E7EB'} />

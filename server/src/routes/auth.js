@@ -1,10 +1,13 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
+import { OAuth2Client } from 'google-auth-library';
 import Patient from '../models/Patient.js';
 import Doctor from '../models/Doctor.js';
 import { protect } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const router = express.Router();
 
@@ -235,7 +238,7 @@ router.put(
     const updateData = {};
 
     allowedFields.forEach((field) => {
-      if (req.body[field] !== undefined) {
+      if (req.body[field] !== undefined && req.body[field] !== '') {
         updateData[field] = req.body[field];
       }
     });
@@ -258,6 +261,43 @@ router.put(
     res.json({
       ...user.toJSON(),
       role: req.user.role
+    });
+  })
+);
+
+// GOOGLE LOGIN (patients only)
+router.post(
+  '/google',
+  catchAsyncErrors(async (req, res) => {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: 'No Google credential provided' });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const { sub: googleId, email, name } = ticket.getPayload();
+
+    let patient = await Patient.findOne({ $or: [{ googleId }, { email }] });
+
+    if (patient) {
+      if (!patient.googleId) {
+        patient.googleId = googleId;
+        await patient.save();
+      }
+    } else {
+      patient = new Patient({ googleId, name, email });
+      await patient.save();
+    }
+
+    const token = generateToken(patient, 'PATIENT');
+
+    res.json({
+      message: 'Google login successful',
+      token,
+      user: { ...patient.toJSON(), role: 'PATIENT' },
     });
   })
 );
