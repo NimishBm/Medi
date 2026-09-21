@@ -21,6 +21,7 @@ import searchRoutes from './routes/search.js';
 import organizationRoutes from './routes/organizations.js';
 import adminRoutes from './routes/admin.js';
 import blogRoutes from './routes/blog.js';
+import notificationRoutes from './routes/notifications.js';
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -64,6 +65,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/blog', blogRoutes);
+app.use('/api/notifications', notificationRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK' });
@@ -72,6 +74,11 @@ app.get('/health', (req, res) => {
 // Socket.IO events
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
+
+  // Doctor/patient joins their personal notification room
+  socket.on('join-notifications', (data) => {
+    socket.join(`notifications-${data.userId}`);
+  });
 
   socket.on('join-queue', (data) => {
     socket.join(`queue-${data.doctorId}`);

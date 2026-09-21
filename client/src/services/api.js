@@ -98,6 +98,7 @@ export const doctorProfileAPI = {
 
 export const prescriptionAPI = {
   createPrescription: (data) => api.post('/prescriptions', data),
+  updatePrescription: (id, data) => api.put(`/prescriptions/${id}`, data),
   getPrescriptionsByPatient: (patientId) => api.get(`/prescriptions/patient/${patientId}`),
   getPrescriptionById: (id) => api.get(`/prescriptions/${id}`),
   getByDoctor: () => api.get('/prescriptions/doctor'),
@@ -145,11 +146,17 @@ export const searchAPI = {
   suggestions: (q) => api.get('/search/suggestions', { params: { q } }),
 };
 
+export const notificationAPI = {
+  getNotifications: () => api.get('/notifications'),
+  markAllRead: () => api.put('/notifications/read-all'),
+  markRead: (id) => api.put(`/notifications/${id}/read`),
+};
+
 export const blogAPI = {
-  getPosts: () => api.get('/blog/posts'),
+  getPosts: (status) => api.get('/blog/posts', { params: status ? { status } : {} }),
   createPost: (data) => api.post('/blog/posts', data),
   updatePost: (id, data) => api.put(`/blog/posts/${id}`, data),
   deletePost: (id) => api.delete(`/blog/posts/${id}`),
-  getCategories: () => api.get('/blog/categories'),
+  incrementView: (id) => api.post(`/blog/posts/${id}/view`),
 };
 export default api;

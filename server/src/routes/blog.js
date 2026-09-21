@@ -1,190 +1,97 @@
 import express from 'express';
-import axios from 'axios';
-import { protect } from '../middleware/auth.js';
+import BlogPost from '../models/BlogPost.js';
+import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
-import User from '../models/User.js';
 
 const router = express.Router();
 
-const getWpAuthHeader = (username, appPassword) => {
-  const credentials = `${username}:${appPassword}`;
-  const encoded = Buffer.from(credentials).toString('base64');
-  return `Basic ${encoded}`;
-};
-
+// GET /api/blog/posts — doctor's own posts
 router.get(
   '/posts',
   protect,
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
-    const doctor = await User.findById(req.user.id);
+    const { status } = req.query;
+    const filter = { doctorId: req.user.id };
+    if (status && status !== 'all') filter.status = status;
 
-    if (!doctor?.wpSiteUrl || !doctor?.wpUsername || !doctor?.wpAppPassword) {
-      return res.status(400).json({ message: 'WordPress credentials not configured' });
-    }
-
-    try {
-      const wpUrl = doctor.wpSiteUrl.replace(/\/$/, '');
-      const response = await axios.get(`${wpUrl}/wp-json/wp/v2/posts`, {
-        headers: {
-          Authorization: getWpAuthHeader(doctor.wpUsername, doctor.wpAppPassword),
-        },
-        params: {
-          author_name: doctor.wpUsername,
-          per_page: 50,
-          _embed: true,
-        },
-      });
-
-      res.json(response.data);
-    } catch (error) {
-      res.status(error.response?.status || 500).json({
-        message: error.response?.data?.message || 'Failed to fetch posts from WordPress',
-      });
-    }
+    const posts = await BlogPost.find(filter).sort({ createdAt: -1 });
+    res.json(posts);
   })
 );
 
+// POST /api/blog/posts — create
 router.post(
   '/posts',
   protect,
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
-    const doctor = await User.findById(req.user.id);
+    const { title, content, excerpt, category, status, coverImage } = req.body;
 
-    if (!doctor?.wpSiteUrl || !doctor?.wpUsername || !doctor?.wpAppPassword) {
-      return res.status(400).json({ message: 'WordPress credentials not configured' });
-    }
-
-    const { title, content, excerpt, status = 'draft', categories = [] } = req.body;
-
-    if (!title || !content) {
+    if (!title?.trim() || !content?.trim()) {
       return res.status(400).json({ message: 'Title and content are required' });
     }
 
-    try {
-      const wpUrl = doctor.wpSiteUrl.replace(/\/$/, '');
-      const response = await axios.post(
-        `${wpUrl}/wp-json/wp/v2/posts`,
-        {
-          title,
-          content,
-          excerpt,
-          status,
-          categories,
-        },
-        {
-          headers: {
-            Authorization: getWpAuthHeader(doctor.wpUsername, doctor.wpAppPassword),
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+    const post = await BlogPost.create({
+      doctorId: req.user.id,
+      title: title.trim(),
+      content,
+      excerpt: excerpt?.trim() || content.substring(0, 160),
+      category: category || 'General Health',
+      status: status || 'draft',
+      coverImage: coverImage || '',
+      publishedAt: status === 'published' ? new Date() : undefined,
+    });
 
-      res.json(response.data);
-    } catch (error) {
-      res.status(error.response?.status || 500).json({
-        message: error.response?.data?.message || 'Failed to create post in WordPress',
-      });
-    }
+    res.status(201).json(post);
   })
 );
 
+// PUT /api/blog/posts/:id — update
 router.put(
   '/posts/:id',
   protect,
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
-    const doctor = await User.findById(req.user.id);
+    const post = await BlogPost.findOne({ _id: req.params.id, doctorId: req.user.id });
 
-    if (!doctor?.wpSiteUrl || !doctor?.wpUsername || !doctor?.wpAppPassword) {
-      return res.status(400).json({ message: 'WordPress credentials not configured' });
+    if (!post) return res.status(404).json({ message: 'Post not found' });
+
+    const { title, content, excerpt, category, status, coverImage } = req.body;
+
+    if (title !== undefined)       post.title       = title.trim();
+    if (content !== undefined)     post.content     = content;
+    if (excerpt !== undefined)     post.excerpt     = excerpt.trim();
+    if (category !== undefined)    post.category    = category;
+    if (coverImage !== undefined)  post.coverImage  = coverImage;
+    if (status !== undefined) {
+      post.status = status;
+      if (status === 'published' && !post.publishedAt) post.publishedAt = new Date();
     }
 
-    const { title, content, excerpt, status, categories } = req.body;
-
-    try {
-      const wpUrl = doctor.wpSiteUrl.replace(/\/$/, '');
-      const response = await axios.post(
-        `${wpUrl}/wp-json/wp/v2/posts/${req.params.id}`,
-        {
-          title,
-          content,
-          excerpt,
-          status,
-          categories,
-        },
-        {
-          headers: {
-            Authorization: getWpAuthHeader(doctor.wpUsername, doctor.wpAppPassword),
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      res.json(response.data);
-    } catch (error) {
-      res.status(error.response?.status || 500).json({
-        message: error.response?.data?.message || 'Failed to update post in WordPress',
-      });
-    }
+    await post.save();
+    res.json(post);
   })
 );
 
+// DELETE /api/blog/posts/:id
 router.delete(
   '/posts/:id',
   protect,
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
-    const doctor = await User.findById(req.user.id);
-
-    if (!doctor?.wpSiteUrl || !doctor?.wpUsername || !doctor?.wpAppPassword) {
-      return res.status(400).json({ message: 'WordPress credentials not configured' });
-    }
-
-    try {
-      const wpUrl = doctor.wpSiteUrl.replace(/\/$/, '');
-      await axios.delete(`${wpUrl}/wp-json/wp/v2/posts/${req.params.id}`, {
-        headers: {
-          Authorization: getWpAuthHeader(doctor.wpUsername, doctor.wpAppPassword),
-        },
-        params: {
-          force: true,
-        },
-      });
-
-      res.json({ message: 'Post deleted successfully' });
-    } catch (error) {
-      res.status(error.response?.status || 500).json({
-        message: error.response?.data?.message || 'Failed to delete post from WordPress',
-      });
-    }
+    const post = await BlogPost.findOneAndDelete({ _id: req.params.id, doctorId: req.user.id });
+    if (!post) return res.status(404).json({ message: 'Post not found' });
+    res.json({ message: 'Post deleted' });
   })
 );
 
-router.get(
-  '/categories',
-  protect,
+// POST /api/blog/posts/:id/view — increment view count
+router.post(
+  '/posts/:id/view',
   catchAsyncErrors(async (req, res) => {
-    const doctor = await User.findById(req.user.id);
-
-    if (!doctor?.wpSiteUrl || !doctor?.wpUsername || !doctor?.wpAppPassword) {
-      return res.status(400).json({ message: 'WordPress credentials not configured' });
-    }
-
-    try {
-      const wpUrl = doctor.wpSiteUrl.replace(/\/$/, '');
-      const response = await axios.get(`${wpUrl}/wp-json/wp/v2/categories`, {
-        headers: {
-          Authorization: getWpAuthHeader(doctor.wpUsername, doctor.wpAppPassword),
-        },
-        params: {
-          per_page: 50,
-        },
-      });
-
-      res.json(response.data);
-    } catch (error) {
-      res.status(error.response?.status || 500).json({
-        message: error.response?.data?.message || 'Failed to fetch categories from WordPress',
-      });
-    }
+    await BlogPost.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } });
+    res.json({ ok: true });
   })
 );
 

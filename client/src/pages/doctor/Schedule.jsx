@@ -6,6 +6,7 @@ import { doctorProfileAPI } from '../../services/api';
 import { setUser } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import { Heart, LogOut, Save, Clock, Plus, X, Trash2, Copy, ArrowLeft } from 'lucide-react';
+import { NotificationBell } from '../../components/NotificationBell';
 
 const DAYS_OF_WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -122,11 +123,12 @@ export const DoctorSchedule = () => {
       });
       dispatch(
         setUser({
-          user: response.data,
+          user: { ...response.data, role: user?.role || 'DOCTOR' },
           token,
         })
       );
       toast.success('Schedule saved successfully!');
+      navigate('/doctor');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to save schedule');
     } finally {
@@ -141,35 +143,41 @@ export const DoctorSchedule = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
+      <header className="sticky top-0 z-50 bg-[#1E3A5F] border-b border-[#2D4F7C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => navigate('/doctor')}
-              className="sm:hidden text-teal-600 hover:text-teal-700 p-2"
+              className="sm:hidden text-teal-300 hover:text-white p-2"
             >
               <ArrowLeft size={24} />
             </button>
-            <div className="w-10 h-10 bg-teal-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-[#0D9488] rounded-lg flex items-center justify-center">
               <Heart className="text-white" size={24} strokeWidth={2.5} />
             </div>
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900">Schedule</h1>
+            <div>
+              <h1 className="text-base sm:text-lg font-bold text-white leading-tight">Schedule</h1>
+              <p className="text-xs text-teal-300 hidden sm:block">ClinicFlow</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
             <button
+              type="button"
               onClick={() => navigate('/doctor')}
-              className="text-gray-700 hover:text-teal-600 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-teal-50 transition hidden sm:block"
+              className="text-slate-200 hover:text-teal-300 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-white/10 transition hidden sm:block"
             >
               Dashboard
             </button>
-            <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+            <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full">
+              <div className="w-8 h-8 bg-[#0D9488] rounded-full flex items-center justify-center text-white font-bold text-sm">
                 {user?.name?.charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm font-medium text-gray-700">{user?.name}</span>
+              <span className="text-sm font-medium text-white">{user?.name}</span>
             </div>
-            <button onClick={() => dispatch(logout())} className="text-gray-700 hover:text-red-600">
+            <NotificationBell />
+            <button type="button" onClick={() => dispatch(logout())} className="text-slate-300 hover:text-red-400 p-2 rounded-lg hover:bg-white/10 transition">
               <LogOut size={18} />
             </button>
           </div>
@@ -179,11 +187,11 @@ export const DoctorSchedule = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {/* Page Title */}
         <div className="mb-4 sm:mb-8 hidden sm:block">
-          <h2 className="text-4xl font-bold text-gray-900 flex items-center gap-3 mb-2">
-            <Clock className="text-teal-600" size={36} />
+          <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-3 mb-1">
+            <Clock className="text-teal-600" size={30} />
             Smart Scheduling
           </h2>
-          <p className="text-gray-600">Set your availability and let patients book appointments automatically</p>
+          <p className="text-gray-500">Set your availability and let patients book appointments automatically</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-8">
@@ -240,6 +248,7 @@ export const DoctorSchedule = () => {
               {DAY_LABELS.map((label, idx) => (
                 <button
                   key={DAYS_OF_WEEK[idx]}
+                  type="button"
                   onClick={() => setActiveDay(DAYS_OF_WEEK[idx])}
                   className={`flex-1 px-4 py-3 text-center font-medium transition ${
                     activeDay === DAYS_OF_WEEK[idx]

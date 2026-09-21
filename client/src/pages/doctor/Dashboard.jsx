@@ -3,8 +3,9 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { logout } from '../../store/slices/authSlice';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { doctorProfileAPI } from '../../services/api';
+import { doctorProfileAPI, queueAPI } from '../../services/api';
 import { setUser } from '../../store/slices/authSlice';
+import { NotificationBell } from '../../components/NotificationBell';
 import {
   Users,
   Calendar,
@@ -46,6 +47,7 @@ export const DoctorDashboard = () => {
   const navigate = useNavigate();
   const [isAnimated, setIsAnimated] = useState(false);
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
+  const [patientsSeen, setPatientsSeen] = useState(0);
 
   // If not logged in as DOCTOR, redirect them
   if (!user || user.role !== 'DOCTOR') {
@@ -57,25 +59,21 @@ export const DoctorDashboard = () => {
   }, []);
 
   useEffect(() => {
-    // Refresh user data every 30 seconds to get live Patients Seen count
-    const interval = setInterval(async () => {
+    // Fetch today's queue to get the live patients-seen count
+    const fetchPatientsSeen = async () => {
       try {
-        const response = await doctorProfileAPI.getMe();
-        if (response.data) {
-          dispatch(
-            setUser({
-              user: response.data,
-              token,
-            })
-          );
-        }
-      } catch (error) {
-        // Silently fail - not critical
+        const res = await queueAPI.getQueueByDoctorId(user._id);
+        setPatientsSeen(res.data.stats?.completed || 0);
+      } catch {
+        // Silently fail — not critical
       }
-    }, 30000);
+    };
 
+    fetchPatientsSeen();
+    // Refresh every 30 seconds while the doctor is on the dashboard
+    const interval = setInterval(fetchPatientsSeen, 30000);
     return () => clearInterval(interval);
-  }, [dispatch, token]);
+  }, [user._id]);
 
   const getWorkingDays = () => {
     if (!user?.availability) return 0;
@@ -126,47 +124,48 @@ export const DoctorDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-teal-200 shadow-md animate-fade-in">
+      <header className="sticky top-0 z-50 bg-[#1E3A5F] border-b border-[#2D4F7C] shadow-lg animate-fade-in">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-9 sm:w-10 h-9 sm:h-10 bg-gradient-to-br from-teal-600 to-teal-500 rounded-lg flex items-center justify-center hover:shadow-lg transition-shadow">
+            <div className="w-9 sm:w-10 h-9 sm:h-10 bg-[#0D9488] rounded-lg flex items-center justify-center hover:shadow-lg transition-shadow">
               <Heart className="text-white" size={20} strokeWidth={2.5} />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-bold text-gray-900">ClinicFlow</h1>
-              <p className="text-xs text-gray-500 hidden sm:block">Doctor Dashboard</p>
+              <h1 className="text-lg sm:text-xl font-bold text-white">ClinicFlow</h1>
+              <p className="text-xs text-teal-300 hidden sm:block">Doctor Dashboard</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
             <button
               onClick={() => navigate('/doctor/appointments')}
-              className="text-gray-700 hover:text-teal-600 font-medium text-xs sm:text-sm px-2 sm:px-4 py-2 rounded-lg hover:bg-teal-50 transition hidden lg:block"
+              className="text-slate-200 hover:text-teal-300 font-medium text-xs sm:text-sm px-2 sm:px-4 py-2 rounded-lg hover:bg-white/10 transition hidden lg:block"
             >
               Appointments
             </button>
             <button
               onClick={() => navigate('/doctor/schedule')}
-              className="text-gray-700 hover:text-teal-600 font-medium text-xs sm:text-sm px-2 sm:px-4 py-2 rounded-lg hover:bg-teal-50 transition hidden lg:block"
+              className="text-slate-200 hover:text-teal-300 font-medium text-xs sm:text-sm px-2 sm:px-4 py-2 rounded-lg hover:bg-white/10 transition hidden lg:block"
             >
               Schedule
             </button>
             <button
               onClick={() => navigate('/doctor/profile')}
-              className="text-gray-700 hover:text-teal-600 font-medium text-xs sm:text-sm px-2 sm:px-4 py-2 rounded-lg hover:bg-teal-50 transition hidden lg:block"
+              className="text-slate-200 hover:text-teal-300 font-medium text-xs sm:text-sm px-2 sm:px-4 py-2 rounded-lg hover:bg-white/10 transition hidden lg:block"
             >
               Profile
             </button>
-            <div className="hidden lg:block h-6 border-l border-gray-300"></div>
-            <div className="flex items-center gap-2 bg-gray-100 px-2 sm:px-4 py-2 rounded-full hover:bg-gray-200 transition">
-              <div className="w-7 sm:w-8 h-7 sm:h-8 bg-gradient-to-br from-teal-400 to-teal-600 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm hover:shadow-md transition-shadow">
+            <div className="hidden lg:block h-6 border-l border-white/20"></div>
+            <div className="flex items-center gap-2 bg-white/10 px-2 sm:px-4 py-2 rounded-full hover:bg-white/20 transition">
+              <div className="w-7 sm:w-8 h-7 sm:h-8 bg-[#0D9488] rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm">
                 {user?.name?.charAt(0).toUpperCase()}
               </div>
-              <span className="text-xs sm:text-sm font-medium text-gray-700 hidden sm:inline">{user?.name?.split(' ')[0]}</span>
+              <span className="text-xs sm:text-sm font-medium text-white hidden sm:inline">{user?.name?.split(' ')[0]}</span>
             </div>
+            <NotificationBell />
             <button
               onClick={() => dispatch(logout())}
-              className="text-gray-700 hover:text-red-600 font-medium text-xs sm:text-sm px-2 sm:px-4 py-2 rounded-lg hover:bg-red-50 transition"
+              className="text-slate-300 hover:text-red-400 font-medium text-xs sm:text-sm px-2 sm:px-4 py-2 rounded-lg hover:bg-white/10 transition"
             >
               Logout
             </button>
@@ -175,7 +174,7 @@ export const DoctorDashboard = () => {
       </header>
 
       {/* Welcome Section */}
-      <section className="relative bg-gradient-to-r from-teal-600 via-teal-500 to-emerald-400 text-white pt-6 sm:pt-8 pb-16 sm:pb-24 overflow-hidden" style={{ minHeight: '280px' }}>
+      <section className="relative text-white pt-6 sm:pt-8 pb-16 sm:pb-24 overflow-hidden" style={{ minHeight: '280px', background: 'linear-gradient(145deg,#1E3A5F,#0F2944,#0D9488)' }}>
         {/* Animated Background Elements */}
         <div className="absolute inset-0 opacity-20">
           <div className="absolute top-10 left-5 w-20 h-20 bg-white rounded-full blur-2xl animate-pulse"></div>
@@ -267,10 +266,9 @@ export const DoctorDashboard = () => {
           <StatCard
             icon={Users}
             label="Patients Seen"
-            value={user?.patientsSeen || 0}
+            value={patientsSeen}
             color="emerald"
-            trend="auto"
-            subtext="Lifetime"
+            subtext="Today"
             delay={200}
           />
           <StatCard
