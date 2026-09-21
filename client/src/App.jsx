@@ -23,6 +23,7 @@ import { LiveQueue } from './pages/patient/LiveQueue';
 import { Prescriptions } from './pages/patient/Prescriptions';
 import { History } from './pages/patient/History';
 import { Payments } from './pages/patient/Payments';
+import { PatientProfile } from './pages/patient/Profile';
 
 // Doctor Pages
 import { DoctorLanding } from './pages/doctor/Landing';
@@ -184,6 +185,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRoles={['PATIENT']}>
                 <Payments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/profile"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <PatientProfile />
               </ProtectedRoute>
             }
           />
