@@ -113,12 +113,25 @@ export const paymentAPI = {
 export const adminAPI = {
   login: (data) => api.post('/admin/login', data),
   getStats: () => api.get('/admin/stats'),
+  // doctors
   getDoctors: (status) => api.get('/admin/doctors', { params: status ? { status } : {} }),
   getDoctorById: (id) => api.get(`/admin/doctors/${id}`),
+  createDoctor: (data) => api.post('/admin/doctors', data),
+  updateDoctor: (id, data) => api.put(`/admin/doctors/${id}`, data),
+  deleteDoctor: (id) => api.delete(`/admin/doctors/${id}`),
   approveDoctor: (id, note) => api.post(`/admin/doctors/${id}/approve`, { note }),
   rejectDoctor: (id, note) => api.post(`/admin/doctors/${id}/reject`, { note }),
   verifyLicense: (id) => api.post(`/admin/doctors/${id}/verify-license`),
+  // doctor full detail
+  getDoctorFull: (id) => api.get(`/admin/doctors/${id}/full`),
+  // patients
   getPatients: () => api.get('/admin/patients'),
+  getPatientById: (id) => api.get(`/admin/patients/${id}`),
+  createPatient: (data) => api.post('/admin/patients', data),
+  updatePatient: (id, data) => api.put(`/admin/patients/${id}`, data),
+  deletePatient: (id) => api.delete(`/admin/patients/${id}`),
+  // patient full detail
+  getPatientFull: (id) => api.get(`/admin/patients/${id}/full`),
 };
 
 export const analyticsAPI = {
