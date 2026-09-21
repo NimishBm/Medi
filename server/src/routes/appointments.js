@@ -53,6 +53,9 @@ router.post(
 
     const createdAppointments = [];
 
+    const queueDateNorm = new Date(appointmentDate);
+    queueDateNorm.setUTCHours(0, 0, 0, 0);
+
     for (const attendee of attendeeList) {
       // Each person gets their own token
       const tokenNumber = await generateTokenNumber(doctorId, new Date(appointmentDate));
@@ -90,7 +93,42 @@ router.post(
       await appointment.save();
       await appointment.populate(['patientId', 'doctorId']);
       createdAppointments.push(appointment);
+
+      // Auto-create queue entry so doctor sees it in Live Queue immediately
+      const queueEntry = new Queue({
+        doctorId,
+        appointmentId: appointment._id,
+        patientId,
+        tokenNumber,
+        queueDate: queueDateNorm,
+        status: 'WAITING',
+      });
+      await queueEntry.save();
+
+      // Create a notification for the doctor
+      const apptDate = new Date(appointmentDate).toLocaleDateString('en-IN', {
+        weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+      });
+      const attendeeDisplayName = attendee.isFamilyMember && attendee.name
+        ? `${attendee.name} (${appointment.patientId.name}'s ${attendee.relationship || 'family'})`
+        : appointment.patientId.name;
+
+      await Notification.create({
+        recipientId: doctorId,
+        recipientModel: 'Doctor',
+        appointmentId: appointment._id,
+        type: 'NEW_APPOINTMENT',
+        title: 'New Appointment Booked',
+        message: `${attendeeDisplayName} booked a ${appointment.appointmentType} on ${apptDate} at ${appointmentTime}. Token #${tokenNumber}.`,
+        data: { patientName: attendeeDisplayName, appointmentTime, appointmentDate, tokenNumber },
+      });
     }
+
+    // Notify doctor via socket — emit to their personal notification room & global queue listeners
+    io.emit('queue-update', { doctorId });
+    io.to(`notifications-${doctorId}`).emit('new-notification', {
+      recipientId: String(doctorId),
+    });
 
     // Return single object for single booking, array for group booking (backward compatible)
     if (createdAppointments.length === 1) {
@@ -99,40 +137,6 @@ router.post(
         appointment: createdAppointments[0],
       });
     }
-
-    // Auto-create queue entry so doctor sees it in Live Queue immediately
-    // Normalise queueDate to start-of-day UTC so the GET /doctor/:id filter always matches
-    const queueDateNorm = new Date(appointmentDate);
-    queueDateNorm.setUTCHours(0, 0, 0, 0);
-    const queueEntry = new Queue({
-      doctorId,
-      appointmentId: appointment._id,
-      patientId,
-      tokenNumber,
-      queueDate: queueDateNorm,
-      status: 'WAITING',
-    });
-    await queueEntry.save();
-
-    // Create a notification for the doctor
-    const apptDate = new Date(appointmentDate).toLocaleDateString('en-IN', {
-      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
-    });
-    await Notification.create({
-      recipientId: doctorId,
-      recipientModel: 'Doctor',
-      appointmentId: appointment._id,
-      type: 'NEW_APPOINTMENT',
-      title: 'New Appointment Booked',
-      message: `${appointment.patientId.name} booked a ${appointment.appointmentType} on ${apptDate} at ${appointmentTime}. Token #${tokenNumber}.`,
-      data: { patientName: appointment.patientId.name, appointmentTime, appointmentDate, tokenNumber },
-    });
-
-    // Notify doctor via socket — emit to their personal notification room
-    io.emit('queue-update', { doctorId });
-    io.to(`notifications-${doctorId}`).emit('new-notification', {
-      recipientId: String(doctorId),
-    });
 
     res.status(201).json({
       message: `${createdAppointments.length} appointments booked successfully`,
@@ -247,6 +251,10 @@ router.post(
     appointment.status = 'CANCELLED';
     await appointment.save();
 
+    // Delete or update queue entry to reflect cancellation
+    await Queue.deleteMany({ appointmentId: appointment._id });
+    io.emit('queue-update', { doctorId: appointment.doctorId });
+
     res.json({
       message: 'Appointment cancelled successfully',
       appointment,
@@ -274,6 +282,9 @@ router.post(
     const appointmentDate = appointment.appointmentDate;
     const doctorId = appointment.doctorId;
 
+    const queueDateNorm = new Date(appointmentDate);
+    queueDateNorm.setUTCHours(0, 0, 0, 0);
+
     // Create queue entry
     let queueEntry = await Queue.findOne({
       appointmentId: appointment._id,
@@ -285,13 +296,14 @@ router.post(
         appointmentId: appointment._id,
         patientId: appointment.patientId,
         tokenNumber,
-        queueDate: appointmentDate,
+        queueDate: queueDateNorm,
         status: 'WAITING',
       });
       await queueEntry.save();
     } else {
       // Already exists — just mark as WAITING in case it was in another state
       queueEntry.status = 'WAITING';
+      queueEntry.queueDate = queueDateNorm;
       await queueEntry.save();
     }
 

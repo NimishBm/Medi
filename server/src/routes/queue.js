@@ -25,7 +25,8 @@ router.get(
       queueDate: { $gte: today, $lt: tomorrow },
     })
       .populate('patientId', 'name phone email dateOfBirth gender bloodGroup allergies medicalHistory')
-      .sort({ status: 1, tokenNumber: 1 });
+      .populate('appointmentId', 'appointmentDate appointmentTime appointmentType reason notes bookedFor bookedBy status')
+      .sort({ tokenNumber: 1 });
 
     const stats = {
       total: queue.length,
@@ -133,10 +134,10 @@ router.post(
     appointment.calledTime = new Date();
     await appointment.save();
 
-    const patientData = await nextPatient.populate(
-      'patientId',
-      'name phone email dateOfBirth gender bloodGroup allergies medicalHistory'
-    );
+    const patientData = await nextPatient.populate([
+      { path: 'patientId', select: 'name phone email dateOfBirth gender bloodGroup allergies medicalHistory' },
+      { path: 'appointmentId', select: 'appointmentDate appointmentTime appointmentType reason notes bookedFor bookedBy status' }
+    ]);
 
     io.emit('queue-update', {
       doctorId,
