@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import Patient from '../models/Patient.js';
 import Doctor from '../models/Doctor.js';
-import Receptionist from '../models/Receptionist.js';
 import { protect } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
@@ -153,27 +152,6 @@ router.post(
 
       if (user) {
         role = 'DOCTOR';
-
-        // Block login if not yet approved by admin
-        if (user.verificationStatus === 'PENDING') {
-          return res.status(403).json({
-            message: 'Your account is under review. Please wait for admin approval before logging in.'
-          });
-        }
-        if (user.verificationStatus === 'REJECTED') {
-          return res.status(403).json({
-            message: 'Your registration has been rejected. Please contact support for more information.'
-          });
-        }
-      }
-    }
-
-    // Check RECEPTIONIST
-    if (!user) {
-      user = await Receptionist.findOne({ email });
-
-      if (user) {
-        role = 'RECEPTIONIST';
       }
     }
 
@@ -215,8 +193,6 @@ router.get(
       user = await Patient.findById(req.user.id);
     } else if (req.user.role === 'DOCTOR') {
       user = await Doctor.findById(req.user.id);
-    } else if (req.user.role === 'RECEPTIONIST') {
-      user = await Receptionist.findById(req.user.id);
     }
 
     if (!user) {
@@ -243,8 +219,6 @@ router.put(
       Model = Patient;
     } else if (req.user.role === 'DOCTOR') {
       Model = Doctor;
-    } else if (req.user.role === 'RECEPTIONIST') {
-      Model = Receptionist;
     }
 
     if (!Model) {

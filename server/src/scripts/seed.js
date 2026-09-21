@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import Doctor from '../models/Doctor.js';
 import User from '../models/User.js';
 import Appointment from '../models/Appointment.js';
 import Queue from '../models/Queue.js';
@@ -16,6 +17,7 @@ const seedDatabase = async () => {
 
     // Clear existing data
     await User.deleteMany({});
+    await Doctor.deleteMany({});
     await Appointment.deleteMany({});
     await Queue.deleteMany({});
     await Consultation.deleteMany({});
@@ -23,18 +25,19 @@ const seedDatabase = async () => {
     await Payment.deleteMany({});
 
     // Create doctors
-    const doctors = await User.create([
+    const doctors = await Doctor.create([
       {
         name: 'Dr. Sarah Sharma',
         email: 'dr.sarah@clinic.com',
         phone: '9876543210',
         password: 'Password123!',
-        role: 'DOCTOR',
         specialization: 'General Physician',
         consultationFee: 500,
         roomNumber: '1',
         qualifications: ['MBBS', 'MD'],
         experience: 10,
+        verificationStatus: 'APPROVED',
+        licenseVerified: true,
         availability: {
           monday: { start: '09:00', end: '18:00' },
           tuesday: { start: '09:00', end: '18:00' },
@@ -51,12 +54,13 @@ const seedDatabase = async () => {
         email: 'dr.priya@clinic.com',
         phone: '9876543211',
         password: 'Password123!',
-        role: 'DOCTOR',
         specialization: 'Dermatologist',
         consultationFee: 600,
         roomNumber: '2',
         qualifications: ['MBBS', 'MD', 'DNB'],
         experience: 8,
+        verificationStatus: 'APPROVED',
+        licenseVerified: true,
         availability: {
           monday: { start: '10:00', end: '17:00' },
           tuesday: { start: '10:00', end: '17:00' },
@@ -72,12 +76,13 @@ const seedDatabase = async () => {
         email: 'dr.rajesh@clinic.com',
         phone: '9876543212',
         password: 'Password123!',
-        role: 'DOCTOR',
         specialization: 'Cardiologist',
         consultationFee: 800,
         roomNumber: '3',
         qualifications: ['MBBS', 'MD', 'DM'],
         experience: 15,
+        verificationStatus: 'APPROVED',
+        licenseVerified: true,
         availability: {
           monday: { start: '09:00', end: '16:00' },
           tuesday: { start: '09:00', end: '16:00' },
@@ -92,17 +97,6 @@ const seedDatabase = async () => {
     ]);
 
     console.log('Doctors created:', doctors.length);
-
-    // Create receptionist
-    const receptionist = await User.create({
-      name: 'Priya Singh',
-      email: 'receptionist@clinic.com',
-      phone: '9876543220',
-      password: 'Password123!',
-      role: 'RECEPTIONIST',
-    });
-
-    console.log('Receptionist created');
 
     // Create patients
     const patients = await User.create([
@@ -312,7 +306,7 @@ const seedDatabase = async () => {
         paymentMethod: 'CASH',
         status: 'PAID',
         paymentDate: new Date(),
-        processedBy: receptionist._id,
+        processedBy: createdAppointments[0].doctorId,
       },
     ]);
 
@@ -326,9 +320,6 @@ const seedDatabase = async () => {
     console.log('  Password: Password123!');
     console.log('\nDOCTOR:');
     console.log('  Email: dr.sarah@clinic.com');
-    console.log('  Password: Password123!');
-    console.log('\nRECEPTIONIST:');
-    console.log('  Email: receptionist@clinic.com');
     console.log('  Password: Password123!');
     console.log('----------------------------------\n');
 

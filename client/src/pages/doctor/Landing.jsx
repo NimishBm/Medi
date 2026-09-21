@@ -36,9 +36,9 @@ export const DoctorLanding = () => {
     navigate('/doctor');
   };
 
-  // If logged in as PATIENT or RECEPTIONIST, redirect them
+  // If logged in as PATIENT, redirect them
   if (user && user.role !== 'DOCTOR') {
-    return <Navigate to={user.role === 'PATIENT' ? '/patient' : '/receptionist'} replace />;
+    return <Navigate to="/patient" replace />;
   }
 
   return (

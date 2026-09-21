@@ -44,7 +44,7 @@ router.get(
 router.post(
   '/call-next',
   protect,
-  authorize('DOCTOR', 'RECEPTIONIST'),
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const { doctorId } = req.body;
 
@@ -99,7 +99,7 @@ router.post(
 router.post(
   '/skip',
   protect,
-  authorize('DOCTOR', 'RECEPTIONIST'),
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const { queueId } = req.body;
 
@@ -136,7 +136,7 @@ router.post(
 router.post(
   '/recall',
   protect,
-  authorize('RECEPTIONIST'),
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const { queueId } = req.body;
 
@@ -276,7 +276,7 @@ router.post(
 router.post(
   '/no-show',
   protect,
-  authorize('DOCTOR', 'RECEPTIONIST'),
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const { queueId } = req.body;
 

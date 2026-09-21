@@ -26,7 +26,7 @@ const generateTokenNumber = async (doctorId, appointmentDate) => {
 router.post(
   '/',
   protect,
-  authorize('PATIENT', 'RECEPTIONIST'),
+  authorize('PATIENT', 'DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const { patientId, doctorId, appointmentDate, appointmentTime, reason, bookedFor, bookedBy, appointmentType } = req.body;
 
@@ -99,7 +99,7 @@ router.get(
 router.get(
   '/today',
   protect,
-  authorize('DOCTOR', 'RECEPTIONIST'),
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -144,7 +144,7 @@ router.get(
 router.put(
   '/:id',
   protect,
-  authorize('PATIENT', 'RECEPTIONIST', 'DOCTOR'),
+  authorize('PATIENT', 'DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const appointment = await Appointment.findById(req.params.id);
 
@@ -188,7 +188,7 @@ router.post(
 router.post(
   '/:id/check-in',
   protect,
-  authorize('RECEPTIONIST'),
+  authorize('DOCTOR', 'PATIENT'),
   catchAsyncErrors(async (req, res) => {
     const appointment = await Appointment.findById(req.params.id);
 
