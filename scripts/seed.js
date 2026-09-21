@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import Doctor from '../models/Doctor.js';
-import Doctor from '../models/Doctor.js';
 import Patient from '../models/Patient.js';
 import Receptionist from '../models/Receptionist.js';
 import Appointment from '../models/Appointment.js';

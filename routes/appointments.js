@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import Appointment from '../models/Appointment.js';
 import Queue from '../models/Queue.js';
 import Notification from '../models/Notification.js';
-import { io } from '../../server.js';
+import { io } from '../server.js';
 
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';

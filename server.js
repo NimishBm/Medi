@@ -9,19 +9,19 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 // Routes
-import authRoutes from './server/src/routes/auth.js';
-import doctorRoutes from './server/src/routes/doctors.js';
-import appointmentRoutes from './server/src/routes/appointments.js';
-import queueRoutes from './server/src/routes/queue.js';
-import consultationRoutes from './server/src/routes/consultations.js';
-import prescriptionRoutes from './server/src/routes/prescriptions.js';
-import paymentRoutes from './server/src/routes/payments.js';
-import analyticsRoutes from './server/src/routes/analytics.js';
-import searchRoutes from './server/src/routes/search.js';
-import organizationRoutes from './server/src/routes/organizations.js';
-import adminRoutes from './server/src/routes/admin.js';
-import blogRoutes from './server/src/routes/blog.js';
-import notificationRoutes from './server/src/routes/notifications.js';
+import authRoutes from './routes/auth.js';
+import doctorRoutes from './routes/doctors.js';
+import appointmentRoutes from './routes/appointments.js';
+import queueRoutes from './routes/queue.js';
+import consultationRoutes from './routes/consultations.js';
+import prescriptionRoutes from './routes/prescriptions.js';
+import paymentRoutes from './routes/payments.js';
+import analyticsRoutes from './routes/analytics.js';
+import searchRoutes from './routes/search.js';
+import organizationRoutes from './routes/organizations.js';
+import adminRoutes from './routes/admin.js';
+import blogRoutes from './routes/blog.js';
+import notificationRoutes from './routes/notifications.js';
 
 dotenv.config();
 
@@ -73,7 +73,7 @@ app.use(async (req, res, next) => {
 });
 
 // Static uploads & client build files
-app.use('/uploads', express.static(path.join(__dirname, 'server/uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const clientDistPath = path.join(__dirname, 'client/dist');
 app.use(express.static(clientDistPath));
 

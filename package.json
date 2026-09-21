@@ -10,7 +10,8 @@
     "vercel-build": "npm install && npm --prefix client install && npm --prefix client run build",
     "start": "node server.js",
     "server:dev": "nodemon server.js",
-    "server:seed": "cd server && npm run seed",
+    "seed": "node scripts/seed.js",
+    "seed-bodhi": "node scripts/importBodhi.js",
     "client:dev": "cd client && npm run dev",
     "client:build": "cd client && npm run build",
     "client:preview": "cd client && npm run preview"
