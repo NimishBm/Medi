@@ -31,10 +31,25 @@ export const BookingPage = () => {
     appointmentTime: '',
     appointmentType: 'General Consultation',
     reason: '',
-    bookFor: 'self',
-    selectedFamilyMember: '',
     prescriptionFile: null,
   });
+
+  // attendees: set of keys — 'self' or the index of the family member as a string
+  const [selectedAttendees, setSelectedAttendees] = useState(new Set(['self']));
+
+  const toggleAttendee = (key) => {
+    setSelectedAttendees(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        // always keep at least one selected
+        if (next.size === 1) return prev;
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     doctorAPI.getDoctorById(doctorId)
@@ -50,18 +65,39 @@ export const BookingPage = () => {
     if (!form.appointmentDate || !form.appointmentTime) { toast.error('Select date and time'); return; }
     setBooking(true);
     try {
+      // Build attendees list from selected checkboxes
+      const attendees = [];
+      if (selectedAttendees.has('self')) {
+        attendees.push({ isFamilyMember: false });
+      }
+      if (user?.familyMembers?.length > 0) {
+        user.familyMembers.forEach((fm, i) => {
+          if (selectedAttendees.has(String(i))) {
+            attendees.push({
+              isFamilyMember: true,
+              name: fm.name,
+              relationship: fm.relationship,
+              dateOfBirth: fm.dateOfBirth,
+              gender: fm.gender,
+              bloodGroup: fm.bloodGroup,
+              phone: fm.phone,
+              allergies: fm.allergies,
+              medicalHistory: fm.medicalHistory,
+            });
+          }
+        });
+      }
+
       const payload = {
-        patientId: user._id, doctorId,
+        patientId: user._id,
+        doctorId,
         appointmentDate: form.appointmentDate,
         appointmentTime: form.appointmentTime,
         appointmentType: form.appointmentType,
         reason: form.reason || 'Consultation',
+        bookedBy: user._id,
+        attendees,
       };
-      if (form.bookFor === 'family' && form.selectedFamilyMember !== '') {
-        const fm = user.familyMembers[parseInt(form.selectedFamilyMember)];
-        payload.bookedFor = { name: fm.name, relationship: fm.relationship, isFamilyMember: true };
-        payload.bookedBy = user._id;
-      }
       await appointmentAPI.createAppointment(payload);
       toast.success('Appointment booked!');
       navigate('/patient/payments');
@@ -180,10 +216,13 @@ export const BookingPage = () => {
 
             {/* Booking for */}
             <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '18px 20px' }}>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 12 }}>Booking for</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 4 }}>Booking for</p>
+              <p style={{ fontSize: 12, color: '#6B7280', marginBottom: 12 }}>Select everyone you want to book an appointment for.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', border: `1.5px solid ${form.bookFor === 'self' ? T : '#E5E7EB'}`, borderRadius: 12, cursor: 'pointer', background: form.bookFor === 'self' ? '#F0FDF4' : '#fff' }}>
-                  <input type="radio" name="bookFor" value="self" checked={form.bookFor === 'self'} onChange={e => set('bookFor', e.target.value)} style={{ width: 16, height: 16, accentColor: T }} />
+
+                {/* Myself */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', border: `1.5px solid ${selectedAttendees.has('self') ? T : '#E5E7EB'}`, borderRadius: 12, cursor: 'pointer', background: selectedAttendees.has('self') ? '#F0FDF4' : '#fff' }}>
+                  <input type="checkbox" checked={selectedAttendees.has('self')} onChange={() => toggleAttendee('self')} style={{ width: 16, height: 16, accentColor: T }} />
                   <User size={18} color={T} />
                   <div>
                     <p style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>Myself</p>
@@ -191,23 +230,32 @@ export const BookingPage = () => {
                   </div>
                 </label>
 
-                {user?.familyMembers?.length > 0 && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', border: `1.5px solid ${form.bookFor === 'family' ? T : '#E5E7EB'}`, borderRadius: 12, cursor: 'pointer', background: form.bookFor === 'family' ? '#F0FDF4' : '#fff' }}>
-                    <input type="radio" name="bookFor" value="family" checked={form.bookFor === 'family'} onChange={e => set('bookFor', e.target.value)} style={{ width: 16, height: 16, accentColor: T }} />
+                {/* Family members — each as its own checkbox */}
+                {user?.familyMembers?.map((fm, i) => (
+                  <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', border: `1.5px solid ${selectedAttendees.has(String(i)) ? T : '#E5E7EB'}`, borderRadius: 12, cursor: 'pointer', background: selectedAttendees.has(String(i)) ? '#F0FDF4' : '#fff' }}>
+                    <input type="checkbox" checked={selectedAttendees.has(String(i))} onChange={() => toggleAttendee(String(i))} style={{ width: 16, height: 16, accentColor: T }} />
                     <Users size={18} color={T} />
-                    <p style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>Family Member</p>
+                    <div>
+                      <p style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{fm.name}</p>
+                      <p style={{ fontSize: 12, color: '#6B7280' }}>{fm.relationship}{fm.gender ? ` · ${fm.gender}` : ''}{fm.bloodGroup ? ` · ${fm.bloodGroup}` : ''}</p>
+                    </div>
                   </label>
+                ))}
+
+                {(!user?.familyMembers || user.familyMembers.length === 0) && (
+                  <p style={{ fontSize: 12, color: '#9CA3AF', padding: '8px 2px' }}>
+                    No family members added yet.{' '}
+                    <span onClick={() => navigate('/patient/family')} style={{ color: T, cursor: 'pointer', fontWeight: 600 }}>Add one →</span>
+                  </p>
                 )}
               </div>
 
-              {form.bookFor === 'family' && user?.familyMembers?.length > 0 && (
-                <select value={form.selectedFamilyMember} onChange={e => set('selectedFamilyMember', e.target.value)}
-                  style={{ width: '100%', marginTop: 10, padding: '10px 12px', border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 13, outline: 'none', background: '#F5F7FA' }}>
-                  <option value="">Select a family member</option>
-                  {user.familyMembers.map((m, i) => (
-                    <option key={i} value={i}>{m.name} ({m.relationship})</option>
-                  ))}
-                </select>
+              {selectedAttendees.size > 1 && (
+                <div style={{ marginTop: 12, padding: '10px 14px', background: '#EFF6FF', border: '1.5px solid #BFDBFE', borderRadius: 10 }}>
+                  <p style={{ fontSize: 12, color: '#1D4ED8', fontWeight: 600 }}>
+                    {selectedAttendees.size} appointments will be created — one per person, each with their own token number.
+                  </p>
+                </div>
               )}
             </div>
 
@@ -260,13 +308,23 @@ export const BookingPage = () => {
               <div style={{ background: '#F0FDF4', border: '1.5px solid #BBF7D0', borderRadius: 16, padding: '16px 20px', marginBottom: 4 }}>
                 <p style={{ fontSize: 13, fontWeight: 700, color: T, marginBottom: 6 }}>Booking Summary</p>
                 <p style={{ fontSize: 13, color: '#374151' }}>Dr. {doctor.name.replace(/^Dr\.?\s+/, '')} · {form.appointmentDate} · {form.appointmentTime}</p>
-                <p style={{ fontSize: 13, color: '#374151' }}>Fee: ₹{doctor.consultationFee}</p>
+                <p style={{ fontSize: 13, color: '#374151' }}>
+                  Fee: ₹{doctor.consultationFee}{selectedAttendees.size > 1 ? ` × ${selectedAttendees.size} people = ₹${doctor.consultationFee * selectedAttendees.size}` : ''}
+                </p>
+                {selectedAttendees.size > 1 && (
+                  <p style={{ fontSize: 12, color: '#6B7280', marginTop: 4 }}>
+                    Booking for: {[
+                      selectedAttendees.has('self') ? user?.name : null,
+                      ...(user?.familyMembers || []).map((fm, i) => selectedAttendees.has(String(i)) ? fm.name : null)
+                    ].filter(Boolean).join(', ')}
+                  </p>
+                )}
               </div>
             )}
 
             <button type="submit" disabled={booking || !form.appointmentTime}
               style={{ width: '100%', background: booking || !form.appointmentTime ? '#9CA3AF' : T, color: '#fff', fontWeight: 800, fontSize: 15, padding: '14px', borderRadius: 14, border: 'none', cursor: form.appointmentTime ? 'pointer' : 'not-allowed', transition: 'background 0.15s' }}>
-              {booking ? 'Confirming...' : 'Confirm Booking'}
+              {booking ? 'Confirming...' : `Confirm Booking${selectedAttendees.size > 1 ? ` (${selectedAttendees.size})` : ''}`}
             </button>
 
             <p style={{ fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginTop: -6 }}>

@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Appointment from '../models/Appointment.js';
 import Queue from '../models/Queue.js';
 
@@ -22,52 +23,85 @@ const generateTokenNumber = async (doctorId, appointmentDate) => {
   return (lastAppointment?.tokenNumber || 0) + 1;
 };
 
-// Book appointment
+// Book appointment(s)
+// Supports single booking (bookedFor object) or group booking (attendees array).
+// Each attendee gets their own appointment document with its own token number.
+// All appointments in the same request share a groupBookingId.
 router.post(
   '/',
   protect,
   authorize('PATIENT', 'RECEPTIONIST'),
   catchAsyncErrors(async (req, res) => {
-    const { patientId, doctorId, appointmentDate, appointmentTime, reason, bookedFor, bookedBy, appointmentType } = req.body;
+    const { patientId, doctorId, appointmentDate, appointmentTime, reason, bookedFor, bookedBy, appointmentType, attendees } = req.body;
 
     if (!patientId || !doctorId || !appointmentDate || !appointmentTime) {
       return res.status(400).json({ message: 'Please provide all required fields' });
     }
 
-    // Check for duplicate booking
-    const existingAppointment = await Appointment.findOne({
-      patientId,
-      doctorId,
-      appointmentDate: new Date(appointmentDate),
-      appointmentTime,
-      status: { $ne: 'CANCELLED' },
-    });
+    // Build the list of attendees to create appointments for.
+    // If `attendees` array is provided use it, otherwise fall back to single bookedFor (or self).
+    const attendeeList = attendees && attendees.length > 0
+      ? attendees
+      : [bookedFor || { isFamilyMember: false }];
 
-    if (existingAppointment) {
-      return res.status(400).json({ message: 'Patient already has an appointment at this time' });
+    // Generate a shared groupBookingId only when booking for multiple people
+    const groupBookingId = attendeeList.length > 1
+      ? new mongoose.Types.ObjectId().toString()
+      : undefined;
+
+    const createdAppointments = [];
+
+    for (const attendee of attendeeList) {
+      // Each person gets their own token
+      const tokenNumber = await generateTokenNumber(doctorId, new Date(appointmentDate));
+
+      // Check for duplicate booking for this patientId + slot
+      const existingAppointment = await Appointment.findOne({
+        patientId,
+        doctorId,
+        appointmentDate: new Date(appointmentDate),
+        appointmentTime,
+        status: { $ne: 'CANCELLED' },
+        'bookedFor.name': attendee.isFamilyMember ? attendee.name : null,
+        'bookedFor.isFamilyMember': attendee.isFamilyMember || false,
+      });
+
+      if (existingAppointment) {
+        const who = attendee.isFamilyMember ? attendee.name : 'Patient';
+        return res.status(400).json({ message: `${who} already has an appointment at this time` });
+      }
+
+      const appointment = new Appointment({
+        patientId,
+        doctorId,
+        appointmentDate: new Date(appointmentDate),
+        appointmentTime,
+        reason,
+        tokenNumber,
+        status: 'BOOKED',
+        bookedFor: attendee,
+        bookedBy,
+        appointmentType: appointmentType || 'General Consultation',
+        groupBookingId,
+      });
+
+      await appointment.save();
+      await appointment.populate(['patientId', 'doctorId']);
+      createdAppointments.push(appointment);
     }
 
-    const tokenNumber = await generateTokenNumber(doctorId, new Date(appointmentDate));
-
-    const appointment = new Appointment({
-      patientId,
-      doctorId,
-      appointmentDate: new Date(appointmentDate),
-      appointmentTime,
-      reason,
-      tokenNumber,
-      status: 'BOOKED',
-      bookedFor,
-      bookedBy,
-      appointmentType: appointmentType || 'General Consultation',
-    });
-
-    await appointment.save();
-    await appointment.populate(['patientId', 'doctorId']);
+    // Return single object for single booking, array for group booking (backward compatible)
+    if (createdAppointments.length === 1) {
+      return res.status(201).json({
+        message: 'Appointment booked successfully',
+        appointment: createdAppointments[0],
+      });
+    }
 
     res.status(201).json({
-      message: 'Appointment booked successfully',
-      appointment,
+      message: `${createdAppointments.length} appointments booked successfully`,
+      appointments: createdAppointments,
+      groupBookingId,
     });
   })
 );

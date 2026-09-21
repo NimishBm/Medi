@@ -71,13 +71,38 @@ const appointmentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
     },
 
+    // One entry per person being seen — first entry is always the account holder (self),
+    // subsequent entries are family members. Each gets its own appointment document.
     bookedFor: {
-      name: String,
-      relationship: String,
       isFamilyMember: {
         type: Boolean,
         default: false,
       },
+      name: String,
+      relationship: String,
+      dateOfBirth: Date,
+      gender: {
+        type: String,
+        enum: ['M', 'F', 'Other'],
+      },
+      bloodGroup: {
+        type: String,
+        enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+      },
+      phone: String,
+      allergies: [String],
+      medicalHistory: [
+        {
+          condition: String,
+          diagnosis: String,
+          date: Date,
+        },
+      ],
+    },
+
+    // groupBookingId links all appointments created in the same booking session
+    groupBookingId: {
+      type: String,
     },
 
     appointmentType: {

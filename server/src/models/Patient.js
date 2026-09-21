@@ -65,7 +65,21 @@ const patientSchema = new mongoose.Schema(
           type: String,
           enum: ['M', 'F', 'Other']
         },
-        allergies: [String]
+        bloodGroup: {
+          type: String,
+          enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+        },
+        phone: {
+          type: String
+        },
+        allergies: [String],
+        medicalHistory: [
+          {
+            condition: String,
+            diagnosis: String,
+            date: Date
+          }
+        ]
       }
     ]
   },
