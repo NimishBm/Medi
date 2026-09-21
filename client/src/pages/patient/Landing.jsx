@@ -14,14 +14,14 @@ import {
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 
 const SPECIALTIES = [
-  { id: 'general',    name: 'General Physician', icon: Activity,    bg: '#E8F5E9', iconColor: '#2E7D32' },
-  { id: 'cardio',     name: 'Cardiology',         icon: Heart,       bg: '#FDECEA', iconColor: '#C62828' },
-  { id: 'derma',      name: 'Dermatology',         icon: Layers,      bg: '#EDE7F6', iconColor: '#6A1B9A' },
-  { id: 'eye',        name: 'Ophthalmology',       icon: Eye,         bg: '#E3F2FD', iconColor: '#1565C0' },
-  { id: 'dental',     name: 'Dental',              icon: Smile,       bg: '#FFF8E1', iconColor: '#F57F17' },
-  { id: 'pediatrics', name: 'Pediatrics',          icon: Thermometer, bg: '#FCE4EC', iconColor: '#AD1457' },
-  { id: 'ortho',      name: 'Orthopedics',         icon: Shield,      bg: '#E0F7FA', iconColor: '#00695C' },
-  { id: 'neuro',      name: 'Neurology',           icon: Zap,         bg: '#F3E5F5', iconColor: '#7B1FA2' },
+  { id: 'general',    name: 'General Physician', icon: Activity,    bg: '#E8F5E9', iconColor: '#2E7D32', specializations: ['General Physician'] },
+  { id: 'cardio',     name: 'Cardiology',         icon: Heart,       bg: '#FDECEA', iconColor: '#C62828', specializations: ['Cardiologist'] },
+  { id: 'derma',      name: 'Dermatology',         icon: Layers,      bg: '#EDE7F6', iconColor: '#6A1B9A', specializations: ['Dermatologist'] },
+  { id: 'eye',        name: 'Ophthalmology',       icon: Eye,         bg: '#E3F2FD', iconColor: '#1565C0', specializations: ['Ophthalmologist'] },
+  { id: 'dental',     name: 'Dental',              icon: Smile,       bg: '#FFF8E1', iconColor: '#F57F17', specializations: ['Dentist'] },
+  { id: 'pediatrics', name: 'Pediatrics',          icon: Thermometer, bg: '#FCE4EC', iconColor: '#AD1457', specializations: ['Pediatrician', 'Paediatrician'] },
+  { id: 'ortho',      name: 'Orthopedics',         icon: Shield,      bg: '#E0F7FA', iconColor: '#00695C', specializations: ['Orthopedic', 'Orthopedic Surgeon'] },
+  { id: 'neuro',      name: 'Neurology',           icon: Zap,         bg: '#F3E5F5', iconColor: '#7B1FA2', specializations: ['Neurologist', 'Neurosurgeon'] },
 ];
 
 const QUICK_ACTIONS = [
@@ -44,27 +44,20 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
   const [queueStats, setQueueStats]               = useState({});
   const [upcomingAppt, setUpcomingAppt]           = useState(null);
   const [loadingDoctors, setLoadingDoctors]       = useState(true);
-  const [activeSpec, setActiveSpec]               = useState('all');
   const [selectedLocation, setSelectedLocation]   = useState('Current Location');
 
   useEffect(() => {
     const loadDoctors = async () => {
       try {
         const res = await doctorAPI.getDoctors();
-        const top8 = (res.data || [])
-          .sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0))
-          .slice(0, 8);
+        const top8 = (res.data || []).slice(0, 8);
         setDoctors(top8);
-        const statsMap = {};
-        await Promise.all(
-          top8.map(async (d) => {
-            try {
-              const q = await queueAPI.getQueueByDoctorId(d._id);
-              statsMap[d._id] = q.data;
-            } catch { statsMap[d._id] = { waiting: 0 }; }
-          })
-        );
-        setQueueStats(statsMap);
+
+        if (queueResult.status === 'fulfilled') {
+          setQueueStats(queueResult.value.data || {});
+        } else {
+          setQueueStats({});
+        }
       } catch { /* silent */ }
       finally { setLoadingDoctors(false); }
     };
@@ -85,7 +78,7 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
   }, []);
 
   useEffect(() => {
-    if (!searchInput.trim() || searchInput.trim().length < 2) {
+    if (!searchInput.trim() || searchInput.trim().length < 4) {
       setSuggestions([]);
       return;
     }
@@ -103,10 +96,9 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
     return (s.waiting || 0) * (d.averageConsultationTime || 10);
   };
 
-  const visibleDoctors = (activeSpec === 'all'
+  const visibleDoctors = activeSpec === 'all'
     ? doctors
-    : doctors.filter(d => d.specialization === activeSpec)
-  ).sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0));
+    : doctors.filter(d => d.specialization === activeSpec);
 
   return (
     <div className="min-h-screen" style={{ background: '#F5F7FA', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -374,11 +366,11 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
             {SPECIALTIES.map(s => {
               const Icon = s.icon;
-              const isActive = activeSpec === s.name;
+              const isActive = false;
               return (
                 <button
                   key={s.id}
-                  onClick={() => setActiveSpec(activeSpec === s.name ? 'all' : s.name)}
+                  onClick={() => navigate('/patient/marketplace', { state: { category: s.id } })}
                   style={{
                     background: isActive ? s.bg : '#fff',
                     border: isActive ? `2px solid ${s.iconColor}` : '1.5px solid #E5E7EB',
@@ -400,7 +392,7 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <h3 style={{ fontSize: 18, fontWeight: 800, color: '#111827' }}>
-              {activeSpec === 'all' ? 'Top Doctors' : activeSpec + ' Specialists'}
+              Top Doctors
             </h3>
             <button
               onClick={() => navigate('/patient/marketplace')}
@@ -625,15 +617,18 @@ const LoggedOutView = ({ navigate, searchInput, setSearchInput, handleSearch, ha
             </div>
 
             <div style={{ display: 'flex', gap: 12, marginTop: 18, flexWrap: 'wrap' }}>
-              {['General Physician', 'Dermatologist', 'Cardiologist'].map(tag => (
+              {['General Physician', 'Dermatologist', 'Cardiologist'].map(tag => {
+                const tagSpecialty = SPECIALTIES.find(s => s.specializations?.includes(tag));
+                return (
                 <button
                   key={tag}
-                  onClick={() => handleSpecialtyClick({ name: tag })}
+                  onClick={() => tagSpecialty && handleSpecialtyClick(tagSpecialty)}
                   style={{ background: 'rgba(255,255,255,0.15)', color: '#CCFBF1', fontSize: 12, fontWeight: 600, padding: '5px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer' }}
                 >
                   {tag}
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -778,9 +773,9 @@ export const Landing = () => {
   };
 
   const handleSpecialtyClick = (specialty) => {
-    const route = user ? '/patient/marketplace' : '/marketplace';
-    navigate(route, { state: { category: specialty.name } });
-  };
+  const route = user ? '/patient/marketplace' : '/marketplace';
+  navigate(route, { state: { category: specialty.id } });
+};
 
   if (user) {
     return (

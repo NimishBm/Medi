@@ -162,9 +162,21 @@ organizationIds: [
       default: true
     },
 
-    isVerified: {
+    // Admin verification
+    verificationStatus: {
+      type: String,
+      enum: ['PENDING', 'APPROVED', 'REJECTED'],
+      default: 'PENDING'
+    },
+
+    licenseVerified: {
       type: Boolean,
       default: false
+    },
+
+    verificationNote: {
+      type: String,
+      default: ''
     }
   },
   {

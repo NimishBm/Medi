@@ -36,10 +36,10 @@ import { DoctorSchedule } from './pages/doctor/Schedule';
 import { DoctorBlog } from './pages/doctor/Blog';
 import { SetupProfile } from './pages/doctor/SetupProfile';
 
-// Receptionist Pages
-import { ReceptionistDashboard } from './pages/receptionist/Dashboard';
-import { ReceptionistAppointments } from './pages/receptionist/Appointments';
-import { ReceptionistQueue } from './pages/receptionist/Queue';
+
+// Admin Pages
+import { AdminLogin } from './pages/admin/Login';
+import { AdminDashboard } from './pages/admin/Dashboard';
 
 // Display
 import { WaitingRoomDisplay } from './pages/WaitingRoomDisplay';
@@ -80,6 +80,17 @@ export default function App() {
           <Route path="/login/doctor" element={<DoctorLogin />} />
           <Route path="/register/doctor" element={<DoctorRegister />} />
           <Route path="/register" element={<Register />} />
+
+          {/* Admin Routes */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute requiredRoles={['ADMIN']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Display Routes */}
           <Route path="/display" element={<WaitingRoomDisplay />} />
@@ -267,31 +278,6 @@ export default function App() {
             }
           />
 
-          {/* Receptionist Routes */}
-          <Route
-            path="/receptionist"
-            element={
-              <ProtectedRoute requiredRoles={['RECEPTIONIST']}>
-                <ReceptionistDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/receptionist/appointments"
-            element={
-              <ProtectedRoute requiredRoles={['RECEPTIONIST']}>
-                <ReceptionistAppointments />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/receptionist/queue"
-            element={
-              <ProtectedRoute requiredRoles={['RECEPTIONIST']}>
-                <ReceptionistQueue />
-              </ProtectedRoute>
-            }
-          />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

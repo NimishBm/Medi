@@ -10,7 +10,7 @@ const router = express.Router();
 router.post(
   '/',
   protect,
-  authorize('RECEPTIONIST'),
+  authorize('DOCTOR', 'PATIENT'),
   catchAsyncErrors(async (req, res) => {
     const {
       appointmentId,
@@ -93,7 +93,7 @@ router.get(
 router.post(
   '/:id/refund',
   protect,
-  authorize('RECEPTIONIST'),
+  authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
     const { refundReason } = req.body;
 
