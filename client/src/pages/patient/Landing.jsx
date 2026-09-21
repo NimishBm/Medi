@@ -50,14 +50,20 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
     const loadDoctors = async () => {
       try {
         const res = await doctorAPI.getDoctors();
-        const top8 = (res.data || []).slice(0, 8);
+        const top8 = (res.data || [])
+          .sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0))
+          .slice(0, 8);
         setDoctors(top8);
-
-        if (queueResult.status === 'fulfilled') {
-          setQueueStats(queueResult.value.data || {});
-        } else {
-          setQueueStats({});
-        }
+        const statsMap = {};
+        await Promise.all(
+          top8.map(async (d) => {
+            try {
+              const q = await queueAPI.getQueueByDoctorId(d._id);
+              statsMap[d._id] = q.data;
+            } catch { statsMap[d._id] = { waiting: 0 }; }
+          })
+        );
+        setQueueStats(statsMap);
       } catch { /* silent */ }
       finally { setLoadingDoctors(false); }
     };
@@ -96,9 +102,7 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
     return (s.waiting || 0) * (d.averageConsultationTime || 10);
   };
 
-  const visibleDoctors = activeSpec === 'all'
-    ? doctors
-    : doctors.filter(d => d.specialization === activeSpec);
+  const visibleDoctors = [...doctors].sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0));
 
   return (
     <div className="min-h-screen" style={{ background: '#F5F7FA', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
