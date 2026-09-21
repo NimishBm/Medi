@@ -66,10 +66,11 @@ const connectDB = async () => {
 app.use(async (req, res, next) => {
   try {
     await connectDB();
+    next();
   } catch (err) {
     console.error('MongoDB connection error:', err);
+    res.status(500).json({ message: 'Database connection failed: ' + err.message });
   }
-  next();
 });
 
 // Static uploads & client build files
