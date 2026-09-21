@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import { authAPI } from '../services/api';
 import { setUser } from '../store/slices/authSlice';
 import toast from 'react-hot-toast';
@@ -20,8 +21,22 @@ export const PatientLogin = () => {
   const navigate  = useNavigate();
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [showPw, setShowPw]     = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [showPw, setShowPw]   = useState(false);
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLoading(true);
+    try {
+      const res = await authAPI.googleLogin(credentialResponse.credential);
+      dispatch(setUser({ user: res.data.user, token: res.data.token }));
+      toast.success('Welcome!');
+      navigate('/patient');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Google login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -140,6 +155,23 @@ export const PatientLogin = () => {
                 {loading ? 'Signing in…' : 'Sign In'}
               </button>
             </form>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0 16px' }}>
+              <div style={{ flex: 1, height: 1, background: '#E5E7EB' }} />
+              <span style={{ fontSize: 12, color: '#9CA3AF', fontWeight: 500 }}>or</span>
+              <div style={{ flex: 1, height: 1, background: '#E5E7EB' }} />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => toast.error('Google sign-in failed')}
+                width="368"
+                text="signin_with"
+                shape="rectangular"
+                theme="outline"
+              />
+            </div>
 
             <div style={{ textAlign: 'center', marginTop: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <p style={{ fontSize: 13, color: '#6B7280' }}>

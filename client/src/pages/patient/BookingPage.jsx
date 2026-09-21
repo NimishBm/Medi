@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { doctorAPI, appointmentAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
@@ -19,8 +19,16 @@ const DEFAULT_SLOTS = ['09:00','09:30','10:00','10:30','11:00','11:30','14:00','
 export const BookingPage = () => {
   const { doctorId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const user = useSelector(s => s.auth.user);
+
+  // Redirect to complete-profile if phone is missing
+  useEffect(() => {
+    if (user && !user.phone) {
+      navigate(`/patient/complete-profile?next=${encodeURIComponent(location.pathname)}`, { replace: true });
+    }
+  }, [user]);
 
   const isMobile = useIsMobile();
   const [doctor, setDoctor]   = useState(null);

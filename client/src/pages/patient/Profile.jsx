@@ -38,7 +38,7 @@ export const PatientProfile = () => {
         setProfile(d);
         setForm({
           name:        d.name        || '',
-          phone:       d.phone       || '',
+          phone:       (d.phone && d.phone.startsWith('+91')) ? d.phone : '+91',
           dateOfBirth: d.dateOfBirth ? d.dateOfBirth.split('T')[0] : '',
           gender:      d.gender      || '',
           bloodGroup:  d.bloodGroup  || '',
@@ -50,6 +50,16 @@ export const PatientProfile = () => {
   }, []);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handlePhoneChange = (e) => {
+    const val = e.target.value;
+    if (!val.startsWith('+91')) return;
+    const digits = val.slice(3).replace(/\D/g, '').slice(0, 10);
+    let formatted = '+91';
+    if (digits.length > 0) formatted += ' ' + digits.slice(0, 5);
+    if (digits.length > 5)  formatted += ' ' + digits.slice(5);
+    set('phone', formatted);
+  };
 
   const addAllergy = () => {
     const val = allergyInput.trim();
@@ -63,7 +73,7 @@ export const PatientProfile = () => {
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('Name is required'); return; }
-    if (!form.phone.trim()) { toast.error('Phone is required'); return; }
+    if (form.phone.replace(/\D/g, '').length !== 12) { toast.error('Enter a valid 10-digit phone number'); return; }
     setSaving(true);
     try {
       const res = await userAPI.updateMe({
@@ -203,7 +213,7 @@ export const PatientProfile = () => {
             {/* Phone */}
             <Field label="Phone Number" icon={<Phone size={14} color="#9CA3AF" />}>
               {editing
-                ? <input value={form.phone} onChange={e => set('phone', e.target.value)}
+                ? <input value={form.phone} onChange={handlePhoneChange}
                     style={inputStyle} placeholder="+91 99999 99999" />
                 : <Value>{profile?.phone || '—'}</Value>}
             </Field>

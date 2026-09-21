@@ -19,13 +19,16 @@ const patientSchema = new mongoose.Schema(
 
     phone: {
       type: String,
-      required: true
     },
 
     password: {
       type: String,
-      required: true,
       minlength: 6
+    },
+
+    googleId: {
+      type: String,
+      sparse: true,
     },
 
     dateOfBirth: Date,
@@ -101,6 +104,7 @@ patientSchema.pre('save', async function (next) {
 });
 
 patientSchema.methods.comparePassword = async function (enteredPassword) {
+  if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
 

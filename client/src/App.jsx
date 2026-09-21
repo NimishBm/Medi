@@ -24,6 +24,7 @@ import { Prescriptions } from './pages/patient/Prescriptions';
 import { History } from './pages/patient/History';
 import { Payments } from './pages/patient/Payments';
 import { PatientProfile } from './pages/patient/Profile';
+import { CompleteProfile } from './pages/patient/CompleteProfile';
 
 // Doctor Pages
 import { DoctorLanding } from './pages/doctor/Landing';
@@ -204,6 +205,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRoles={['PATIENT']}>
                 <PatientProfile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/complete-profile"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <CompleteProfile />
               </ProtectedRoute>
             }
           />
