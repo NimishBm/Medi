@@ -62,7 +62,7 @@ export const DoctorDetail = () => {
 
   return (
     <div style={{ minHeight: '100vh', background: '#F5F7FA', fontFamily: 'system-ui,-apple-system,sans-serif' }}>
-      {user && user.role !== 'PATIENT' && <Navigate to={user.role === 'DOCTOR' ? '/doctor' : '/receptionist'} replace />}
+      {user && user.role !== 'PATIENT' && <Navigate to="/doctor" replace />}
 
       {/* Header */}
       <header style={{ background: '#fff', borderBottom: '1px solid #E8ECF0', position: 'sticky', top: 0, zIndex: 50 }}>

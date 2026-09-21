@@ -53,7 +53,7 @@ const paymentSchema = new mongoose.Schema(
 
     processedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Receptionist',
+      ref: 'Doctor',
     },
 
     notes: String,

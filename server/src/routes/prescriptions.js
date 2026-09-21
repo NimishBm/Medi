@@ -11,16 +11,16 @@ router.post(
   protect,
   authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
-    const { consultationId, patientId, doctorId, medicines, additionalNotes, validTill } = req.body;
+    const { consultationId, patientId, medicines, additionalNotes, validTill } = req.body;
 
-    if (!consultationId || !medicines) {
-      return res.status(400).json({ message: 'Consultation ID and medicines are required' });
+    if (!patientId || !medicines || medicines.length === 0) {
+      return res.status(400).json({ message: 'Patient and at least one medicine are required' });
     }
 
     const prescription = new Prescription({
-      consultationId,
+      consultationId: consultationId || undefined,
       patientId,
-      doctorId,
+      doctorId: req.user.id,
       medicines,
       additionalNotes,
       validTill,
@@ -28,10 +28,26 @@ router.post(
 
     await prescription.save();
 
+    const populated = await Prescription.findById(prescription._id)
+      .populate('patientId', 'name email phone');
+
     res.status(201).json({
       message: 'Prescription created successfully',
-      prescription,
+      prescription: populated,
     });
+  })
+);
+
+// Get prescriptions written by logged-in doctor
+router.get(
+  '/doctor',
+  protect,
+  authorize('DOCTOR'),
+  catchAsyncErrors(async (req, res) => {
+    const prescriptions = await Prescription.find({ doctorId: req.user.id })
+      .populate('patientId', 'name email phone')
+      .sort({ createdAt: -1 });
+    res.json(prescriptions);
   })
 );
 

@@ -1,8 +1,8 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import axios from 'axios';
 import Patient from '../models/Patient.js';
 import Doctor from '../models/Doctor.js';
-import Receptionist from '../models/Receptionist.js';
 import { protect } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
@@ -83,6 +83,18 @@ router.post(
       return res.status(400).json({ message: 'Doctor already exists with this email' });
     }
 
+    // Call AskMyDoc license verification API (non-blocking — failure just leaves licenseVerified false)
+    let licenseVerified = false;
+    try {
+      const verifyRes = await axios.get(
+        `https://api.askmydoc.in/api/verify?reg_number=${licenseNumber}`,
+        { timeout: 10000 }
+      );
+      licenseVerified = verifyRes.data?.verified === true && verifyRes.data?.success === true;
+    } catch {
+      licenseVerified = false;
+    }
+
     const doctor = new Doctor({
       name,
       email,
@@ -96,6 +108,8 @@ router.post(
         ? (Array.isArray(qualifications) ? qualifications : qualifications.split(',').map(q => q.trim()).filter(Boolean))
         : [],
       consultationFee: consultationFee ? Number(consultationFee) : 0,
+      licenseVerified,
+      verificationStatus: 'PENDING',
     });
 
     await doctor.save();
@@ -103,7 +117,7 @@ router.post(
     const token = generateToken(doctor, 'DOCTOR');
 
     res.status(201).json({
-      message: 'Doctor registered successfully',
+      message: 'Registration successful. Your account is under review. You will be able to login once an admin approves your account.',
       token,
       user: { ...doctor.toJSON(), role: 'DOCTOR' },
     });
@@ -138,15 +152,6 @@ router.post(
 
       if (user) {
         role = 'DOCTOR';
-      }
-    }
-
-    // Check RECEPTIONIST
-    if (!user) {
-      user = await Receptionist.findOne({ email });
-
-      if (user) {
-        role = 'RECEPTIONIST';
       }
     }
 
@@ -188,8 +193,6 @@ router.get(
       user = await Patient.findById(req.user.id);
     } else if (req.user.role === 'DOCTOR') {
       user = await Doctor.findById(req.user.id);
-    } else if (req.user.role === 'RECEPTIONIST') {
-      user = await Receptionist.findById(req.user.id);
     }
 
     if (!user) {
@@ -216,8 +219,6 @@ router.put(
       Model = Patient;
     } else if (req.user.role === 'DOCTOR') {
       Model = Doctor;
-    } else if (req.user.role === 'RECEPTIONIST') {
-      Model = Receptionist;
     }
 
     if (!Model) {
