@@ -2,9 +2,128 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../store/slices/authSlice';
-import { appointmentAPI, consultationAPI } from '../../services/api';
+import { appointmentAPI, consultationAPI, prescriptionAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { Heart, LogOut, Menu, ArrowLeft } from 'lucide-react';
+import { Heart, LogOut, ArrowLeft, FileText, Plus, Trash2, X } from 'lucide-react';
+
+const FREQUENCIES = ['Once daily', 'Twice daily', 'Three times daily', 'Four times daily', 'Every 6 hours', 'Every 8 hours', 'As needed'];
+const DURATIONS = ['1 day', '2 days', '3 days', '5 days', '1 week', '2 weeks', '1 month', '3 months', 'Ongoing'];
+const emptyMedicine = () => ({ name: '', dosage: '', frequency: 'Twice daily', duration: '5 days', instructions: '' });
+
+const PrescriptionModal = ({ patient, onClose }) => {
+  const [medicines, setMedicines] = useState([emptyMedicine()]);
+  const [additionalNotes, setAdditionalNotes] = useState('');
+  const [validTill, setValidTill] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const addMedicine = () => setMedicines((prev) => [...prev, emptyMedicine()]);
+  const removeMedicine = (i) => setMedicines((prev) => prev.filter((_, idx) => idx !== i));
+  const updateMedicine = (i, field, value) =>
+    setMedicines((prev) => prev.map((m, idx) => (idx === i ? { ...m, [field]: value } : m)));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const filled = medicines.filter((m) => m.name.trim());
+    if (filled.length === 0) { toast.error('Add at least one medicine name'); return; }
+    try {
+      setSaving(true);
+      await prescriptionAPI.createPrescription({
+        patientId: patient._id,
+        medicines: filled,
+        additionalNotes: additionalNotes.trim() || undefined,
+        validTill: validTill || undefined,
+      });
+      toast.success('Prescription saved successfully');
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save prescription');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">Write Prescription</h3>
+            <p className="text-sm text-gray-500">Patient: <span className="font-medium text-gray-700">{patient.name}</span></p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={22} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-gray-800">Medicines</p>
+              <button type="button" onClick={addMedicine} className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium">
+                <Plus size={14} /> Add Medicine
+              </button>
+            </div>
+            <div className="space-y-3">
+              {medicines.map((med, i) => (
+                <div key={i} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-600">Medicine {i + 1}</span>
+                    {medicines.length > 1 && (
+                      <button type="button" onClick={() => removeMedicine(i)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2">
+                      <label className="block text-xs text-gray-600 mb-1">Medicine Name *</label>
+                      <input type="text" value={med.name} onChange={(e) => updateMedicine(i, 'name', e.target.value)} placeholder="e.g., Paracetamol 500mg" className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Dosage</label>
+                      <input type="text" value={med.dosage} onChange={(e) => updateMedicine(i, 'dosage', e.target.value)} placeholder="e.g., 1 tablet" className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Frequency</label>
+                      <select value={med.frequency} onChange={(e) => updateMedicine(i, 'frequency', e.target.value)} className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white">
+                        {FREQUENCIES.map((f) => <option key={f}>{f}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Duration</label>
+                      <select value={med.duration} onChange={(e) => updateMedicine(i, 'duration', e.target.value)} className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white">
+                        {DURATIONS.map((d) => <option key={d}>{d}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Instructions</label>
+                      <input type="text" value={med.instructions} onChange={(e) => updateMedicine(i, 'instructions', e.target.value)} placeholder="e.g., After food" className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-1">Additional Notes</label>
+              <textarea value={additionalNotes} onChange={(e) => setAdditionalNotes(e.target.value)} rows={3} placeholder="Diet, precautions, follow-up instructions..." className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-1">Valid Till</label>
+              <input type="date" value={validTill} onChange={(e) => setValidTill(e.target.value)} min={new Date().toISOString().split('T')[0]} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500" />
+              <p className="text-xs text-gray-400 mt-1">Leave blank for no expiry</p>
+            </div>
+          </div>
+        </form>
+
+        <div className="px-5 py-3 border-t border-gray-200 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition">Cancel</button>
+          <button type="submit" disabled={saving} onClick={handleSubmit} className="px-5 py-2 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 rounded-lg transition">
+            {saving ? 'Saving...' : 'Save Prescription'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const TABS = ['All', 'Today', 'Completed', 'Cancelled'];
 
@@ -31,6 +150,7 @@ export const DoctorAppointments = () => {
   const [activeTypeFilter, setActiveTypeFilter] = useState('All Types');
   const [expandedConsultation, setExpandedConsultation] = useState(null);
   const [consultationNotes, setConsultationNotes] = useState({});
+  const [prescriptionPatient, setPrescriptionPatient] = useState(null);
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -109,6 +229,14 @@ export const DoctorAppointments = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Prescription modal */}
+      {prescriptionPatient && (
+        <PrescriptionModal
+          patient={prescriptionPatient}
+          onClose={() => setPrescriptionPatient(null)}
+        />
+      )}
+
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -274,6 +402,13 @@ export const DoctorAppointments = () => {
                           {expandedConsultation === apt._id ? '▼' : '▶'} Notes
                         </span>
                       )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setPrescriptionPatient(apt.patientId); }}
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition"
+                      >
+                        <FileText size={13} />
+                        <span className="hidden sm:inline">Prescription</span>
+                      </button>
                     </div>
                   </div>
 

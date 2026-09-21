@@ -97,6 +97,7 @@ export const prescriptionAPI = {
   createPrescription: (data) => api.post('/prescriptions', data),
   getPrescriptionsByPatient: (patientId) => api.get(`/prescriptions/patient/${patientId}`),
   getPrescriptionById: (id) => api.get(`/prescriptions/${id}`),
+  getByDoctor: () => api.get('/prescriptions/doctor'),
 };
 
 export const paymentAPI = {
