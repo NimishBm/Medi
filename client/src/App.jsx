@@ -32,10 +32,6 @@ import { DoctorQueue } from './pages/doctor/Queue';
 import { DoctorAppointments } from './pages/doctor/Appointments';
 import { SetupProfile } from './pages/doctor/SetupProfile';
 
-// Receptionist Pages
-import { ReceptionistDashboard } from './pages/receptionist/Dashboard';
-import { ReceptionistAppointments } from './pages/receptionist/Appointments';
-import { ReceptionistQueue } from './pages/receptionist/Queue';
 
 // Admin Pages
 import { AdminLogin } from './pages/admin/Login';
@@ -250,31 +246,6 @@ export default function App() {
             }
           />
 
-          {/* Receptionist Routes */}
-          <Route
-            path="/receptionist"
-            element={
-              <ProtectedRoute requiredRoles={['RECEPTIONIST']}>
-                <ReceptionistDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/receptionist/appointments"
-            element={
-              <ProtectedRoute requiredRoles={['RECEPTIONIST']}>
-                <ReceptionistAppointments />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/receptionist/queue"
-            element={
-              <ProtectedRoute requiredRoles={['RECEPTIONIST']}>
-                <ReceptionistQueue />
-              </ProtectedRoute>
-            }
-          />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
