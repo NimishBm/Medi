@@ -17,6 +17,7 @@ import searchRoutes from '../server/src/routes/search.js';
 import organizationRoutes from '../server/src/routes/organizations.js';
 import adminRoutes from '../server/src/routes/admin.js';
 import blogRoutes from '../server/src/routes/blog.js';
+import notificationRoutes from '../server/src/routes/notifications.js';
 
 dotenv.config();
 
@@ -65,6 +66,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/blog', blogRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
