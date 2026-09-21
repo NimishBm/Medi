@@ -1,156 +1,180 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { setUser, setError } from '../store/slices/authSlice';
+import { setUser } from '../store/slices/authSlice';
 import { authAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import { Stethoscope, Eye, EyeOff, CheckCircle } from 'lucide-react';
+
+const T = '#0D9488';
 
 export const Register = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
-    dateOfBirth: '',
-    gender: '',
-  });
-  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [showPw, setShowPw]       = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [form, setForm] = useState({
+    name: '', email: '', phone: '', password: '', dateOfBirth: '', gender: '',
+  });
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.name || !form.email || !form.phone || !form.password) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
     setIsLoading(true);
-
     try {
-      const response = await authAPI.register({
-        ...formData,
-        role: 'PATIENT',
-      });
-
-      dispatch(setUser({
-        user: response.data.user,
-        token: response.data.token,
-      }));
-
-      toast.success('Registration successful!');
+      const res = await authAPI.register({ ...form, role: 'PATIENT' });
+      dispatch(setUser({ user: res.data.user, token: res.data.token }));
+      toast.success('Account created! Welcome to ClinicFlow.');
       navigate('/patient');
-    } catch (error) {
-      const message = error.response?.data?.message || 'Registration failed';
-      dispatch(setError(message));
-      toast.error(message);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Registration failed');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center px-4 py-8">
-      <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-blue-600">ClinicFlow</h1>
-          <p className="text-gray-600 mt-2">Create Your Account</p>
+    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: 'system-ui,-apple-system,sans-serif' }}>
+
+      {/* Left panel */}
+      <div style={{ display: 'none', flex: '0 0 40%', background: `linear-gradient(145deg,${T},#0F766E,#115E59)`, flexDirection: 'column', justifyContent: 'center', padding: '48px 52px' }}
+        className="reg-left">
+        <style>{`.reg-left{display:none} @media(min-width:768px){.reg-left{display:flex!important}}`}</style>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 40 }}>
+          <div style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.2)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Stethoscope size={24} color="#fff" strokeWidth={2.5} />
+          </div>
+          <span style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '-0.5px' }}>ClinicFlow</span>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-            <input
-              type="text"
-              name="name"
-              required
-              value={formData.name}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-              placeholder="Enter your full name"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
-              type="email"
-              name="email"
-              required
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-              placeholder="Enter your email"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-            <input
-              type="tel"
-              name="phone"
-              required
-              value={formData.phone}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-              placeholder="Enter your phone number"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-            <input
-              type="date"
-              name="dateOfBirth"
-              value={formData.dateOfBirth}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-            <select
-              name="gender"
-              value={formData.gender}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-            >
-              <option value="">Select gender</option>
-              <option value="M">Male</option>
-              <option value="F">Female</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input
-              type="password"
-              name="password"
-              required
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-              placeholder="Enter a password (min 6 characters)"
-            />
-          </div>
-
-          <button type="submit" disabled={isLoading} className="w-full btn-primary mt-6 text-sm">
-            {isLoading ? 'Registering...' : 'Register'}
-          </button>
-        </form>
-
-        <p className="text-center text-gray-600 mt-6 text-sm">
-          Already have an account?{' '}
-          <a href="/login" className="text-blue-600 hover:underline font-medium">
-            Login here
-          </a>
+        <h2 style={{ fontSize: 28, fontWeight: 900, color: '#fff', lineHeight: 1.3, marginBottom: 8 }}>
+          Join thousands of<br />patients who trust us.
+        </h2>
+        <p style={{ fontSize: 14, color: '#99F6E4', marginBottom: 36 }}>
+          Your complete healthcare management platform.
         </p>
+
+        {[
+          'Book appointments with verified doctors',
+          'Get real-time queue updates',
+          'Access your prescriptions anytime',
+          'Manage health for the whole family',
+        ].map(item => (
+          <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <CheckCircle size={16} color="#6EE7B7" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+            <p style={{ fontSize: 13, color: '#E0FDF4', fontWeight: 500 }}>{item}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Right panel */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: '#F5F7FA', padding: '32px 16px' }}>
+        <div style={{ width: '100%', maxWidth: 420 }}>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 28, justifyContent: 'center' }}
+            className="reg-mobile-logo">
+            <style>{`.reg-mobile-logo{display:flex} @media(min-width:768px){.reg-mobile-logo{display:none!important}}`}</style>
+            <div style={{ width: 36, height: 36, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Stethoscope size={18} color="#fff" strokeWidth={2.5} />
+            </div>
+            <span style={{ fontSize: 19, fontWeight: 900, color: T }}>ClinicFlow</span>
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 20, padding: '32px 28px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)', border: '1.5px solid #E5E7EB' }}>
+            <h2 style={{ fontSize: 22, fontWeight: 900, color: '#111827', marginBottom: 4 }}>Create your account</h2>
+            <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 24 }}>Free forever · No credit card required</p>
+
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+              <div>
+                <label style={labelStyle}>Full Name <Req /></label>
+                <input value={form.name} onChange={e => set('name', e.target.value)}
+                  placeholder="Rahul Sharma" style={inputStyle}
+                  onFocus={e => e.target.style.borderColor = T}
+                  onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Email Address <Req /></label>
+                <input type="email" value={form.email} onChange={e => set('email', e.target.value)}
+                  placeholder="rahul@email.com" style={inputStyle}
+                  onFocus={e => e.target.style.borderColor = T}
+                  onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Phone Number <Req /></label>
+                <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)}
+                  placeholder="+91 99999 99999" style={inputStyle}
+                  onFocus={e => e.target.style.borderColor = T}
+                  onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
+              </div>
+
+              {/* DOB + Gender side by side */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Date of Birth</label>
+                  <input type="date" value={form.dateOfBirth} onChange={e => set('dateOfBirth', e.target.value)}
+                    style={inputStyle} max={new Date().toISOString().split('T')[0]}
+                    onFocus={e => e.target.style.borderColor = T}
+                    onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Gender</label>
+                  <select value={form.gender} onChange={e => set('gender', e.target.value)}
+                    style={inputStyle}
+                    onFocus={e => e.target.style.borderColor = T}
+                    onBlur={e => e.target.style.borderColor = '#E5E7EB'}>
+                    <option value="">Select</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Password <Req /></label>
+                <div style={{ position: 'relative' }}>
+                  <input type={showPw ? 'text' : 'password'} value={form.password}
+                    onChange={e => set('password', e.target.value)}
+                    placeholder="Min 6 characters" style={{ ...inputStyle, paddingRight: 40 }}
+                    onFocus={e => e.target.style.borderColor = T}
+                    onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
+                  <button type="button" onClick={() => setShowPw(p => !p)}
+                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex' }}>
+                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" disabled={isLoading}
+                style={{ width: '100%', background: isLoading ? '#9CA3AF' : T, color: '#fff', fontWeight: 800, fontSize: 15, padding: '13px', borderRadius: 11, border: 'none', cursor: isLoading ? 'not-allowed' : 'pointer', marginTop: 4 }}>
+                {isLoading ? 'Creating account…' : 'Create Account'}
+              </button>
+            </form>
+
+            <p style={{ textAlign: 'center', fontSize: 13, color: '#6B7280', marginTop: 20 }}>
+              Already have an account?{' '}
+              <Link to="/login/patient" style={{ color: T, fontWeight: 700, textDecoration: 'none' }}>Sign in</Link>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
+};
+
+const Req = () => <span style={{ color: '#EF4444', marginLeft: 2 }}>*</span>;
+const labelStyle = { display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 };
+const inputStyle = {
+  width: '100%', padding: '10px 13px', border: '1.5px solid #E5E7EB', borderRadius: 10,
+  fontSize: 13, color: '#111827', background: '#FAFAFA', outline: 'none', boxSizing: 'border-box',
+  transition: 'border-color 0.15s',
 };
