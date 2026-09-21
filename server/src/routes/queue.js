@@ -5,7 +5,7 @@ import Doctor from '../models/Doctor.js';
 import Consultation from '../models/Consultation.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
-import { io } from '../index.js';
+import { io } from '../../server.js';
 
 const router = express.Router();
 
