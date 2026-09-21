@@ -63,6 +63,7 @@ export const appointmentAPI = {
 
 export const queueAPI = {
   getQueueByDoctorId: (doctorId) => api.get(`/queue/doctor/${doctorId}`),
+  getQueueStats: () => api.get('/queue/stats'),
   callNextPatient: (data) => api.post('/queue/call-next', data),
   skipPatient: (data) => api.post('/queue/skip', data),
   recallPatient: (data) => api.post('/queue/recall', data),

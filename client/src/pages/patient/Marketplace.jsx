@@ -14,12 +14,14 @@ const T = '#0D9488';
 
 const CATEGORIES = [
   { id: 'all',        name: 'All Doctors',       icon: '⭐' },
-  { id: 'general',   name: 'General Physician',  icon: null, specialization: 'General Physician' },
-  { id: 'cardio',    name: 'Cardiology',          icon: null, specialization: 'Cardiologist' },
-  { id: 'derma',     name: 'Dermatology',         icon: null, specialization: 'Dermatologist' },
-  { id: 'eye',       name: 'Ophthalmology',       icon: null, specialization: 'Ophthalmologist' },
-  { id: 'dental',    name: 'Dental',              icon: null, specialization: 'Dentist' },
-  { id: 'pediatrics',name: 'Pediatrics',          icon: null, specialization: 'Pediatrician' },
+  { id: 'general',   name: 'General Physician',  icon: null, specializations: ['General Physician'] },
+  { id: 'cardio',    name: 'Cardiology',          icon: null, specializations: ['Cardiologist'] },
+  { id: 'derma',     name: 'Dermatology',         icon: null, specializations: ['Dermatologist'] },
+  { id: 'eye',       name: 'Ophthalmology',       icon: null, specializations: ['Ophthalmologist'] },
+  { id: 'dental',    name: 'Dental',              icon: null, specializations: ['Dentist'] },
+  { id: 'pediatrics',name: 'Pediatrics',          icon: null, specializations: ['Pediatrician', 'Paediatrician'] },
+  { id: 'ortho',     name: 'Orthopedics',         icon: null, specializations: ['Orthopedic', 'Orthopedic Surgeon'] },
+  { id: 'neuro',     name: 'Neurology',            icon: null, specializations: ['Neurologist', 'Neurosurgeon'] },
 ];
 
 const SORT_OPTIONS = [
@@ -74,34 +76,52 @@ export const Marketplace = () => {
     const fetch = async () => {
       try {
         setLoading(true);
-        const res = await doctorAPI.getDoctors();
-        setDoctors(res.data);
-        const map = {};
-        for (const d of res.data) {
-          try {
-            const q = await queueAPI.getQueueByDoctorId(d._id);
-            map[d._id] = q.data;
-          } catch { map[d._id] = { waiting: 0 }; }
+
+        const [doctorsResult, queueResult] = await Promise.allSettled([
+          doctorAPI.getDoctors(),
+          queueAPI.getQueueStats(),
+        ]);
+
+        if (doctorsResult.status === 'fulfilled') {
+          setDoctors(Array.isArray(doctorsResult.value.data) ? doctorsResult.value.data : []);
+        } else {
+          setDoctors([]);
+          if (doctorsResult.reason?.response?.status !== 401) {
+            toast.error('Failed to load doctors');
+          }
         }
-        setQueueStats(map);
-      } catch (e) {
-        if (e.response?.status !== 401) toast.error('Failed to load doctors');
-      } finally { setLoading(false); }
+
+        setQueueStats(
+          queueResult.status === 'fulfilled' ? (queueResult.value.data || {}) : {}
+        );
+      } finally {
+        setLoading(false);
+      }
     };
     fetch();
   }, []);
 
   useEffect(() => {
-    if (!search.trim()) {
+    const query = search.trim();
+
+    if (!query) {
       setSearchResults(null);
       setSearchType(null);
+      setSearchLoading(false);
       return;
     }
-    if (!search.trim()) return;
+
+    if (query.length < 4) {
+      setSearchResults([]);
+      setSearchType(null);
+      setSearchLoading(false);
+      return;
+    }
+
     const timer = setTimeout(async () => {
       try {
         setSearchLoading(true);
-        const res = await searchAPI.search(search.trim());
+        const res = await searchAPI.search(query);
         setSearchResults(res.data.doctors || []);
         setSearchType(res.data.searchType || null);
       } catch {
@@ -119,9 +139,9 @@ export const Marketplace = () => {
     let r = base;
     if (!search.trim() && selectedCategory !== 'all') {
       const cat = CATEGORIES.find(c => c.id === selectedCategory);
-      r = cat?.specialization
-        ? r.filter(d => d.specialization === cat.specialization)
-        : r.filter(d => d.specialization === selectedCategory);
+      if (cat?.specializations) {
+        r = r.filter(d => cat.specializations.includes(d.specialization));
+      }
     }
     return [...r].sort((a, b) => {
       const wA = (queueStats[a._id]?.waiting || 0) * (a.averageConsultationTime || 10);
@@ -221,7 +241,12 @@ export const Marketplace = () => {
         <div style={{ background: '#FAFAFA', borderTop: '1px solid #F3F4F6', padding: '8px 16px', overflowX: 'auto' }}>
           <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', gap: 8 }}>
             {CATEGORIES.map(cat => (
-              <button key={cat.id} onClick={() => setSelected(cat.id)}
+              <button key={cat.id} onClick={() => {
+                setSelected(cat.id);
+                setSearch('');
+                setSearchResults(null);
+                setSearchType(null);
+              }}
                 style={{
                   fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 20, whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
                   background: selectedCategory === cat.id ? T : '#fff',
