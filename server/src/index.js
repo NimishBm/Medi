@@ -46,6 +46,10 @@ app.use(express.json());
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Serve static frontend in production
+const clientDistPath = path.join(__dirname, '../../client/dist');
+app.use(express.static(clientDistPath));
+
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI).then(async () => {
   console.log('MongoDB connected');
@@ -69,6 +73,14 @@ app.use('/api/notifications', notificationRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK' });
+});
+
+// SPA catch-all route for frontend navigation
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+    return next();
+  }
+  res.sendFile(path.join(clientDistPath, 'index.html'));
 });
 
 // Socket.IO events
