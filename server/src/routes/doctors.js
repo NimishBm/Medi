@@ -2,7 +2,6 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import User from '../models/User.js';
 import Doctor from '../models/Doctor.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
@@ -108,11 +107,15 @@ router.post(
 
     const fileUrl = `/uploads/doctors/${req.file.filename}`;
 
-    const doctor = await User.findByIdAndUpdate(
+    const doctor = await Doctor.findByIdAndUpdate(
       req.user.id,
       { profilePhoto: fileUrl },
       { new: true }
     ).select('-password');
+
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor not found' });
+    }
 
     // Return full URL for frontend
     const fullUrl = `${req.protocol}://${req.get('host')}${fileUrl}`;
