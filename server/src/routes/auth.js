@@ -228,7 +228,7 @@ router.put(
 
     const allowedFields =
       req.user.role === 'PATIENT'
-        ? ['familyMembers', 'phone', 'dateOfBirth', 'gender', 'allergies']
+        ? ['name', 'phone', 'dateOfBirth', 'gender', 'bloodGroup', 'allergies', 'familyMembers']
         : ['phone'];
 
     const updateData = {};

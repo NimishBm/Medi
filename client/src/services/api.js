@@ -102,4 +102,9 @@ export const analyticsAPI = {
   getClinicAnalytics: () => api.get('/analytics/clinic/overview'),
 };
 
+export const searchAPI = {
+  search: (q) => api.get('/search', { params: { q } }),
+  suggestions: (q) => api.get('/search/suggestions', { params: { q } }),
+};
+
 export default api;

@@ -108,13 +108,8 @@ router.get("/", async (req, res) => {
   try {
     const query = (req.query.q || "").trim();
 
-    // Minimum 4 characters
-    if (query.length < 4) {
-      return res.json({
-        success: true,
-        doctors: [],
-        message: "Enter at least 4 characters to search",
-      });
+    if (!query) {
+      return res.json({ success: true, doctors: [] });
     }
 
     const searchRegex = new RegExp(
