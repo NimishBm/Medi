@@ -293,7 +293,7 @@ export const DoctorDashboard = () => {
                 <div className="relative inline-block mb-4">
                   {user?.profilePhoto ? (
                     <img
-                      src={user.profilePhoto.startsWith('http') ? user.profilePhoto : `http://localhost:5000${user.profilePhoto}`}
+                      src={user.profilePhoto.startsWith('http') ? user.profilePhoto : user.profilePhoto}
                       alt={user.name}
                       className="w-20 h-20 rounded-full mx-auto object-cover border-4 border-teal-100 hover:scale-110 transition-transform duration-300"
                     />

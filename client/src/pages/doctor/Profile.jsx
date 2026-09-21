@@ -25,8 +25,8 @@ export const DoctorProfile = () => {
     // If it's already a full URL, return it as is
     if (photo.startsWith('http')) return photo;
     // If it's a relative path, construct the full URL
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    const baseUrl = apiUrl.replace('/api', '');
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const baseUrl = (apiUrl && !apiUrl.includes('localhost')) ? apiUrl.replace('/api', '') : '';
     return `${baseUrl}${photo}`;
   });
   const [newQualification, setNewQualification] = useState('');

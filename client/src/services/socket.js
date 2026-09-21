@@ -1,6 +1,10 @@
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+const rawSocketUrl = import.meta.env.VITE_SOCKET_URL;
+const isProd = import.meta.env.PROD;
+const SOCKET_URL = (rawSocketUrl && (!isProd || !rawSocketUrl.includes('localhost')))
+  ? rawSocketUrl
+  : (isProd ? window.location.origin : 'https://medi-ecru.vercel.app');
 
 let socket = null;
 
