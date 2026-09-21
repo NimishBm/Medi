@@ -123,7 +123,7 @@ router.post(
     res.json({
       message: 'Photo uploaded successfully',
       profilePhoto: fullUrl,
-      user: doctor.toJSON()
+      user: { ...doctor.toJSON(), role: 'DOCTOR' }
     });
   })
 );
@@ -169,7 +169,7 @@ router.put(
       });
     }
 
-    res.json(doctor.toJSON());
+    res.json({ ...doctor.toJSON(), role: 'DOCTOR' });
   })
 );
 
