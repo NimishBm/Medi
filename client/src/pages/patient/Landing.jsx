@@ -559,7 +559,7 @@ const LoggedOutView = ({ navigate, searchInput, setSearchInput, handleSearch, ha
               Login
             </button>
             <button
-              onClick={() => navigate('/register/patient')}
+              onClick={() => navigate('/register')}
               style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: '#0D9488', border: 'none', borderRadius: 8, padding: '8px 18px', cursor: 'pointer' }}
             >
               {isMobile ? 'Sign Up' : 'Sign Up Free'}
