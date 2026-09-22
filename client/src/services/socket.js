@@ -2,9 +2,11 @@ import { io } from 'socket.io-client';
 
 const rawSocketUrl = import.meta.env.VITE_SOCKET_URL;
 const isProd = import.meta.env.PROD;
+// In production: use same origin (Vercel domain)
+// In dev: use VITE_SOCKET_URL from .env, fallback to localhost:5000
 const SOCKET_URL = (rawSocketUrl && (!isProd || !rawSocketUrl.includes('localhost')))
   ? rawSocketUrl
-  : (isProd ? window.location.origin : 'https://medi-ecru.vercel.app');
+  : (isProd ? window.location.origin : 'http://localhost:5000');
 
 let socket = null;
 
