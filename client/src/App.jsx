@@ -50,31 +50,29 @@ import { WaitingRoomDisplay } from './pages/WaitingRoomDisplay';
 function AppRoutes() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user, token } = useSelector((state) => state.auth);
-  const fetchingRef = useRef(false);
+  const { user, token, authInitialized } = useSelector((state) => state.auth);
+  const restoringRef = useRef(false);
 
-  // Restore user session from token on first mount
+  // Restore user session when a token exists but user is not yet in the store.
+  // This runs ONCE per token value. On completion (success OR failure) we mark
+  // authInitialized=true so ProtectedRoute knows it can now make a routing decision.
   useEffect(() => {
-    if (token && !user && !fetchingRef.current) {
-      fetchingRef.current = true;
-      const fetchUser = async () => {
-        try {
-          const response = await authAPI.getMe();
-          dispatch(setUser({
-            user: response.data,
-            token,
-          }));
-        } catch (error) {
-          console.error('Failed to fetch user', error);
-        } finally {
-          fetchingRef.current = false;
-        }
-      };
-      fetchUser();
+    if (token && !user && !restoringRef.current) {
+      restoringRef.current = true;
+      authAPI.getMe()
+        .then((response) => {
+          dispatch(setUser({ user: response.data, token }));
+        })
+        .catch(() => {
+          // getMe() failed (network error, invalid token, etc.).
+          // Clear the stale token so ProtectedRoute can redirect cleanly.
+          dispatch(logout());
+        });
+      // Note: restoringRef is NOT reset — we only want one getMe() call per mount.
     }
-  }, [token, dispatch]);
+  }, [token, dispatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Handle 401 responses from the API interceptor without a hard page reload
+  // Handle 401 responses from the API interceptor without a hard page reload.
   useEffect(() => {
     const handleUnauthorized = () => {
       closeSocket();
@@ -90,11 +88,14 @@ function AppRoutes() {
   const prevTokenRef = useRef(token);
   useEffect(() => {
     if (prevTokenRef.current && !token) {
-      // Token was just cleared (logout happened)
       closeSocket();
     }
     prevTokenRef.current = token;
   }, [token]);
+
+  // While session is being restored from a stored token, render nothing.
+  // This prevents ProtectedRoute from redirecting to /login prematurely.
+  if (!authInitialized) return null;
 
   return (
         <Routes>

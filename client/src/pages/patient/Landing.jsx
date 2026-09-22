@@ -50,21 +50,15 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
   useEffect(() => {
     const loadDoctors = async () => {
       try {
-        const res = await doctorAPI.getDoctors();
-        const top8 = (res.data || [])
+        const [doctorsRes, statsRes] = await Promise.allSettled([
+          doctorAPI.getDoctors(),
+          queueAPI.getQueueStats(),
+        ]);
+        const top8 = (doctorsRes.status === 'fulfilled' ? doctorsRes.value.data || [] : [])
           .sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0))
           .slice(0, 8);
         setDoctors(top8);
-        const statsMap = {};
-        await Promise.all(
-          top8.map(async (d) => {
-            try {
-              const q = await queueAPI.getQueueByDoctorId(d._id);
-              statsMap[d._id] = q.data;
-            } catch { statsMap[d._id] = { waiting: 0 }; }
-          })
-        );
-        setQueueStats(statsMap);
+        setQueueStats(statsRes.status === 'fulfilled' ? statsRes.value.data || {} : {});
       } catch { /* silent */ }
       finally { setLoadingDoctors(false); }
     };
@@ -558,7 +552,7 @@ const LoggedOutView = ({ navigate, searchInput, setSearchInput, handleSearch, ha
               Login
             </button>
             <button
-              onClick={() => navigate('/register/patient')}
+              onClick={() => navigate('/register')}
               style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: '#0D9488', border: 'none', borderRadius: 8, padding: '8px 18px', cursor: 'pointer' }}
             >
               {isMobile ? 'Sign Up' : 'Sign Up Free'}
@@ -663,7 +657,8 @@ const LoggedOutView = ({ navigate, searchInput, setSearchInput, handleSearch, ha
             { label: 'Book Appointment', sub: 'Search & book a doctor near you', icon: CalendarCheck, bg: '#E8F5E9', accent: '#2E7D32', action: () => navigate('/marketplace') },
             { label: 'Live Queue Tracker', sub: 'Check wait time before you go', icon: Clock, bg: '#E0F7FA', accent: '#00695C', action: () => navigate('/marketplace') },
             { label: 'Doctor for Emergency', sub: '24/7 urgent consultations', icon: Zap, bg: '#FDECEA', accent: '#C62828', action: () => navigate('/marketplace') },
-            { label: 'Create Account', sub: 'Save history & manage family', icon: Shield, bg: '#F3E5F5', accent: '#6A1B9A', action: () => navigate('/register/patient') },
+
+            { label: 'Create Account', sub: 'Save history & manage family', icon: Shield, bg: '#F3E5F5', accent: '#6A1B9A', action: () => navigate('/register') },
           ].map(({ label, sub, icon: Icon, bg, accent, action }) => (
             <button
               key={label}
@@ -764,7 +759,7 @@ const LoggedOutView = ({ navigate, searchInput, setSearchInput, handleSearch, ha
             <p style={{ color: '#6B7280', fontSize: 14 }}>Join thousands of patients who trust ClinicFlow every day.</p>
           </div>
           <button
-            onClick={() => navigate('/register/patient')}
+            onClick={() => navigate('/register')}
             style={{ background: '#0D9488', color: '#fff', fontWeight: 700, fontSize: 15, padding: '12px 28px', borderRadius: 12, border: 'none', cursor: 'pointer', flexShrink: 0 }}
           >
             Get Started Free →

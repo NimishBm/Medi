@@ -50,9 +50,9 @@ export const NotificationBell = () => {
   // ── socket: join personal room & listen ────────────────────────────────────
 
   useEffect(() => {
-    fetchNotifications();
-
     if (!user?._id) return;
+
+    fetchNotifications();
 
     try {
       const socket = initSocket();
