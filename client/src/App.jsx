@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
 
@@ -9,7 +9,8 @@ import { DoctorLogin } from './pages/DoctorLogin';
 import { DoctorRegister } from './pages/DoctorRegister';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { authAPI } from './services/api';
-import { setUser } from './store/slices/authSlice';
+import { setUser, logout } from './store/slices/authSlice';
+import { closeSocket } from './services/socket';
 
 // Patient Pages
 import { Landing } from './pages/patient/Landing';
@@ -45,11 +46,14 @@ import { AdminDashboard } from './pages/admin/Dashboard';
 // Display
 import { WaitingRoomDisplay } from './pages/WaitingRoomDisplay';
 
-export default function App() {
+// Inner component so it can use useNavigate (which requires BrowserRouter context)
+function AppRoutes() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { user, token } = useSelector((state) => state.auth);
   const fetchingRef = useRef(false);
 
+  // Restore user session from token on first mount
   useEffect(() => {
     if (token && !user && !fetchingRef.current) {
       fetchingRef.current = true;
@@ -70,10 +74,29 @@ export default function App() {
     }
   }, [token, dispatch]);
 
+  // Handle 401 responses from the API interceptor without a hard page reload
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      closeSocket();
+      dispatch(logout());
+      navigate('/login', { replace: true });
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, [dispatch, navigate]);
+
+  // Close the socket singleton when the user logs out so a fresh connection
+  // is established on the next login (avoids stale socket with old user context).
+  const prevTokenRef = useRef(token);
+  useEffect(() => {
+    if (prevTokenRef.current && !token) {
+      // Token was just cleared (logout happened)
+      closeSocket();
+    }
+    prevTokenRef.current = token;
+  }, [token]);
+
   return (
-    <>
-      <Toaster position="top-right" />
-      <BrowserRouter future={{ v7_relativeSplatPath: true }}>
         <Routes>
           {/* Auth Routes */}
           <Route path="/login" element={<Navigate to="/login/patient" replace />} />
@@ -291,6 +314,15 @@ export default function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <>
+      <Toaster position="top-right" />
+      <BrowserRouter future={{ v7_relativeSplatPath: true }}>
+        <AppRoutes />
       </BrowserRouter>
     </>
   );

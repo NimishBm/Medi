@@ -49,16 +49,15 @@ export const DoctorDashboard = () => {
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [patientsSeen, setPatientsSeen] = useState(0);
 
-  // If not logged in as DOCTOR, redirect them
-  if (!user || user.role !== 'DOCTOR') {
-    return <Navigate to="/login/doctor" replace />;
-  }
-
+  // All hooks must be called unconditionally before any conditional return
   useEffect(() => {
     setIsAnimated(true);
   }, []);
 
   useEffect(() => {
+    // Only fetch when a valid doctor is logged in
+    if (!user?._id) return;
+
     // Fetch today's queue to get the live patients-seen count
     const fetchPatientsSeen = async () => {
       try {
@@ -73,7 +72,12 @@ export const DoctorDashboard = () => {
     // Refresh every 30 seconds while the doctor is on the dashboard
     const interval = setInterval(fetchPatientsSeen, 30000);
     return () => clearInterval(interval);
-  }, [user._id]);
+  }, [user?._id]);
+
+  // Guard: if not logged in as DOCTOR, redirect — placed after all hooks
+  if (!user || user.role !== 'DOCTOR') {
+    return <Navigate to="/login/doctor" replace />;
+  }
 
   const getWorkingDays = () => {
     if (!user?.availability) return 0;
