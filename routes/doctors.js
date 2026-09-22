@@ -40,11 +40,18 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
-// Get all doctors
+// Get all doctors (hide REJECTED, show APPROVED and PENDING)
 router.get(
   '/',
   catchAsyncErrors(async (req, res) => {
-    const doctors = await Doctor.find({ isActive: true }).select('-password');
+    const filter = {
+      isActive: true,
+      verificationStatus: { $ne: 'REJECTED' }
+    };
+    const doctors = await Doctor.find(filter).select('-password');
+    console.log(`[DOCTORS API] Total doctors: ${doctors.length}, Filter applied:`, filter);
+    const rejected = await Doctor.find({ verificationStatus: 'REJECTED' });
+    console.log(`[DOCTORS API] Rejected doctors in DB: ${rejected.length}`);
     res.json(doctors);
   })
 );
@@ -54,7 +61,8 @@ router.get(
   '/specializations',
   catchAsyncErrors(async (req, res) => {
     const specializations = await Doctor.distinct('specialization', {
-      isActive: true
+      isActive: true,
+      verificationStatus: { $ne: 'REJECTED' }
     });
 
     res.json(specializations.filter(Boolean).sort());
@@ -68,6 +76,12 @@ router.get(
     const doctor = await Doctor.findById(req.params.id).select('-password');
 
     if (!doctor) {
+      return res.status(404).json({
+        message: 'Doctor not found'
+      });
+    }
+
+    if (doctor.verificationStatus === 'REJECTED') {
       return res.status(404).json({
         message: 'Doctor not found'
       });

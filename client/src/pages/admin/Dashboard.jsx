@@ -35,7 +35,7 @@ const LicenseBadge = ({ verified }) => (
 );
 
 const StatCard = ({ label, value, color }) => (
-  <div className={`bg-white rounded-xl border border-gray-200 p-5 border-l-4 ${color}`}>
+  <div className={`bg-white rounded-xl border border-gray-200 p-5 border-l-4 ${color} shadow-sm hover:shadow-md transition-shadow`}>
     <p className="text-sm text-gray-500 mb-1">{label}</p>
     <p className="text-3xl font-bold text-gray-900">{value ?? '—'}</p>
   </div>
@@ -349,14 +349,14 @@ export const AdminDashboard = () => {
   const fetchDoctors = useCallback(async () => {
     setDocLoading(true);
     try {
-      const res = await adminAPI.getDoctors(docTab === 'ALL' ? null : docTab);
+      const res = await adminAPI.getDoctors(null);
       setDoctors(res.data);
     } catch {
       toast.error('Failed to load doctors');
     } finally {
       setDocLoading(false);
     }
-  }, [docTab]);
+  }, []);
 
   const fetchPatients = useCallback(async () => {
     setPatLoading(true);
@@ -481,10 +481,15 @@ export const AdminDashboard = () => {
   // ── filtered lists ─────────────────────────────────────────────────────────
 
   const filteredDoctors = doctors.filter(
-    (d) =>
-      d.name.toLowerCase().includes(docSearch.toLowerCase()) ||
-      d.email.toLowerCase().includes(docSearch.toLowerCase()) ||
-      (d.licenseNumber || '').toLowerCase().includes(docSearch.toLowerCase()),
+    (d) => {
+      const matchesSearch = d.name.toLowerCase().includes(docSearch.toLowerCase()) ||
+        d.email.toLowerCase().includes(docSearch.toLowerCase()) ||
+        (d.licenseNumber || '').toLowerCase().includes(docSearch.toLowerCase());
+
+      const matchesStatus = docTab === 'ALL' || d.verificationStatus === docTab;
+
+      return matchesSearch && matchesStatus;
+    }
   );
 
   const filteredPatients = patients.filter(
@@ -526,22 +531,22 @@ export const AdminDashboard = () => {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Sidebar ── */}
-        <aside className="w-56 bg-white border-r border-gray-200 flex flex-col py-6 shrink-0">
-          <nav className="flex flex-col gap-1 px-3">
+        <aside className="w-56 bg-gradient-to-b from-slate-50 to-gray-50 border-r border-gray-200 flex flex-col py-6 shrink-0">
+          <nav className="flex flex-col gap-1 px-4 space-y-0.5">
             {NAV.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => { setPage(id); setViewDoctorId(null); setViewPatientId(null); }}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
                   page === id
-                    ? 'bg-slate-800 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
+                    ? 'bg-slate-800 text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-white hover:shadow-sm'
                 }`}
               >
-                <Icon size={17} />
+                <Icon size={17} className="shrink-0" />
                 {label}
                 {id === 'doctors' && stats?.pendingDoctors > 0 && (
-                  <span className="ml-auto bg-yellow-400 text-yellow-900 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                  <span className="ml-auto bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">
                     {stats.pendingDoctors}
                   </span>
                 )}
@@ -551,7 +556,7 @@ export const AdminDashboard = () => {
         </aside>
 
         {/* ── Main content ── */}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50">
 
           {/* ════ OVERVIEW ════ */}
           {page === 'overview' && (
@@ -616,26 +621,26 @@ export const AdminDashboard = () => {
                   <button
                     key={tab}
                     onClick={() => setDocTab(tab)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
                       docTab === tab
-                        ? 'bg-slate-800 text-white border-slate-800'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-slate-400'
+                        ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-slate-300 hover:shadow-sm'
                     }`}
                   >
                     {tab}
-                    <span className={`ml-2 px-1.5 py-0.5 rounded-full text-xs ${docTab === tab ? 'bg-white text-slate-800' : 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${docTab === tab ? 'bg-slate-700 text-slate-100' : 'bg-gray-100 text-gray-700'}`}>
                       {docCounts[tab] ?? 0}
                     </span>
                   </button>
                 ))}
-                <div className="ml-auto flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                <div className="ml-auto flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm hover:border-slate-300 transition-colors">
                   <Search size={14} className="text-gray-400 shrink-0" />
                   <input
                     type="text"
-                    placeholder="Name, email or license…"
+                    placeholder="Search by name, email…"
                     value={docSearch}
                     onChange={(e) => setDocSearch(e.target.value)}
-                    className="outline-none text-sm text-gray-700 w-44"
+                    className="outline-none text-sm text-gray-700 w-48 bg-transparent"
                   />
                 </div>
               </div>
@@ -648,7 +653,7 @@ export const AdminDashboard = () => {
                   <div className="flex items-center justify-center h-48 text-gray-400">No doctors found</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm select-none">
                       <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
                           <th className="px-5 py-3 text-left font-semibold text-gray-600">Doctor</th>
@@ -662,16 +667,17 @@ export const AdminDashboard = () => {
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {filteredDoctors.map((doc) => (
-                          <tr key={doc._id} className="hover:bg-gray-50 transition-colors">
+                          <tr key={doc._id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setViewDoctorId(doc._id)}>
                             <td className="px-5 py-4">
-                              <button
-                                onClick={() => setViewDoctorId(doc._id)}
-                                className="text-left group"
-                              >
-                                <p className="font-medium text-gray-900 group-hover:text-slate-600 group-hover:underline">{doc.name}</p>
-                                <p className="text-gray-400 text-xs">{doc.email}</p>
-                                {doc.phone && <p className="text-gray-400 text-xs">{doc.phone}</p>}
-                              </button>
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                  <Stethoscope size={16} className="text-slate-500" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-medium text-gray-900 hover:text-slate-600 truncate">{doc.name}</p>
+                                  <p className="text-gray-400 text-xs truncate">{doc.email}</p>
+                                </div>
+                              </div>
                             </td>
                             <td className="px-5 py-4 text-gray-600">{doc.specialization}</td>
                             <td className="px-5 py-4 font-mono text-gray-700">{doc.licenseNumber || '—'}</td>
@@ -690,7 +696,7 @@ export const AdminDashboard = () => {
                             <td className="px-5 py-4">
                               <div className="flex items-center justify-end gap-1.5">
                                 <button
-                                  onClick={() => handleVerifyLicense(doc._id)}
+                                  onClick={(e) => { e.stopPropagation(); handleVerifyLicense(doc._id); }}
                                   disabled={actionLoading === doc._id}
                                   title="Re-run AskMyDoc license check"
                                   className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 disabled:opacity-40 transition-colors"
@@ -699,7 +705,7 @@ export const AdminDashboard = () => {
                                 </button>
                                 {doc.verificationStatus !== 'APPROVED' && (
                                   <button
-                                    onClick={() => openModal(doc._id, 'approve')}
+                                    onClick={(e) => { e.stopPropagation(); openModal(doc._id, 'approve'); }}
                                     disabled={actionLoading === doc._id}
                                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-medium disabled:opacity-40 transition-colors"
                                   >
@@ -708,7 +714,7 @@ export const AdminDashboard = () => {
                                 )}
                                 {doc.verificationStatus !== 'REJECTED' && (
                                   <button
-                                    onClick={() => openModal(doc._id, 'reject')}
+                                    onClick={(e) => { e.stopPropagation(); openModal(doc._id, 'reject'); }}
                                     disabled={actionLoading === doc._id}
                                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium disabled:opacity-40 transition-colors"
                                   >
@@ -716,14 +722,14 @@ export const AdminDashboard = () => {
                                   </button>
                                 )}
                                 <button
-                                  onClick={() => setDoctorModal({ data: doc })}
+                                  onClick={(e) => { e.stopPropagation(); setDoctorModal({ data: doc }); }}
                                   title="Edit doctor"
                                   className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
                                 >
                                   <Pencil size={15} />
                                 </button>
                                 <button
-                                  onClick={() => setDeleteDoctorConfirm(doc._id)}
+                                  onClick={(e) => { e.stopPropagation(); setDeleteDoctorConfirm(doc._id); }}
                                   title="Delete doctor"
                                   className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
                                 >
@@ -764,14 +770,14 @@ export const AdminDashboard = () => {
               </div>
 
               {/* search */}
-              <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 w-full max-w-sm mb-5">
+              <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 w-full max-w-sm mb-5 shadow-sm hover:border-slate-300 transition-colors">
                 <Search size={14} className="text-gray-400 shrink-0" />
                 <input
                   type="text"
-                  placeholder="Name, email or phone…"
+                  placeholder="Search by name, email…"
                   value={patSearch}
                   onChange={(e) => setPatSearch(e.target.value)}
-                  className="outline-none text-sm text-gray-700 flex-1"
+                  className="outline-none text-sm text-gray-700 flex-1 bg-transparent"
                 />
               </div>
 
@@ -782,7 +788,7 @@ export const AdminDashboard = () => {
                   <div className="flex items-center justify-center h-48 text-gray-400">No patients found</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm select-none">
                       <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
                           <th className="px-5 py-3 text-left font-semibold text-gray-600">Patient</th>
@@ -797,15 +803,17 @@ export const AdminDashboard = () => {
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {filteredPatients.map((pat) => (
-                          <tr key={pat._id} className="hover:bg-gray-50 transition-colors">
+                          <tr key={pat._id} className="hover:bg-purple-50 transition-colors cursor-pointer" onClick={() => setViewPatientId(pat._id)}>
                             <td className="px-5 py-4">
-                              <button
-                                onClick={() => setViewPatientId(pat._id)}
-                                className="text-left group"
-                              >
-                                <p className="font-medium text-gray-900 group-hover:text-slate-600 group-hover:underline">{pat.name}</p>
-                                <p className="text-gray-400 text-xs">{pat.email}</p>
-                              </button>
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                                  <Users size={16} className="text-purple-500" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-medium text-gray-900 truncate">{pat.name}</p>
+                                  <p className="text-gray-400 text-xs truncate">{pat.email}</p>
+                                </div>
+                              </div>
                             </td>
                             <td className="px-5 py-4 text-gray-600">{pat.phone || '—'}</td>
                             <td className="px-5 py-4 text-gray-600">{pat.gender || '—'}</td>

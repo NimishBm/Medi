@@ -45,7 +45,7 @@ export const PatientLogin = () => {
     try {
       const res = await authAPI.login({ email, password });
       if (res.data.user.role !== 'PATIENT') {
-        toast.error('Please use your patient account.');
+        toast.error('Please use your Doctor account.');
         return;
       }
       dispatch(setUser({ user: res.data.user, token: res.data.token }));
