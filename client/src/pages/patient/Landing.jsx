@@ -51,7 +51,8 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
     const loadDoctors = async () => {
       try {
         const res = await doctorAPI.getDoctors();
-        const top8 = (res.data || [])
+        const filtered = (res.data || []).filter(d => d.verificationStatus !== 'REJECTED');
+        const top8 = filtered
           .sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0))
           .slice(0, 8);
         setDoctors(top8);

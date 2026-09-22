@@ -182,9 +182,7 @@ router.get("/", async (req, res) => {
     if (directDoctorMap.size > 0) {
       return res.json({
         success: true,
-        doctors: Array.from(
-          directDoctorMap.values()
-        ),
+        doctors: Array.from(directDoctorMap.values()),
         searchType: "doctor",
       });
     }

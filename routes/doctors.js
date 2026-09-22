@@ -44,14 +44,10 @@ const upload = multer({
 router.get(
   '/',
   catchAsyncErrors(async (req, res) => {
-    const filter = {
+    const doctors = await Doctor.find({
       isActive: true,
       verificationStatus: { $ne: 'REJECTED' }
-    };
-    const doctors = await Doctor.find(filter).select('-password');
-    console.log(`[DOCTORS API] Total doctors: ${doctors.length}, Filter applied:`, filter);
-    const rejected = await Doctor.find({ verificationStatus: 'REJECTED' });
-    console.log(`[DOCTORS API] Rejected doctors in DB: ${rejected.length}`);
+    }).select('-password');
     res.json(doctors);
   })
 );

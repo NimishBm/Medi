@@ -29,7 +29,8 @@ router.get('/search', async (req, res) => {
           })
             .populate({
               path: 'doctorId',
-              select: '-password'
+              select: '-password',
+              match: { verificationStatus: { $ne: 'REJECTED' } }
             })
             .lean();
 
@@ -76,7 +77,8 @@ router.get('/:id', async (req, res) => {
       })
         .populate({
           path: 'doctorId',
-          select: '-password'
+          select: '-password',
+          match: { verificationStatus: { $ne: 'REJECTED' } }
         })
         .lean();
 

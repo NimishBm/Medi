@@ -27,6 +27,11 @@ export const DoctorDetail = () => {
           doctorAPI.getDoctorById(doctorId),
           queueAPI.getQueueByDoctorId(doctorId),
         ]);
+        if (docRes.data.verificationStatus === 'REJECTED') {
+          toast.error('This doctor is not available');
+          navigate(user ? '/patient/marketplace' : '/marketplace');
+          return;
+        }
         setDoctor(docRes.data);
         setQueueStats(qRes.data);
       } catch {
