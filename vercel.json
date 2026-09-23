@@ -1,0 +1,71 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "client/dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/auth/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/doctors/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/appointments/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/queue/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/consultations/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/prescriptions/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/payments/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/analytics/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/search/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/organizations/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/admin/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/blog/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/notifications/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

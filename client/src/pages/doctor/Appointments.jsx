@@ -4,8 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { logout } from '../../store/slices/authSlice';
 import { appointmentAPI, consultationAPI, prescriptionAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { Heart, LogOut, ArrowLeft, FileText, Plus, Trash2, X, CalendarClock } from 'lucide-react';
+import { Heart, LogOut, ArrowLeft, FileText, Plus, Trash2, X, CalendarClock, ListOrdered } from 'lucide-react';
 import { NotificationBell } from '../../components/NotificationBell';
+import { initSocket, joinRooms } from '../../services/socket';
+import { useDoctorNotifications } from '../../hooks/useDoctorNotifications';
 
 const FREQUENCIES = ['Once daily', 'Twice daily', 'Three times daily', 'Four times daily', 'Every 6 hours', 'Every 8 hours', 'As needed'];
 const DURATIONS = ['1 day', '2 days', '3 days', '5 days', '1 week', '2 weeks', '1 month', '3 months', 'Ongoing'];
@@ -233,6 +235,7 @@ export const DoctorAppointments = () => {
   const { user } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  useDoctorNotifications(user?._id);
   const [appointments, setAppointments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All');
@@ -255,7 +258,32 @@ export const DoctorAppointments = () => {
     };
 
     fetchAppointments();
-  }, []);
+
+    // Listen for real-time queue/appointment changes
+    const socket = initSocket();
+    joinRooms('doctor', user._id);
+    socket.on('connect', () => joinRooms('doctor', user._id));
+    socket.on('queue-update', fetchAppointments);
+    socket.on('new-appointment', fetchAppointments);
+    return () => {
+      socket.off('queue-update', fetchAppointments);
+      socket.off('new-appointment', fetchAppointments);
+      socket.off('connect');
+    };
+  }, [user._id]);
+
+  // Add a BOOKED/CHECKED_IN today appointment to the live queue manually
+  const handleCheckIn = async (apt) => {
+    try {
+      await appointmentAPI.checkInPatient(apt._id);
+      toast.success(`Token #${apt.tokenNumber} added to Live Queue`);
+      setAppointments((prev) =>
+        prev.map((a) => (a._id === apt._id ? { ...a, status: 'CHECKED_IN' } : a))
+      );
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to add to queue');
+    }
+  };
 
   const handleRescheduleSaved = (updated) => {
     setAppointments((prev) =>
@@ -510,6 +538,21 @@ export const DoctorAppointments = () => {
                         <span className="text-xs text-teal-600 font-medium hidden sm:inline">
                           {expandedConsultation === apt._id ? '▼' : '▶'} Notes
                         </span>
+                      )}
+                      {/* Add to Queue — only for today's BOOKED appointments not yet in queue */}
+                      {['BOOKED'].includes(apt.status) && (() => {
+                        const apptDay = new Date(apt.appointmentDate).toISOString().split('T')[0];
+                        const todayDay = new Date().toISOString().split('T')[0];
+                        return apptDay === todayDay;
+                      })() && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCheckIn(apt); }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition"
+                          title="Add this patient to the Live Queue"
+                        >
+                          <ListOrdered size={13} />
+                          <span className="hidden sm:inline">Add to Queue</span>
+                        </button>
                       )}
                       {!['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(apt.status) && (
                         <button

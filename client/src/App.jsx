@@ -24,6 +24,7 @@ import { Prescriptions } from './pages/patient/Prescriptions';
 import { History } from './pages/patient/History';
 import { Payments } from './pages/patient/Payments';
 import { PatientProfile } from './pages/patient/Profile';
+import { CompleteProfile } from './pages/patient/CompleteProfile';
 
 // Doctor Pages
 import { DoctorLanding } from './pages/doctor/Landing';
@@ -49,16 +50,14 @@ export default function App() {
   const { user, token } = useSelector((state) => state.auth);
   const fetchingRef = useRef(false);
 
+  // Restore user from token on hard refresh
   useEffect(() => {
     if (token && !user && !fetchingRef.current) {
       fetchingRef.current = true;
       const fetchUser = async () => {
         try {
           const response = await authAPI.getMe();
-          dispatch(setUser({
-            user: response.data,
-            token,
-          }));
+          dispatch(setUser({ user: response.data, token }));
         } catch (error) {
           console.error('Failed to fetch user', error);
         } finally {
@@ -204,6 +203,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRoles={['PATIENT']}>
                 <PatientProfile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/complete-profile"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <CompleteProfile />
               </ProtectedRoute>
             }
           />

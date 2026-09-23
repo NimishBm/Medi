@@ -1,6 +1,14 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// When deployed on Vercel or similar single-domain hosting, API calls should go to same-origin /api.
+// If VITE_API_URL is set to http://localhost:5000 in production, ignore it and use /api.
+const rawApiUrl = import.meta.env.VITE_API_URL;
+const isProd = import.meta.env.PROD;
+let API_URL = '/api';
+
+if (rawApiUrl && (!isProd || !rawApiUrl.includes('localhost'))) {
+  API_URL = rawApiUrl;
+}
 
 const api = axios.create({
   baseURL: API_URL,
@@ -36,10 +44,20 @@ api.interceptors.response.use(
   }
 );
 
+export const notificationAPI = {
+  getAll:           ()   => api.get('/notifications'),
+  getNotifications: ()   => api.get('/notifications'),
+  markRead:         (id) => api.put(`/notifications/${id}/read`),
+  markAllRead:      ()   => api.put('/notifications/read-all'),
+  deleteOne:        (id) => api.delete(`/notifications/${id}`),
+  clearAll:         ()   => api.delete('/notifications'),
+};
+
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   registerDoctor: (data) => api.post('/auth/register/doctor', data),
   login: (data) => api.post('/auth/login', data),
+  googleLogin: (credential) => api.post('/auth/google', { credential }),
   getMe: () => api.get('/auth/me'),
 };
 
@@ -114,12 +132,25 @@ export const paymentAPI = {
 export const adminAPI = {
   login: (data) => api.post('/admin/login', data),
   getStats: () => api.get('/admin/stats'),
+  // doctors
   getDoctors: (status) => api.get('/admin/doctors', { params: status ? { status } : {} }),
   getDoctorById: (id) => api.get(`/admin/doctors/${id}`),
+  createDoctor: (data) => api.post('/admin/doctors', data),
+  updateDoctor: (id, data) => api.put(`/admin/doctors/${id}`, data),
+  deleteDoctor: (id) => api.delete(`/admin/doctors/${id}`),
   approveDoctor: (id, note) => api.post(`/admin/doctors/${id}/approve`, { note }),
   rejectDoctor: (id, note) => api.post(`/admin/doctors/${id}/reject`, { note }),
   verifyLicense: (id) => api.post(`/admin/doctors/${id}/verify-license`),
+  // doctor full detail
+  getDoctorFull: (id) => api.get(`/admin/doctors/${id}/full`),
+  // patients
   getPatients: () => api.get('/admin/patients'),
+  getPatientById: (id) => api.get(`/admin/patients/${id}`),
+  createPatient: (data) => api.post('/admin/patients', data),
+  updatePatient: (id, data) => api.put(`/admin/patients/${id}`, data),
+  deletePatient: (id) => api.delete(`/admin/patients/${id}`),
+  // patient full detail
+  getPatientFull: (id) => api.get(`/admin/patients/${id}/full`),
 };
 
 export const analyticsAPI = {
@@ -133,17 +164,25 @@ export const searchAPI = {
   suggestions: (q) => api.get('/search/suggestions', { params: { q } }),
 };
 
-export const notificationAPI = {
-  getNotifications: () => api.get('/notifications'),
-  markAllRead: () => api.put('/notifications/read-all'),
-  markRead: (id) => api.put(`/notifications/${id}/read`),
-};
 
 export const blogAPI = {
-  getPosts: (status) => api.get('/blog/posts', { params: status ? { status } : {} }),
-  createPost: (data) => api.post('/blog/posts', data),
-  updatePost: (id, data) => api.put(`/blog/posts/${id}`, data),
-  deletePost: (id) => api.delete(`/blog/posts/${id}`),
-  incrementView: (id) => api.post(`/blog/posts/${id}/view`),
+  getPosts:       (status) => api.get('/blog/posts', { params: status ? { status } : {} }),
+  createPost:     (data)   => api.post('/blog/posts', data),
+  updatePost:     (id, data) => api.put(`/blog/posts/${id}`, data),
+  deletePost:     (id)     => api.delete(`/blog/posts/${id}`),
+  incrementView:  (id)     => api.post(`/blog/posts/${id}/view`),
+  uploadImage:    (file)   => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return api.post('/blog/upload-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+};
+
+export const adminBlogAPI = {
+  getPosts:     (status) => api.get('/admin/blog', { params: status ? { status } : {} }),
+  updateStatus: (id, status) => api.put(`/admin/blog/${id}/status`, { status }),
+  deletePost:   (id)     => api.delete(`/admin/blog/${id}`),
 };
 export default api;

@@ -2,19 +2,15 @@ import mongoose from 'mongoose';
 
 const notificationSchema = new mongoose.Schema(
   {
-    // recipient — can be a Doctor, Patient or Receptionist ObjectId
     recipientId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
+      index: true,
     },
     recipientModel: {
       type: String,
       enum: ['Doctor', 'Patient', 'Receptionist'],
-      required: true,
-    },
-    appointmentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Appointment',
+      default: 'Patient',
     },
     type: {
       type: String,
@@ -28,10 +24,14 @@ const notificationSchema = new mongoose.Schema(
         'APPOINTMENT_COMPLETED',
         'PRESCRIPTION_READY',
       ],
-      required: true,
+      default: 'APPOINTMENT_CANCELLED',
     },
     title: { type: String, required: true },
     message: { type: String, required: true },
+    appointmentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Appointment',
+    },
     data: mongoose.Schema.Types.Mixed,
     read: {
       type: Boolean,
@@ -44,4 +44,4 @@ const notificationSchema = new mongoose.Schema(
 
 notificationSchema.index({ recipientId: 1, read: 1, createdAt: -1 });
 
-export default mongoose.model('Notification', notificationSchema);
+export default mongoose.model('Notification', notificationSchema, 'Notifications');

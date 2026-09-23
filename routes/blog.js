@@ -1,9 +1,37 @@
 import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import BlogPost from '../models/BlogPost.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
 const router = express.Router();
+
+// ── image upload setup ────────────────────────────────────────────────────────
+
+const blogUploadsDir = path.join(process.cwd(), 'uploads', 'blog');
+if (!fs.existsSync(blogUploadsDir)) {
+  fs.mkdirSync(blogUploadsDir, { recursive: true });
+}
+
+const blogStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, blogUploadsDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, `blog-${req.user.id}-${uniqueSuffix}${path.extname(file.originalname)}`);
+  },
+});
+
+const blogUpload = multer({
+  storage: blogStorage,
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed'), false);
+  },
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+});
 
 // GET /api/blog/posts — doctor's own posts
 router.get(
@@ -94,5 +122,55 @@ router.post(
     res.json({ ok: true });
   })
 );
+
+// POST /api/blog/upload-image — upload a cover image, returns { url }
+router.post(
+  '/upload-image',
+  protect,
+  authorize('DOCTOR'),
+  blogUpload.single('image'),
+  catchAsyncErrors(async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No image file provided' });
+    }
+    // Build a publicly accessible URL path
+    const url = `/uploads/blog/${req.file.filename}`;
+    res.json({ url });
+  })
+);
+
+// ── Admin blog routes (protected by requireAdmin via admin.js middleware) ─────
+// These are mounted separately under /api/admin/blog in server.js — see below.
+// Exposed here as helpers that admin.js can import:
+
+export const getAdminBlogPosts = catchAsyncErrors(async (req, res) => {
+  const { status } = req.query;
+  const filter = status && status !== 'all' ? { status } : {};
+  const posts = await BlogPost.find(filter)
+    .populate('doctorId', 'name specialization')
+    .sort({ createdAt: -1 });
+  res.json(posts);
+});
+
+export const updateBlogPostStatus = catchAsyncErrors(async (req, res) => {
+  const { status } = req.body;
+  const allowed = ['published', 'draft', 'rejected'];
+  if (!allowed.includes(status)) {
+    return res.status(400).json({ message: 'Invalid status' });
+  }
+  const post = await BlogPost.findByIdAndUpdate(
+    req.params.id,
+    { status, ...(status === 'published' ? { publishedAt: new Date() } : {}) },
+    { new: true }
+  ).populate('doctorId', 'name specialization');
+  if (!post) return res.status(404).json({ message: 'Post not found' });
+  res.json(post);
+});
+
+export const deleteBlogPost = catchAsyncErrors(async (req, res) => {
+  const post = await BlogPost.findByIdAndDelete(req.params.id);
+  if (!post) return res.status(404).json({ message: 'Post not found' });
+  res.json({ message: 'Post deleted' });
+});
 
 export default router;

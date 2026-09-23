@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../store/slices/authSlice';
 import { queueAPI, consultationAPI } from '../../services/api';
-import { initSocket } from '../../services/socket';
+import { initSocket, joinRooms } from '../../services/socket';
 import toast from 'react-hot-toast';
 import {
   Heart, LogOut, AlertCircle, Phone, ArrowLeft,
@@ -12,6 +12,7 @@ import {
   RotateCcw, FileText, User, Mail, ShieldAlert
 } from 'lucide-react';
 import { NotificationBell } from '../../components/NotificationBell';
+import { useDoctorNotifications } from '../../hooks/useDoctorNotifications';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,7 @@ export const DoctorQueue = () => {
   const { user } = useSelector((s) => s.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  useDoctorNotifications(user?._id);
 
   const [queue, setQueue]                       = useState([]);
   const [isLoading, setIsLoading]               = useState(true);
@@ -91,8 +93,19 @@ export const DoctorQueue = () => {
 
     fetchQueue();
     const socket = initSocket();
+
+    // Join doctor-specific rooms so targeted server emits are received
+    joinRooms('doctor', user._id);
+
+    // Re-join rooms after reconnection (socket re-assigns a new socket.id)
+    socket.on('connect', () => joinRooms('doctor', user._id));
+
     socket.on('queue-update', fetchQueue);
-    return () => { mounted = false; socket.off('queue-update', fetchQueue); };
+    return () => {
+      mounted = false;
+      socket.off('queue-update', fetchQueue);
+      socket.off('connect');
+    };
   }, [user._id]);
 
   // ── consultation timer ─────────────────────────────────────────────────────

@@ -1,13 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { adminAPI } from '../../services/api';
+import { adminAPI, adminBlogAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import {
   ShieldCheck, LogOut, LayoutDashboard, Stethoscope,
   Users, CheckCircle, XCircle, RefreshCw, Search, Clock,
+  Plus, Pencil, Trash2, PenSquare, Globe, FileText,
+  AlertCircle, Eye, BookOpen,
 } from 'lucide-react';
+import { DoctorDetailView } from './DoctorDetailView';
+import { PatientDetailView } from './PatientDetailView';
 
 // ── small reusable badges ────────────────────────────────────────────────────
 
@@ -38,13 +42,268 @@ const StatCard = ({ label, value, color }) => (
   </div>
 );
 
+// ── field helpers ────────────────────────────────────────────────────────────
+
+const Field = ({ label, children }) => (
+  <div>
+    <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+    {children}
+  </div>
+);
+
+const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400';
+const selectCls = inputCls;
+
+// ── Doctor Form Modal ────────────────────────────────────────────────────────
+
+const DOCTOR_BLANK = {
+  name: '', email: '', phone: '', password: '',
+  specialization: '', experience: '', consultationFee: '',
+  licenseNumber: '', clinicName: '', clinicCity: '',
+  verificationStatus: 'PENDING', isActive: true,
+};
+
+const DoctorModal = ({ initialData, onSave, onClose }) => {
+  const isEdit = !!initialData?._id;
+  const [form, setForm] = useState(() => ({
+    ...DOCTOR_BLANK,
+    ...(initialData || {}),
+    password: '',
+  }));
+  const [saving, setSaving] = useState(false);
+
+  const set = (e) => {
+    const { name, value, type, checked } = e.target;
+    setForm((f) => ({ ...f, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = { ...form };
+      if (!payload.password) delete payload.password;
+      if (payload.experience !== '') payload.experience = Number(payload.experience);
+      if (payload.consultationFee !== '') payload.consultationFee = Number(payload.consultationFee);
+      await onSave(payload);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
+          <h3 className="text-lg font-bold text-gray-900">{isEdit ? 'Edit Doctor' : 'Add Doctor'}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <XCircle size={20} />
+          </button>
+        </div>
+        <form onSubmit={submit} className="overflow-y-auto px-6 py-4 space-y-3 flex-1">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Full Name *">
+              <input name="name" value={form.name} onChange={set} required className={inputCls} placeholder="Dr. Jane Smith" />
+            </Field>
+            <Field label="Email *">
+              <input name="email" type="email" value={form.email} onChange={set} required className={inputCls} placeholder="dr@email.com" />
+            </Field>
+            <Field label="Phone *">
+              <input name="phone" value={form.phone} onChange={set} required className={inputCls} placeholder="9876543210" />
+            </Field>
+            <Field label={isEdit ? 'New Password (leave blank to keep)' : 'Password *'}>
+              <input name="password" type="password" value={form.password} onChange={set} required={!isEdit} className={inputCls} placeholder="••••••••" />
+            </Field>
+            <Field label="Specialization *">
+              <input name="specialization" value={form.specialization} onChange={set} required className={inputCls} placeholder="Cardiology" />
+            </Field>
+            <Field label="License Number">
+              <input name="licenseNumber" value={form.licenseNumber} onChange={set} className={inputCls} placeholder="MCI-12345" />
+            </Field>
+            <Field label="Experience (yrs)">
+              <input name="experience" type="number" min="0" value={form.experience} onChange={set} className={inputCls} />
+            </Field>
+            <Field label="Consultation Fee (₹)">
+              <input name="consultationFee" type="number" min="0" value={form.consultationFee} onChange={set} className={inputCls} />
+            </Field>
+            <Field label="Clinic Name">
+              <input name="clinicName" value={form.clinicName} onChange={set} className={inputCls} />
+            </Field>
+            <Field label="Clinic City">
+              <input name="clinicCity" value={form.clinicCity} onChange={set} className={inputCls} />
+            </Field>
+            <Field label="Verification Status">
+              <select name="verificationStatus" value={form.verificationStatus} onChange={set} className={selectCls}>
+                <option value="PENDING">PENDING</option>
+                <option value="APPROVED">APPROVED</option>
+                <option value="REJECTED">REJECTED</option>
+              </select>
+            </Field>
+            <Field label="Active">
+              <div className="flex items-center h-9">
+                <input name="isActive" type="checkbox" checked={form.isActive} onChange={set} className="w-4 h-4 accent-slate-700" />
+                <span className="ml-2 text-sm text-gray-600">{form.isActive ? 'Active' : 'Inactive'}</span>
+              </div>
+            </Field>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 mt-4">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} className="px-4 py-2 text-sm rounded-lg bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 font-medium">
+              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Doctor'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ── Patient Form Modal ───────────────────────────────────────────────────────
+
+const PATIENT_BLANK = {
+  name: '', email: '', phone: '', password: '',
+  gender: '', dateOfBirth: '', bloodGroup: '', allergies: '',
+};
+
+const PatientModal = ({ initialData, onSave, onClose }) => {
+  const isEdit = !!initialData?._id;
+  const [form, setForm] = useState(() => ({
+    ...PATIENT_BLANK,
+    ...(initialData || {}),
+    password: '',
+    allergies: Array.isArray(initialData?.allergies) ? initialData.allergies.join(', ') : '',
+    dateOfBirth: initialData?.dateOfBirth
+      ? new Date(initialData.dateOfBirth).toISOString().split('T')[0]
+      : '',
+  }));
+  const [saving, setSaving] = useState(false);
+
+  const set = (e) => {
+    const { name, value } = e.target;
+    setForm((f) => ({ ...f, [name]: value }));
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = { ...form };
+      if (!payload.password) delete payload.password;
+      if (!payload.gender) delete payload.gender;
+      if (!payload.bloodGroup) delete payload.bloodGroup;
+      if (!payload.dateOfBirth) delete payload.dateOfBirth;
+      await onSave(payload);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
+          <h3 className="text-lg font-bold text-gray-900">{isEdit ? 'Edit Patient' : 'Add Patient'}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <XCircle size={20} />
+          </button>
+        </div>
+        <form onSubmit={submit} className="overflow-y-auto px-6 py-4 space-y-3 flex-1">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Full Name *">
+              <input name="name" value={form.name} onChange={set} required className={inputCls} placeholder="John Doe" />
+            </Field>
+            <Field label="Email *">
+              <input name="email" type="email" value={form.email} onChange={set} required className={inputCls} placeholder="patient@email.com" />
+            </Field>
+            <Field label="Phone *">
+              <input name="phone" value={form.phone} onChange={set} required className={inputCls} placeholder="9876543210" />
+            </Field>
+            <Field label={isEdit ? 'New Password (leave blank to keep)' : 'Password *'}>
+              <input name="password" type="password" value={form.password} onChange={set} required={!isEdit} className={inputCls} placeholder="••••••••" />
+            </Field>
+            <Field label="Gender">
+              <select name="gender" value={form.gender} onChange={set} className={selectCls}>
+                <option value="">— select —</option>
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </Field>
+            <Field label="Blood Group">
+              <select name="bloodGroup" value={form.bloodGroup} onChange={set} className={selectCls}>
+                <option value="">— select —</option>
+                {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Date of Birth">
+              <input name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={set} className={inputCls} />
+            </Field>
+            <Field label="Allergies (comma-separated)">
+              <input name="allergies" value={form.allergies} onChange={set} className={inputCls} placeholder="Penicillin, Pollen" />
+            </Field>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 mt-4">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} className="px-4 py-2 text-sm rounded-lg bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 font-medium">
+              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Patient'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ── Delete Confirm Modal ─────────────────────────────────────────────────────
+
+const DeleteModal = ({ label, onConfirm, onClose }) => (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+          <Trash2 size={18} className="text-red-600" />
+        </div>
+        <div>
+          <h3 className="font-bold text-gray-900">Delete {label}?</h3>
+          <p className="text-sm text-gray-500">This action cannot be undone.</p>
+        </div>
+      </div>
+      <div className="flex justify-end gap-3 mt-4">
+        <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">
+          Cancel
+        </button>
+        <button onClick={onConfirm} className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium">
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 // ── nav items ────────────────────────────────────────────────────────────────
 
 const NAV = [
   { id: 'overview',  label: 'Overview',  icon: LayoutDashboard },
   { id: 'doctors',   label: 'Doctors',   icon: Stethoscope },
   { id: 'patients',  label: 'Patients',  icon: Users },
+  { id: 'blog',      label: 'Blog Posts', icon: PenSquare },
 ];
+
+const BLOG_STATUS_TABS = ['all', 'pending_review', 'published', 'rejected', 'draft'];
+const BLOG_STATUS_META = {
+  published:      { label: 'Published',     style: 'bg-green-100 text-green-700'  },
+  pending_review: { label: 'Pending Review',style: 'bg-yellow-100 text-yellow-700'},
+  draft:          { label: 'Draft',          style: 'bg-gray-100 text-gray-600'   },
+  rejected:       { label: 'Rejected',       style: 'bg-red-100 text-red-600'     },
+};
 
 const DOCTOR_STATUS_TABS = ['ALL', 'PENDING', 'APPROVED', 'REJECTED'];
 
@@ -56,6 +315,10 @@ export const AdminDashboard = () => {
   const { user }  = useSelector((state) => state.auth);
 
   const [page, setPage]               = useState('overview');
+
+  // detail views
+  const [viewDoctorId, setViewDoctorId]   = useState(null);
+  const [viewPatientId, setViewPatientId] = useState(null);
 
   // overview
   const [stats, setStats]             = useState(null);
@@ -69,11 +332,23 @@ export const AdminDashboard = () => {
   const [actionLoading, setActionLoading] = useState(null);
   const [noteModal, setNoteModal]     = useState(null);
   const [note, setNote]               = useState('');
+  const [doctorModal, setDoctorModal] = useState(null);
+  const [deleteDoctorConfirm, setDeleteDoctorConfirm] = useState(null);
 
   // patients
   const [patients, setPatients]       = useState([]);
   const [patLoading, setPatLoading]   = useState(false);
   const [patSearch, setPatSearch]     = useState('');
+  const [patientModal, setPatientModal] = useState(null);
+  const [deletePatientConfirm, setDeletePatientConfirm] = useState(null);
+
+  // blog
+  const [blogPosts, setBlogPosts]         = useState([]);
+  const [blogLoading, setBlogLoading]     = useState(false);
+  const [blogTab, setBlogTab]             = useState('pending_review');
+  const [blogSearch, setBlogSearch]       = useState('');
+  const [blogActionLoading, setBlogActionLoading] = useState(null);
+  const [previewBlogPost, setPreviewBlogPost] = useState(null);
 
   // ── fetch helpers ──────────────────────────────────────────────────────────
 
@@ -113,11 +388,24 @@ export const AdminDashboard = () => {
     }
   }, []);
 
+  const fetchBlogPosts = useCallback(async () => {
+    setBlogLoading(true);
+    try {
+      const res = await adminBlogAPI.getPosts(blogTab === 'all' ? null : blogTab);
+      setBlogPosts(res.data);
+    } catch {
+      toast.error('Failed to load blog posts');
+    } finally {
+      setBlogLoading(false);
+    }
+  }, [blogTab]);
+
   useEffect(() => { fetchStats(); }, [fetchStats]);
   useEffect(() => { if (page === 'doctors')  fetchDoctors();  }, [page, fetchDoctors]);
   useEffect(() => { if (page === 'patients') fetchPatients(); }, [page, fetchPatients]);
+  useEffect(() => { if (page === 'blog')     fetchBlogPosts(); }, [page, fetchBlogPosts]);
 
-  // ── doctor actions ─────────────────────────────────────────────────────────
+  // ── doctor approve / reject ────────────────────────────────────────────────
 
   const openModal = (id, action) => { setNote(''); setNoteModal({ id, action }); };
 
@@ -155,6 +443,72 @@ export const AdminDashboard = () => {
     }
   };
 
+  // ── doctor CRUD ────────────────────────────────────────────────────────────
+
+  const handleSaveDoctor = async (data) => {
+    try {
+      if (doctorModal?.data?._id) {
+        await adminAPI.updateDoctor(doctorModal.data._id, data);
+        toast.success('Doctor updated');
+      } else {
+        await adminAPI.createDoctor(data);
+        toast.success('Doctor created');
+      }
+      setDoctorModal(null);
+      fetchDoctors();
+      fetchStats();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Save failed');
+      throw err;
+    }
+  };
+
+  const handleDeleteDoctor = async () => {
+    const id = deleteDoctorConfirm;
+    setDeleteDoctorConfirm(null);
+    try {
+      await adminAPI.deleteDoctor(id);
+      toast.success('Doctor deleted');
+      fetchDoctors();
+      fetchStats();
+    } catch {
+      toast.error('Delete failed');
+    }
+  };
+
+  // ── patient CRUD ───────────────────────────────────────────────────────────
+
+  const handleSavePatient = async (data) => {
+    try {
+      if (patientModal?.data?._id) {
+        await adminAPI.updatePatient(patientModal.data._id, data);
+        toast.success('Patient updated');
+      } else {
+        await adminAPI.createPatient(data);
+        toast.success('Patient created');
+      }
+      setPatientModal(null);
+      fetchPatients();
+      fetchStats();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Save failed');
+      throw err;
+    }
+  };
+
+  const handleDeletePatient = async () => {
+    const id = deletePatientConfirm;
+    setDeletePatientConfirm(null);
+    try {
+      await adminAPI.deletePatient(id);
+      toast.success('Patient deleted');
+      fetchPatients();
+      fetchStats();
+    } catch {
+      toast.error('Delete failed');
+    }
+  };
+
   // ── filtered lists ─────────────────────────────────────────────────────────
 
   const filteredDoctors = doctors.filter(
@@ -169,6 +523,40 @@ export const AdminDashboard = () => {
       p.name.toLowerCase().includes(patSearch.toLowerCase()) ||
       p.email.toLowerCase().includes(patSearch.toLowerCase()) ||
       (p.phone || '').includes(patSearch),
+  );
+
+  // blog actions
+  const handleBlogStatus = async (id, status) => {
+    setBlogActionLoading(id);
+    try {
+      await adminBlogAPI.updateStatus(id, status);
+      toast.success(status === 'published' ? 'Post published!' : status === 'rejected' ? 'Post rejected' : 'Post updated');
+      fetchBlogPosts();
+    } catch {
+      toast.error('Failed to update post status');
+    } finally {
+      setBlogActionLoading(null);
+    }
+  };
+
+  const handleBlogDelete = async (id) => {
+    if (!window.confirm('Delete this blog post permanently?')) return;
+    setBlogActionLoading(id);
+    try {
+      await adminBlogAPI.deletePost(id);
+      toast.success('Post deleted');
+      setBlogPosts((prev) => prev.filter((p) => p._id !== id));
+    } catch {
+      toast.error('Failed to delete post');
+    } finally {
+      setBlogActionLoading(null);
+    }
+  };
+
+  const filteredBlogPosts = blogPosts.filter((p) =>
+    !blogSearch ||
+    p.title?.toLowerCase().includes(blogSearch.toLowerCase()) ||
+    p.doctorId?.name?.toLowerCase().includes(blogSearch.toLowerCase())
   );
 
   const docCounts = {
@@ -208,7 +596,7 @@ export const AdminDashboard = () => {
             {NAV.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
-                onClick={() => setPage(id)}
+                onClick={() => { setPage(id); setViewDoctorId(null); setViewPatientId(null); }}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   page === id
                     ? 'bg-slate-800 text-white'
@@ -253,15 +641,15 @@ export const AdminDashboard = () => {
                 >
                   <Stethoscope size={22} className="text-slate-600 mb-3" />
                   <p className="font-semibold text-gray-900">Manage Doctors</p>
-                  <p className="text-sm text-gray-500 mt-1">Approve, reject and verify doctor registrations</p>
+                  <p className="text-sm text-gray-500 mt-1">Create, edit, delete and verify doctors</p>
                 </button>
                 <button
                   onClick={() => setPage('patients')}
                   className="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-slate-400 transition-colors"
                 >
                   <Users size={22} className="text-slate-600 mb-3" />
-                  <p className="font-semibold text-gray-900">View Patients</p>
-                  <p className="text-sm text-gray-500 mt-1">Browse all registered patient accounts</p>
+                  <p className="font-semibold text-gray-900">Manage Patients</p>
+                  <p className="text-sm text-gray-500 mt-1">Create, edit and delete patient accounts</p>
                 </button>
               </div>
             </div>
@@ -270,7 +658,22 @@ export const AdminDashboard = () => {
           {/* ════ DOCTORS ════ */}
           {page === 'doctors' && (
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-5">Registered Doctors</h2>
+              {viewDoctorId ? (
+                <DoctorDetailView
+                  doctorId={viewDoctorId}
+                  onBack={() => setViewDoctorId(null)}
+                />
+              ) : (
+              <>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-xl font-bold text-gray-900">Registered Doctors</h2>
+                <button
+                  onClick={() => setDoctorModal({ data: null })}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 transition-colors"
+                >
+                  <Plus size={15} /> Add Doctor
+                </button>
+              </div>
 
               {/* filter bar */}
               <div className="flex flex-wrap gap-2 mb-5">
@@ -326,9 +729,14 @@ export const AdminDashboard = () => {
                         {filteredDoctors.map((doc) => (
                           <tr key={doc._id} className="hover:bg-gray-50 transition-colors">
                             <td className="px-5 py-4">
-                              <p className="font-medium text-gray-900">{doc.name}</p>
-                              <p className="text-gray-400 text-xs">{doc.email}</p>
-                              {doc.phone && <p className="text-gray-400 text-xs">{doc.phone}</p>}
+                              <button
+                                onClick={() => setViewDoctorId(doc._id)}
+                                className="text-left group"
+                              >
+                                <p className="font-medium text-gray-900 group-hover:text-slate-600 group-hover:underline">{doc.name}</p>
+                                <p className="text-gray-400 text-xs">{doc.email}</p>
+                                {doc.phone && <p className="text-gray-400 text-xs">{doc.phone}</p>}
+                              </button>
                             </td>
                             <td className="px-5 py-4 text-gray-600">{doc.specialization}</td>
                             <td className="px-5 py-4 font-mono text-gray-700">{doc.licenseNumber || '—'}</td>
@@ -345,7 +753,7 @@ export const AdminDashboard = () => {
                               {new Date(doc.createdAt).toLocaleDateString()}
                             </td>
                             <td className="px-5 py-4">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-1.5">
                                 <button
                                   onClick={() => handleVerifyLicense(doc._id)}
                                   disabled={actionLoading === doc._id}
@@ -358,7 +766,7 @@ export const AdminDashboard = () => {
                                   <button
                                     onClick={() => openModal(doc._id, 'approve')}
                                     disabled={actionLoading === doc._id}
-                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-medium disabled:opacity-40 transition-colors"
+                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-medium disabled:opacity-40 transition-colors"
                                   >
                                     <CheckCircle size={13} /> Approve
                                   </button>
@@ -367,11 +775,25 @@ export const AdminDashboard = () => {
                                   <button
                                     onClick={() => openModal(doc._id, 'reject')}
                                     disabled={actionLoading === doc._id}
-                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium disabled:opacity-40 transition-colors"
+                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium disabled:opacity-40 transition-colors"
                                   >
                                     <XCircle size={13} /> Reject
                                   </button>
                                 )}
+                                <button
+                                  onClick={() => setDoctorModal({ data: doc })}
+                                  title="Edit doctor"
+                                  className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                                <button
+                                  onClick={() => setDeleteDoctorConfirm(doc._id)}
+                                  title="Delete doctor"
+                                  className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -381,13 +803,30 @@ export const AdminDashboard = () => {
                   </div>
                 )}
               </div>
+              </>
+              )}
             </div>
           )}
 
           {/* ════ PATIENTS ════ */}
           {page === 'patients' && (
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-5">Registered Patients</h2>
+              {viewPatientId ? (
+                <PatientDetailView
+                  patientId={viewPatientId}
+                  onBack={() => setViewPatientId(null)}
+                />
+              ) : (
+              <>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-xl font-bold text-gray-900">Registered Patients</h2>
+                <button
+                  onClick={() => setPatientModal({ data: null })}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 transition-colors"
+                >
+                  <Plus size={15} /> Add Patient
+                </button>
+              </div>
 
               {/* search */}
               <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 w-full max-w-sm mb-5">
@@ -415,22 +854,30 @@ export const AdminDashboard = () => {
                           <th className="px-5 py-3 text-left font-semibold text-gray-600">Phone</th>
                           <th className="px-5 py-3 text-left font-semibold text-gray-600">Gender</th>
                           <th className="px-5 py-3 text-left font-semibold text-gray-600">Date of Birth</th>
-                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Family Members</th>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Blood Group</th>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Family</th>
                           <th className="px-5 py-3 text-left font-semibold text-gray-600">Joined</th>
+                          <th className="px-5 py-3 text-right font-semibold text-gray-600">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {filteredPatients.map((pat) => (
                           <tr key={pat._id} className="hover:bg-gray-50 transition-colors">
                             <td className="px-5 py-4">
-                              <p className="font-medium text-gray-900">{pat.name}</p>
-                              <p className="text-gray-400 text-xs">{pat.email}</p>
+                              <button
+                                onClick={() => setViewPatientId(pat._id)}
+                                className="text-left group"
+                              >
+                                <p className="font-medium text-gray-900 group-hover:text-slate-600 group-hover:underline">{pat.name}</p>
+                                <p className="text-gray-400 text-xs">{pat.email}</p>
+                              </button>
                             </td>
                             <td className="px-5 py-4 text-gray-600">{pat.phone || '—'}</td>
                             <td className="px-5 py-4 text-gray-600">{pat.gender || '—'}</td>
                             <td className="px-5 py-4 text-gray-600">
                               {pat.dateOfBirth ? new Date(pat.dateOfBirth).toLocaleDateString() : '—'}
                             </td>
+                            <td className="px-5 py-4 text-gray-600">{pat.bloodGroup || '—'}</td>
                             <td className="px-5 py-4 text-gray-600">{pat.familyMembers?.length ?? 0}</td>
                             <td className="px-5 py-4 text-gray-500 text-xs whitespace-nowrap">
                               <span className="flex items-center gap-1">
@@ -438,8 +885,196 @@ export const AdminDashboard = () => {
                                 {new Date(pat.createdAt).toLocaleDateString()}
                               </span>
                             </td>
+                            <td className="px-5 py-4">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => setPatientModal({ data: pat })}
+                                  title="Edit patient"
+                                  className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                                <button
+                                  onClick={() => setDeletePatientConfirm(pat._id)}
+                                  title="Delete patient"
+                                  className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+              </>
+              )}
+            </div>
+          )}
+
+          {/* ════ BLOG POSTS ════ */}
+          {page === 'blog' && (
+            <div>
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Blog Posts</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">Review and publish doctor-authored health articles</p>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {BLOG_STATUS_TABS.map((tab) => (
+                  <button key={tab} onClick={() => setBlogTab(tab)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                      blogTab === tab ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                    }`}>
+                    {tab === 'all' ? 'All' : BLOG_STATUS_META[tab]?.label || tab}
+                    {tab === 'pending_review' && blogPosts.filter(p => p.status === 'pending_review').length > 0 && (
+                      <span className="ml-1.5 bg-yellow-400 text-yellow-900 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                        {blogPosts.filter(p => p.status === 'pending_review').length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search */}
+              <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 w-full max-w-sm mb-5">
+                <Search size={14} className="text-gray-400 shrink-0" />
+                <input type="text" placeholder="Search by title or doctor…"
+                  value={blogSearch} onChange={(e) => setBlogSearch(e.target.value)}
+                  className="outline-none text-sm text-gray-700 flex-1" />
+              </div>
+
+              {/* Preview modal */}
+              {previewBlogPost && (
+                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+                      <span className="font-bold text-gray-900">Preview: {previewBlogPost.title}</span>
+                      <button onClick={() => setPreviewBlogPost(null)} className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100">
+                        <XCircle size={20} />
+                      </button>
+                    </div>
+                    <div className="overflow-y-auto flex-1 p-5">
+                      {previewBlogPost.coverImage && (
+                        <img src={previewBlogPost.coverImage} alt="" className="w-full h-48 object-cover rounded-lg mb-4" onError={(e) => { e.target.style.display='none'; }} />
+                      )}
+                      <div className="flex items-center gap-2 mb-3 text-xs">
+                        <span className="bg-teal-50 text-teal-700 px-2.5 py-1 rounded-full font-medium">{previewBlogPost.category}</span>
+                        <span className="text-gray-400">by Dr. {previewBlogPost.doctorId?.name}</span>
+                        <span className="text-gray-400">{previewBlogPost.doctorId?.specialization}</span>
+                      </div>
+                      <h2 className="text-xl font-bold text-gray-900 mb-2">{previewBlogPost.title}</h2>
+                      {previewBlogPost.excerpt && (
+                        <p className="text-gray-500 italic text-sm border-l-4 border-teal-400 pl-3 mb-4">{previewBlogPost.excerpt}</p>
+                      )}
+                      <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">{previewBlogPost.content}</p>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-100">
+                      {previewBlogPost.status === 'pending_review' && (
+                        <>
+                          <button
+                            onClick={() => { handleBlogStatus(previewBlogPost._id, 'rejected'); setPreviewBlogPost(null); }}
+                            className="px-4 py-2 text-sm font-semibold bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition">
+                            Reject
+                          </button>
+                          <button
+                            onClick={() => { handleBlogStatus(previewBlogPost._id, 'published'); setPreviewBlogPost(null); }}
+                            className="px-4 py-2 text-sm font-semibold bg-green-600 text-white hover:bg-green-700 rounded-lg transition">
+                            Publish
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Table */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                {blogLoading ? (
+                  <div className="flex items-center justify-center h-48 text-gray-400">Loading…</div>
+                ) : filteredBlogPosts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-48 text-gray-400 gap-2">
+                    <BookOpen size={32} className="text-gray-200" />
+                    <p>No posts found</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Title</th>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Doctor</th>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Category</th>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Status</th>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Views</th>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Date</th>
+                          <th className="px-5 py-3 text-right font-semibold text-gray-600">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {filteredBlogPosts.map((post) => {
+                          const sm = BLOG_STATUS_META[post.status] || BLOG_STATUS_META.draft;
+                          const isActing = blogActionLoading === post._id;
+                          return (
+                            <tr key={post._id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-5 py-4 max-w-xs">
+                                <p className="font-medium text-gray-900 truncate">{post.title}</p>
+                                {post.excerpt && <p className="text-gray-400 text-xs truncate">{post.excerpt}</p>}
+                              </td>
+                              <td className="px-5 py-4">
+                                <p className="text-gray-700 font-medium">{post.doctorId?.name || '—'}</p>
+                                <p className="text-gray-400 text-xs">{post.doctorId?.specialization || ''}</p>
+                              </td>
+                              <td className="px-5 py-4">
+                                <span className="text-xs px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 font-medium">{post.category}</span>
+                              </td>
+                              <td className="px-5 py-4">
+                                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${sm.style}`}>{sm.label}</span>
+                              </td>
+                              <td className="px-5 py-4 text-gray-600">{post.views ?? 0}</td>
+                              <td className="px-5 py-4 text-gray-500 text-xs whitespace-nowrap">
+                                {new Date(post.createdAt).toLocaleDateString()}
+                              </td>
+                              <td className="px-5 py-4">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button onClick={() => setPreviewBlogPost(post)} title="Preview"
+                                    className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors" disabled={isActing}>
+                                    <Eye size={15} />
+                                  </button>
+                                  {post.status === 'pending_review' && (
+                                    <>
+                                      <button onClick={() => handleBlogStatus(post._id, 'published')} title="Publish"
+                                        className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition-colors" disabled={isActing}>
+                                        {isActing ? <RefreshCw size={15} className="animate-spin" /> : <CheckCircle size={15} />}
+                                      </button>
+                                      <button onClick={() => handleBlogStatus(post._id, 'rejected')} title="Reject"
+                                        className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors" disabled={isActing}>
+                                        <XCircle size={15} />
+                                      </button>
+                                    </>
+                                  )}
+                                  {post.status === 'rejected' && (
+                                    <button onClick={() => handleBlogStatus(post._id, 'published')} title="Publish anyway"
+                                      className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition-colors" disabled={isActing}>
+                                      <Globe size={15} />
+                                    </button>
+                                  )}
+                                  <button onClick={() => handleBlogDelete(post._id)} title="Delete"
+                                    className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors" disabled={isActing}>
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -482,6 +1117,38 @@ export const AdminDashboard = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Doctor CRUD modals ── */}
+      {doctorModal && (
+        <DoctorModal
+          initialData={doctorModal.data}
+          onSave={handleSaveDoctor}
+          onClose={() => setDoctorModal(null)}
+        />
+      )}
+      {deleteDoctorConfirm && (
+        <DeleteModal
+          label="doctor"
+          onConfirm={handleDeleteDoctor}
+          onClose={() => setDeleteDoctorConfirm(null)}
+        />
+      )}
+
+      {/* ── Patient CRUD modals ── */}
+      {patientModal && (
+        <PatientModal
+          initialData={patientModal.data}
+          onSave={handleSavePatient}
+          onClose={() => setPatientModal(null)}
+        />
+      )}
+      {deletePatientConfirm && (
+        <DeleteModal
+          label="patient"
+          onConfirm={handleDeletePatient}
+          onClose={() => setDeletePatientConfirm(null)}
+        />
       )}
     </div>
   );

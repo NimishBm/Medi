@@ -2,15 +2,16 @@
   "name": "clinicflow",
   "version": "1.0.0",
   "description": "ClinicFlow - Clinic Management & Smart Patient Queue System",
-  "main": "index.js",
+  "main": "server.js",
+  "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
-    "build": "npm run server:build && npm run client:build",
-    "start": "node server/src/index.js",
-    "server:dev": "cd server && npm run dev",
-    "server:build": "cd server && npm run build",
-    "server:start": "cd server && npm run start",
-    "server:seed": "cd server && npm run seed",
+    "build": "npm --prefix client install && npm --prefix client run build",
+    "vercel-build": "npm install && npm --prefix client install && npm --prefix client run build",
+    "start": "node server.js",
+    "server:dev": "nodemon server.js",
+    "seed": "node scripts/seed.js",
+    "seed-bodhi": "node scripts/importBodhi.js",
     "client:dev": "cd client && npm run dev",
     "client:build": "cd client && npm run build",
     "client:preview": "cd client && npm run preview"
@@ -19,10 +20,21 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.1"
   },
   "dependencies": {
-    "mongod": "^2.0.0",
-    "mongodb": "^7.6.0"
+    "axios": "^1.20.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "csv-parse": "^7.0.2",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-async-errors": "^3.1.1",
+    "google-auth-library": "^11.1.0",
+    "jsonwebtoken": "^9.0.0",
+    "mongoose": "^7.5.0",
+    "multer": "^2.4.0",
+    "socket.io": "^4.7.2"
   }
 }

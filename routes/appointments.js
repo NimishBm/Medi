@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import Appointment from '../models/Appointment.js';
 import Queue from '../models/Queue.js';
 import Notification from '../models/Notification.js';
-import { io } from '../index.js';
+import { io } from '../server.js';
 
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
@@ -41,7 +41,6 @@ router.post(
     }
 
     // Build the list of attendees to create appointments for.
-    // If `attendees` array is provided use it, otherwise fall back to single bookedFor (or self).
     const attendeeList = attendees && attendees.length > 0
       ? attendees
       : [bookedFor || { isFamilyMember: false }];
@@ -53,8 +52,13 @@ router.post(
 
     const createdAppointments = [];
 
+    // Normalise queueDate to UTC midnight for consistent date matching
     const queueDateNorm = new Date(appointmentDate);
     queueDateNorm.setUTCHours(0, 0, 0, 0);
+
+    const apptDateStr = new Date(appointmentDate).toISOString().split('T')[0];
+    const todayStr    = new Date().toISOString().split('T')[0];
+    const isToday     = apptDateStr === todayStr;
 
     for (const attendee of attendeeList) {
       // Each person gets their own token
@@ -94,19 +98,25 @@ router.post(
       await appointment.populate(['patientId', 'doctorId']);
       createdAppointments.push(appointment);
 
-      // Auto-create queue entry so doctor sees it in Live Queue immediately
-      const queueEntry = new Queue({
-        doctorId,
-        appointmentId: appointment._id,
-        patientId,
-        tokenNumber,
-        queueDate: queueDateNorm,
-        status: 'WAITING',
-      });
-      await queueEntry.save();
+      // Auto-create queue entry for today's appointments so doctor sees them in Live Queue immediately
+      if (isToday) {
+        try {
+          await Queue.create({
+            doctorId,
+            appointmentId: appointment._id,
+            patientId,
+            tokenNumber,
+            queueDate: queueDateNorm,
+            status: 'WAITING',
+          });
+          console.log('[Queue] entry created for appointment', appointment._id);
+        } catch (qErr) {
+          console.error('[Queue] failed to create entry:', qErr.message);
+        }
+      }
 
-      // Create a notification for the doctor
-      const apptDate = new Date(appointmentDate).toLocaleDateString('en-IN', {
+      // Notify doctor via their notification room
+      const apptDateFmt = new Date(appointmentDate).toLocaleDateString('en-IN', {
         weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
       });
       const attendeeDisplayName = attendee.isFamilyMember && attendee.name
@@ -119,13 +129,24 @@ router.post(
         appointmentId: appointment._id,
         type: 'NEW_APPOINTMENT',
         title: 'New Appointment Booked',
-        message: `${attendeeDisplayName} booked a ${appointment.appointmentType} on ${apptDate} at ${appointmentTime}. Token #${tokenNumber}.`,
+        message: `${attendeeDisplayName} booked a ${appointment.appointmentType} on ${apptDateFmt} at ${appointmentTime}. Token #${tokenNumber}.`,
         data: { patientName: attendeeDisplayName, appointmentTime, appointmentDate, tokenNumber },
+      });
+
+      // Real-time notification to doctor's personal room
+      io.to(`doctor-${doctorId}`).emit('new-appointment', {
+        appointmentId: appointment._id,
+        patientName:   appointment.patientId?.name || 'A patient',
+        date:          appointmentDate,
+        time:          appointmentTime,
+        tokenNumber,
+        bookedFor:     attendee,
       });
     }
 
-    // Notify doctor via socket — emit to their personal notification room & global queue listeners
+    // Broadcast queue update so all queue listeners refresh
     io.emit('queue-update', { doctorId });
+    io.to(`queue-${doctorId}`).emit('queue-update', { doctorId });
     io.to(`notifications-${doctorId}`).emit('new-notification', {
       recipientId: String(doctorId),
     });
@@ -243,26 +264,93 @@ router.post(
   protect,
   catchAsyncErrors(async (req, res) => {
     const appointment = await Appointment.findById(req.params.id);
-
-    if (!appointment) {
-      return res.status(404).json({ message: 'Appointment not found' });
-    }
+    if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
 
     appointment.status = 'CANCELLED';
     await appointment.save();
 
-    // Delete or update queue entry to reflect cancellation
+    // Remove any queue entry for this appointment
     await Queue.deleteMany({ appointmentId: appointment._id });
     io.emit('queue-update', { doctorId: appointment.doctorId });
+    io.to(`queue-${appointment.doctorId}`).emit('queue-update', { doctorId: appointment.doctorId });
 
-    res.json({
-      message: 'Appointment cancelled successfully',
-      appointment,
-    });
+    // Notify patient when a doctor cancels
+    if (req.user.role === 'DOCTOR') {
+      const dateStr = new Date(appointment.appointmentDate).toDateString();
+      const notification = await Notification.create({
+        recipientId:   appointment.patientId,
+        recipientModel: 'Patient',
+        type:          'APPOINTMENT_CANCELLED',
+        title:         'Appointment Cancelled',
+        message:       `Your appointment on ${dateStr} at ${appointment.appointmentTime} has been cancelled by your doctor.`,
+        appointmentId: appointment._id,
+      });
+      io.to(`patient-${appointment.patientId}`).emit('notification', notification);
+    }
+
+    res.json({ message: 'Appointment cancelled successfully', appointment });
   })
 );
 
-// Check in patient
+// Reschedule appointment (doctor only)
+router.put(
+  '/:id/reschedule',
+  protect,
+  authorize('DOCTOR'),
+  catchAsyncErrors(async (req, res) => {
+    const { appointmentDate, appointmentTime } = req.body;
+    if (!appointmentDate || !appointmentTime) {
+      return res.status(400).json({ message: 'New date and time are required' });
+    }
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+    if (String(appointment.doctorId) !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    const rescheduledToStr = new Date(appointmentDate).toISOString().split('T')[0];
+    const todayCheckStr    = new Date().toISOString().split('T')[0];
+
+    // Remove existing WAITING queue entry (will be re-created if rescheduled to today)
+    await Queue.deleteOne({ appointmentId: appointment._id, status: 'WAITING' });
+
+    appointment.appointmentDate = appointmentDate;
+    appointment.appointmentTime = appointmentTime;
+    await appointment.save();
+
+    // If rescheduled to today, create a fresh queue entry
+    if (rescheduledToStr === todayCheckStr) {
+      const queueDateNorm = new Date(appointmentDate);
+      queueDateNorm.setUTCHours(0, 0, 0, 0);
+      await Queue.create({
+        doctorId:      appointment.doctorId,
+        appointmentId: appointment._id,
+        patientId:     appointment.patientId,
+        tokenNumber:   appointment.tokenNumber,
+        queueDate:     queueDateNorm,
+        status:        'WAITING',
+      });
+    }
+
+    io.emit('queue-update', { doctorId: appointment.doctorId });
+    io.to(`queue-${appointment.doctorId}`).emit('queue-update', { doctorId: appointment.doctorId });
+
+    const dateStr = new Date(appointmentDate).toDateString();
+    const notification = await Notification.create({
+      recipientId:   appointment.patientId,
+      recipientModel: 'Patient',
+      type:          'APPOINTMENT_RESCHEDULED',
+      title:         'Appointment Rescheduled',
+      message:       `Your appointment has been rescheduled to ${dateStr} at ${appointmentTime}.`,
+      appointmentId: appointment._id,
+    });
+    io.to(`patient-${appointment.patientId}`).emit('notification', notification);
+
+    res.json({ message: 'Appointment rescheduled successfully', appointment });
+  })
+);
+
+// Check in patient — adds to live queue (WAITING)
 router.post(
   '/:id/check-in',
   protect,
@@ -278,40 +366,37 @@ router.post(
     appointment.checkInTime = new Date();
     await appointment.save();
 
-    const tokenNumber = appointment.tokenNumber;
-    const appointmentDate = appointment.appointmentDate;
-    const doctorId = appointment.doctorId;
+    const { tokenNumber, appointmentDate, doctorId, patientId } = appointment;
 
     const queueDateNorm = new Date(appointmentDate);
     queueDateNorm.setUTCHours(0, 0, 0, 0);
 
-    // Create queue entry
-    let queueEntry = await Queue.findOne({
-      appointmentId: appointment._id,
-    });
+    // Upsert queue entry
+    let queueEntry = await Queue.findOne({ appointmentId: appointment._id });
 
     if (!queueEntry) {
       queueEntry = new Queue({
         doctorId,
         appointmentId: appointment._id,
-        patientId: appointment.patientId,
+        patientId,
         tokenNumber,
         queueDate: queueDateNorm,
         status: 'WAITING',
       });
       await queueEntry.save();
     } else {
-      // Already exists — just mark as WAITING in case it was in another state
-      queueEntry.status = 'WAITING';
+      queueEntry.status   = 'WAITING';
       queueEntry.queueDate = queueDateNorm;
       await queueEntry.save();
     }
 
     io.emit('queue-update', { doctorId });
+    io.to(`queue-${doctorId}`).emit('queue-update', { doctorId });
 
     res.json({
       message: 'Patient checked in successfully',
       appointment,
+      queueEntry,
     });
   })
 );
