@@ -5,7 +5,6 @@ import Payment from '../models/Payment.js';
 import Appointment from '../models/Appointment.js';
 import Doctor from '../models/Doctor.js';
 import Patient from '../models/Patient.js';
-import Appointment from '../models/Appointment.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
