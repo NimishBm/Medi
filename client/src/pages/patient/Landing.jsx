@@ -50,14 +50,34 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
   useEffect(() => {
     const loadDoctors = async () => {
       try {
+        const cached = sessionStorage.getItem('doctorsCache');
+        const cacheTime = sessionStorage.getItem('doctorsCacheTime');
+        const now = Date.now();
+
+        if (cached && cacheTime && (now - parseInt(cacheTime)) < 300000) {
+          setDoctors(JSON.parse(cached));
+          setLoadingDoctors(false);
+          return;
+        }
+
         const [doctorsRes, statsRes] = await Promise.allSettled([
           doctorAPI.getDoctors(),
           queueAPI.getQueueStats(),
         ]);
-        const top8 = (doctorsRes.status === 'fulfilled' ? doctorsRes.value.data || [] : [])
+
+        let doctorsArray = [];
+        if (doctorsRes.status === 'fulfilled') {
+          const data = doctorsRes.value.data;
+          doctorsArray = Array.isArray(data) ? data : (data?.doctors || []);
+        }
+
+        const top8 = doctorsArray
           .sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0))
           .slice(0, 8);
+
         setDoctors(top8);
+        sessionStorage.setItem('doctorsCache', JSON.stringify(top8));
+        sessionStorage.setItem('doctorsCacheTime', now.toString());
         setQueueStats(statsRes.status === 'fulfilled' ? statsRes.value.data || {} : {});
       } catch { /* silent */ }
       finally { setLoadingDoctors(false); }
