@@ -9,6 +9,7 @@ import {
   FileText, Plus, Trash2, X, ChevronDown, ChevronUp, Pencil,
 } from 'lucide-react';
 import { NotificationBell } from '../../components/NotificationBell';
+import { useDoctorNotifications } from '../../hooks/useDoctorNotifications';
 
 const FREQUENCIES = ['Once daily', 'Twice daily', 'Three times daily', 'Four times daily', 'Every 6 hours', 'Every 8 hours', 'As needed'];
 const DURATIONS   = ['1 day', '2 days', '3 days', '5 days', '1 week', '2 weeks', '1 month', '3 months', 'Ongoing'];
@@ -305,6 +306,7 @@ export const DoctorPatients = () => {
   const { user }   = useSelector((state) => state.auth);
   const dispatch   = useDispatch();
   const navigate   = useNavigate();
+  useDoctorNotifications(user?._id);
 
   const [patients, setPatients]                 = useState([]);
   const [filteredPatients, setFilteredPatients] = useState([]);

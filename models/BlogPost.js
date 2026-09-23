@@ -30,7 +30,7 @@ const blogPostSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['draft', 'pending_review', 'published', 'rejected'],
+      enum: ['draft', 'published'],
       default: 'draft',
     },
     views: {
