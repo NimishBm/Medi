@@ -171,10 +171,14 @@ app.get('*', (req, res, next) => {
 // Socket.IO events (used when running via node server.js)
 io.on('connection', (socket) => {
   socket.on('join-notifications', (data) => {
-    if (data?.userId) socket.join(`patient-${data.userId}`);
+    if (data?.userId) socket.join(`notifications-${data.userId}`);
   });
   socket.on('join-doctor-notifications', (data) => {
-    if (data?.doctorId) socket.join(`doctor-${data.doctorId}`);
+    // Keep legacy room + add unified notifications room
+    if (data?.doctorId) {
+      socket.join(`doctor-${data.doctorId}`);
+      socket.join(`notifications-${data.doctorId}`);
+    }
   });
   socket.on('join-queue', (data) => {
     if (data?.doctorId) socket.join(`queue-${data.doctorId}`);

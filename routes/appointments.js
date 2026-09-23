@@ -124,6 +124,23 @@ router.post(
       });
     }
 
+    // Notify doctor for every appointment booked (single or group)
+    const apptDateFormatted = new Date(appointmentDate).toLocaleDateString('en-IN', {
+      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+    });
+    for (const appt of createdAppointments) {
+      await Notification.create({
+        recipientId:    doctorId,
+        recipientModel: 'Doctor',
+        appointmentId:  appt._id,
+        type:           'NEW_APPOINTMENT',
+        title:          'New Appointment Booked',
+        message:        `${appt.patientId?.name || 'A patient'} booked a ${appt.appointmentType} on ${apptDateFormatted} at ${appt.appointmentTime}. Token #${appt.tokenNumber}.`,
+        data: { patientName: appt.patientId?.name, appointmentTime: appt.appointmentTime, appointmentDate, tokenNumber: appt.tokenNumber },
+      });
+    }
+    io.to(`notifications-${doctorId}`).emit('new-notification', { recipientId: String(doctorId) });
+
     // Return single object for single booking, array for group booking (backward compatible)
     if (createdAppointments.length === 1) {
       return res.status(201).json({
@@ -131,40 +148,6 @@ router.post(
         appointment: createdAppointments[0],
       });
     }
-
-    // Auto-create queue entry so doctor sees it in Live Queue immediately
-    // Normalise queueDate to start-of-day UTC so the GET /doctor/:id filter always matches
-    const queueDateNorm = new Date(appointmentDate);
-    queueDateNorm.setUTCHours(0, 0, 0, 0);
-    const queueEntry = new Queue({
-      doctorId,
-      appointmentId: appointment._id,
-      patientId,
-      tokenNumber,
-      queueDate: queueDateNorm,
-      status: 'WAITING',
-    });
-    await queueEntry.save();
-
-    // Create a notification for the doctor
-    const apptDate = new Date(appointmentDate).toLocaleDateString('en-IN', {
-      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
-    });
-    await Notification.create({
-      recipientId: doctorId,
-      recipientModel: 'Doctor',
-      appointmentId: appointment._id,
-      type: 'NEW_APPOINTMENT',
-      title: 'New Appointment Booked',
-      message: `${appointment.patientId.name} booked a ${appointment.appointmentType} on ${apptDate} at ${appointmentTime}. Token #${tokenNumber}.`,
-      data: { patientName: appointment.patientId.name, appointmentTime, appointmentDate, tokenNumber },
-    });
-
-    // Notify doctor via socket — emit to their personal notification room
-    io.emit('queue-update', { doctorId });
-    io.to(`notifications-${doctorId}`).emit('new-notification', {
-      recipientId: String(doctorId),
-    });
 
     res.status(201).json({
       message: `${createdAppointments.length} appointments booked successfully`,
@@ -254,9 +237,32 @@ router.put(
       return res.status(404).json({ message: 'Appointment not found' });
     }
 
+    const isReschedule = req.user.role === 'DOCTOR' &&
+      (req.body.appointmentDate || req.body.appointmentTime) &&
+      (String(appointment.doctorId) === req.user.id);
+
+    const oldDate = appointment.appointmentDate;
+    const oldTime = appointment.appointmentTime;
+
     Object.assign(appointment, req.body);
     await appointment.save();
     await appointment.populate(['patientId', 'doctorId']);
+
+    if (isReschedule) {
+      const newDate = req.body.appointmentDate || oldDate;
+      const newTime = req.body.appointmentTime || oldTime;
+      const dateStr = new Date(newDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+      const doctorName = appointment.doctorId?.name ? `Dr. ${appointment.doctorId.name.replace(/^Dr\.?\s+/i, '')}` : 'Your doctor';
+      await Notification.create({
+        recipientId:    appointment.patientId._id,
+        recipientModel: 'Patient',
+        type:           'APPOINTMENT_RESCHEDULED',
+        title:          'Appointment Rescheduled',
+        message:        `${doctorName} has rescheduled your ${appointment.appointmentType || 'appointment'} to ${dateStr} at ${newTime}.`,
+        appointmentId:  appointment._id,
+      });
+      io.to(`notifications-${appointment.patientId._id}`).emit('new-notification', { recipientId: String(appointment.patientId._id) });
+    }
 
     res.json({
       message: 'Appointment updated successfully',
@@ -284,13 +290,14 @@ router.post(
     if (req.user.role === 'DOCTOR') {
       const dateStr = new Date(appointment.appointmentDate).toDateString();
       const notification = await Notification.create({
-        userId:        appointment.patientId,
-        type:          'APPOINTMENT_CANCELLED',
-        title:         'Appointment Cancelled',
-        message:       `Your appointment on ${dateStr} at ${appointment.appointmentTime} has been cancelled by your doctor.`,
-        appointmentId: appointment._id,
+        recipientId:    appointment.patientId,
+        recipientModel: 'Patient',
+        type:           'APPOINTMENT_CANCELLED',
+        title:          'Appointment Cancelled',
+        message:        `Your appointment on ${dateStr} at ${appointment.appointmentTime} has been cancelled by your doctor.`,
+        appointmentId:  appointment._id,
       });
-      io.to(`patient-${appointment.patientId}`).emit('notification', notification);
+      io.to(`notifications-${appointment.patientId}`).emit('new-notification', { recipientId: String(appointment.patientId) });
     }
 
     res.json({ message: 'Appointment cancelled successfully', appointment });
@@ -325,14 +332,15 @@ router.put(
     await appointment.save();
 
     const dateStr = new Date(appointmentDate).toDateString();
-    const notification = await Notification.create({
-      userId:        appointment.patientId,
-      type:          'APPOINTMENT_RESCHEDULED',
-      title:         'Appointment Rescheduled',
-      message:       `Your appointment has been rescheduled to ${dateStr} at ${appointmentTime}.`,
-      appointmentId: appointment._id,
+    await Notification.create({
+      recipientId:    appointment.patientId,
+      recipientModel: 'Patient',
+      type:           'APPOINTMENT_RESCHEDULED',
+      title:          'Appointment Rescheduled',
+      message:        `Your appointment has been rescheduled to ${dateStr} at ${appointmentTime}.`,
+      appointmentId:  appointment._id,
     });
-    io.to(`patient-${appointment.patientId}`).emit('notification', notification);
+    io.to(`notifications-${appointment.patientId}`).emit('new-notification', { recipientId: String(appointment.patientId) });
 
     res.json({ message: 'Appointment rescheduled successfully', appointment });
   })

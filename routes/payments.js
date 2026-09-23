@@ -4,6 +4,8 @@ import Razorpay from 'razorpay';
 import Payment from '../models/Payment.js';
 import Appointment from '../models/Appointment.js';
 import Doctor from '../models/Doctor.js';
+import Notification from '../models/Notification.js';
+import { io } from '../server.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
@@ -222,6 +224,23 @@ router.post(
       paymentDate:       new Date(),
       processedBy:       patientId,
     });
+
+    // Notify doctor for each appointment created via Razorpay
+    const apptDateFormatted = new Date(appointmentDate).toLocaleDateString('en-IN', {
+      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+    });
+    for (const appt of createdAppointments) {
+      await Notification.create({
+        recipientId:    doctorId,
+        recipientModel: 'Doctor',
+        appointmentId:  appt._id,
+        type:           'NEW_APPOINTMENT',
+        title:          'New Appointment Booked',
+        message:        `A patient booked a ${appt.appointmentType || 'consultation'} on ${apptDateFormatted} at ${appointmentTime}. Token #${appt.tokenNumber}.`,
+        data: { appointmentTime, appointmentDate, tokenNumber: appt.tokenNumber },
+      });
+    }
+    io.to(`notifications-${doctorId}`).emit('new-notification', { recipientId: String(doctorId) });
 
     res.json(createdAppointments.length === 1 ? createdAppointments[0] : createdAppointments);
   })

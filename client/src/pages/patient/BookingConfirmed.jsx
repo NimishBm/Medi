@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { logout } from '../../store/slices/authSlice';
+import { NotificationBell } from '../../components/NotificationBell';
 import {
   Stethoscope, CheckCircle, Calendar, Clock, User, CreditCard,
   Download, CalendarCheck, Home, Hash,
@@ -64,6 +65,7 @@ export const BookingConfirmed = () => {
             </div>
             {!isMobile && <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginLeft: 4 }}>/ Booking Confirmed</span>}
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <NotificationBell userId={user?._id} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F3F4F6', padding: '5px 10px', borderRadius: 20 }}>
                 <div style={{ width: 24, height: 24, background: T, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12 }}>
                   {user?.name?.charAt(0)}
