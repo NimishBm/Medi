@@ -69,7 +69,7 @@ export const userAPI = {
 };
 
 export const doctorAPI = {
-  getDoctors: () => api.get('/doctors'),
+  getDoctors: (config) => api.get('/doctors', config),
   getDoctorById: (id) => api.get(`/doctors/${id}`),
 };
 

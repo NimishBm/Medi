@@ -79,12 +79,12 @@ export const Marketplace = () => {
         setLoading(true);
 
         const [doctorsResult, queueResult] = await Promise.allSettled([
-          doctorAPI.getDoctors(),
+          doctorAPI.getDoctors({ params: { limit: 999 } }),  // Fetch all doctors
           queueAPI.getQueueStats(),
         ]);
 
         if (doctorsResult.status === 'fulfilled') {
-          setDoctors(Array.isArray(doctorsResult.value.data) ? doctorsResult.value.data : []);
+          setDoctors(Array.isArray(doctorsResult.value.data?.doctors) ? doctorsResult.value.data.doctors : []);
         } else {
           setDoctors([]);
           if (doctorsResult.reason?.response?.status !== 401) {
