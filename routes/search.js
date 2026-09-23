@@ -330,8 +330,29 @@ router.get("/", async (req, res) => {
       .select("-password")
       .lean();
 
+    // Exclude generic specialties - only show specific ones
+    const excludedSpecialties = [
+      'generalsurgeon',
+      'medicinespecialist',
+      'generalpractitioner',
+      'general',
+      'medicine',
+      'practitioner'
+    ];
+
     const normalizedSpecialties =
-      specialtyNames.map(normalizeSpecialty);
+      specialtyNames
+        .map(normalizeSpecialty)
+        .filter(spec => !excludedSpecialties.includes(spec));
+
+    // If all specialties were excluded, return empty
+    if (normalizedSpecialties.length === 0) {
+      return res.json({
+        success: true,
+        doctors: [],
+        searchType: "symptom",
+      });
+    }
 
     const doctorsFromSymptoms =
       allDoctors.filter((doctor) => {
