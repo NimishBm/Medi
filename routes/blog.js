@@ -95,4 +95,29 @@ router.post(
   })
 );
 
+// GET /api/blog/public/posts — all published posts, visible to patients
+router.get(
+  '/public/posts',
+  catchAsyncErrors(async (req, res) => {
+    const { category } = req.query;
+    const filter = { status: 'published' };
+    if (category && category !== 'all') filter.category = category;
+    const posts = await BlogPost.find(filter)
+      .populate('doctorId', 'name specialization')
+      .sort({ publishedAt: -1 });
+    res.json(posts);
+  })
+);
+
+// GET /api/blog/public/posts/:id — single published post
+router.get(
+  '/public/posts/:id',
+  catchAsyncErrors(async (req, res) => {
+    const post = await BlogPost.findOne({ _id: req.params.id, status: 'published' })
+      .populate('doctorId', 'name specialization');
+    if (!post) return res.status(404).json({ message: 'Post not found' });
+    res.json(post);
+  })
+);
+
 export default router;

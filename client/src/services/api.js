@@ -169,5 +169,7 @@ export const blogAPI = {
   updatePost: (id, data) => api.put(`/blog/posts/${id}`, data),
   deletePost: (id) => api.delete(`/blog/posts/${id}`),
   incrementView: (id) => api.post(`/blog/posts/${id}/view`),
+  getPublicPosts: (category) => api.get('/blog/public/posts', { params: category && category !== 'all' ? { category } : {} }),
+  getPublicPost: (id) => api.get(`/blog/public/posts/${id}`),
 };
 export default api;

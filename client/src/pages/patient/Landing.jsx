@@ -8,7 +8,7 @@ import {
   Search, Heart, Eye, Smile, Activity, Thermometer, Layers, MapPin,
   CheckCircle, CalendarCheck, Star, ChevronRight,
   Calendar, User, FileText, Users, CreditCard, Stethoscope,
-  Zap, Shield, Phone, Clock, ArrowRight, Menu, X as XIcon,
+  Zap, Shield, Phone, Clock, ArrowRight, Menu, X as XIcon, BookOpen,
 } from 'lucide-react';
 import { NotificationBell } from '../../components/NotificationBell';
 
@@ -30,6 +30,7 @@ const QUICK_ACTIONS = [
   { label: 'My Appointments',  sub: 'View & manage bookings',  icon: Calendar,      bg: '#E3F2FD', accent: '#1565C0', route: '/patient/my-appointments' },
   { label: 'Prescriptions',    sub: 'Access your records',     icon: FileText,      bg: '#FFF8E1', accent: '#F57F17', route: '/patient/prescriptions' },
   { label: 'Family Members',   sub: 'Manage family health',    icon: Users,         bg: '#FCE4EC', accent: '#AD1457', route: '/patient/family' },
+  { label: 'Health Blog',      sub: 'Articles by our doctors', icon: BookOpen,      bg: '#E0F2FE', accent: '#0369A1', route: '/patient/blog' },
 ];
 
 const LOCATIONS = ['Current Location', 'Mumbai', 'Delhi', 'Bangalore', 'Pune', 'Hyderabad', 'Chennai'];
