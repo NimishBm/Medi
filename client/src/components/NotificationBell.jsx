@@ -50,9 +50,9 @@ export const NotificationBell = () => {
   // ── socket: join personal room & listen ────────────────────────────────────
 
   useEffect(() => {
-    fetchNotifications();
-
     if (!user?._id) return;
+
+    fetchNotifications();
 
     try {
       const socket = initSocket();
@@ -62,12 +62,12 @@ export const NotificationBell = () => {
         socket.emit('join-notifications', { userId: user._id });
       };
 
+      // Join immediately if already connected, otherwise wait for the connect event.
+      // Use a single socket.on('connect') listener — do NOT also add socket.once, which
+      // would register a second handler on the same event and cause duplicate joins.
       if (socket.connected) {
         joinRoom();
-      } else {
-        socket.once('connect', joinRoom);
       }
-
       socket.on('connect', joinRoom);
 
       const onNew = () => fetchNotifications();

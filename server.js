@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import mongoose from 'mongoose';
 import 'express-async-errors';
 import http from 'http';
@@ -41,6 +42,7 @@ export const io = new Server(server, {
 
 // Middleware
 app.use(cors());
+app.use(compression());
 app.use(express.json());
 
 // Serverless / persistent DB connection handler
@@ -54,14 +56,18 @@ const connectDB = async () => {
   }
   if (!connPromise || mongoose.connection.readyState === 0) {
     connPromise = mongoose.connect(process.env.MONGO_URI, {
-      serverSelectionTimeoutMS: 8000,
-      connectTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      family: 4,
+      maxPoolSize: 10,
+      minPoolSize: 5,
     });
   }
   try {
     await connPromise;
   } catch (err) {
-    connPromise = null; // reset promise so next request retries fresh connection
+    connPromise = null;
     throw err;
   }
   return mongoose.connection;

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
 
@@ -9,7 +9,8 @@ import { DoctorLogin } from './pages/DoctorLogin';
 import { DoctorRegister } from './pages/DoctorRegister';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { authAPI } from './services/api';
-import { setUser } from './store/slices/authSlice';
+import { setUser, logout } from './store/slices/authSlice';
+import { closeSocket } from './services/socket';
 
 // Patient Pages
 import { Landing } from './pages/patient/Landing';
@@ -46,35 +47,58 @@ import { AdminDashboard } from './pages/admin/Dashboard';
 // Display
 import { WaitingRoomDisplay } from './pages/WaitingRoomDisplay';
 
-export default function App() {
+// Inner component so it can use useNavigate (which requires BrowserRouter context)
+function AppRoutes() {
   const dispatch = useDispatch();
-  const { user, token } = useSelector((state) => state.auth);
-  const fetchingRef = useRef(false);
+  const navigate = useNavigate();
+  const { user, token, authInitialized } = useSelector((state) => state.auth);
+  const restoringRef = useRef(false);
 
+  // Restore user session when a token exists but user is not yet in the store.
+  // This runs ONCE per token value. On completion (success OR failure) we mark
+  // authInitialized=true so ProtectedRoute knows it can now make a routing decision.
   useEffect(() => {
-    if (token && !user && !fetchingRef.current) {
-      fetchingRef.current = true;
-      const fetchUser = async () => {
-        try {
-          const response = await authAPI.getMe();
-          dispatch(setUser({
-            user: response.data,
-            token,
-          }));
-        } catch (error) {
-          console.error('Failed to fetch user', error);
-        } finally {
-          fetchingRef.current = false;
-        }
-      };
-      fetchUser();
+    if (token && !user && !restoringRef.current) {
+      restoringRef.current = true;
+      authAPI.getMe()
+        .then((response) => {
+          dispatch(setUser({ user: response.data, token }));
+        })
+        .catch(() => {
+          // getMe() failed (network error, invalid token, etc.).
+          // Clear the stale token so ProtectedRoute can redirect cleanly.
+          dispatch(logout());
+        });
+      // Note: restoringRef is NOT reset — we only want one getMe() call per mount.
     }
-  }, [token, dispatch]);
+  }, [token, dispatch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle 401 responses from the API interceptor without a hard page reload.
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      closeSocket();
+      dispatch(logout());
+      navigate('/login', { replace: true });
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, [dispatch, navigate]);
+
+  // Close the socket singleton when the user logs out so a fresh connection
+  // is established on the next login (avoids stale socket with old user context).
+  const prevTokenRef = useRef(token);
+  useEffect(() => {
+    if (prevTokenRef.current && !token) {
+      closeSocket();
+    }
+    prevTokenRef.current = token;
+  }, [token]);
+
+  // While session is being restored from a stored token, render nothing.
+  // This prevents ProtectedRoute from redirecting to /login prematurely.
+  if (!authInitialized) return null;
 
   return (
-    <>
-      <Toaster position="top-right" />
-      <BrowserRouter future={{ v7_relativeSplatPath: true }}>
         <Routes>
           {/* Auth Routes */}
           <Route path="/login" element={<Navigate to="/login/patient" replace />} />
@@ -300,6 +324,15 @@ export default function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <>
+      <Toaster position="top-right" />
+      <BrowserRouter future={{ v7_relativeSplatPath: true }}>
+        <AppRoutes />
       </BrowserRouter>
     </>
   );

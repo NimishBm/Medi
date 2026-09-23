@@ -37,7 +37,9 @@ api.interceptors.response.use(
       if (!isAuthEndpoint && !isAdminEndpoint) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        // Dispatch a custom event so App.jsx can handle logout/redirect via React Router
+        // instead of a hard page reload (window.location.href).
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
       }
     }
     return Promise.reject(error);

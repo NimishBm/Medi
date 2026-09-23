@@ -2,8 +2,19 @@
   "name": "clinicflow",
   "version": "1.0.0",
   "description": "ClinicFlow - Clinic Management & Smart Patient Queue System",
-  "main": "server.js",
+  "keywords": [],
+  "homepage": "https://github.com/NimishBm/Medi#readme",
+  "bugs": {
+    "url": "https://github.com/NimishBm/Medi/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NimishBm/Medi.git"
+  },
+  "license": "ISC",
+  "author": "",
   "type": "module",
+  "main": "server.js",
   "scripts": {
     "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
     "build": "npm --prefix client install && npm --prefix client run build",
@@ -16,16 +27,10 @@
     "client:build": "cd client && npm run build",
     "client:preview": "cd client && npm run preview"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "concurrently": "^8.2.2",
-    "nodemon": "^3.0.1"
-  },
   "dependencies": {
     "axios": "^1.20.0",
     "bcryptjs": "^2.4.3",
+    "compression": "^1.8.2",
     "cors": "^2.8.5",
     "csv-parse": "^7.0.2",
     "dotenv": "^16.3.1",
@@ -36,5 +41,9 @@
     "mongoose": "^7.5.0",
     "multer": "^2.4.0",
     "socket.io": "^4.7.2"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.1"
   }
 }

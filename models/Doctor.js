@@ -205,5 +205,11 @@ doctorSchema.methods.toJSON = function () {
   return obj;
 };
 
+// Add indexes for faster queries
+doctorSchema.index({ isActive: 1, createdAt: -1 });
+doctorSchema.index({ specialization: 1, isActive: 1 });
+doctorSchema.index({ email: 1 });
+doctorSchema.index({ averageRating: -1, isActive: 1 });
+
 // IMPORTANT: use the existing Atlas collection "Doctors"
 export default mongoose.model('Doctor', doctorSchema, 'Doctors');

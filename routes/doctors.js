@@ -44,8 +44,29 @@ const upload = multer({
 router.get(
   '/',
   catchAsyncErrors(async (req, res) => {
-    const doctors = await Doctor.find({ isActive: true }).select('-password');
-    res.json(doctors);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+
+    const doctors = await Doctor.find({ isActive: true })
+      .select('name specialization consultationFee profilePhoto averageRating totalReviews experience')
+      .lean()
+      .skip(skip)
+      .limit(limit)
+      .sort({ averageRating: -1, createdAt: -1 });
+
+    const total = await Doctor.countDocuments({ isActive: true });
+
+    res.set('Cache-Control', 'public, max-age=600');
+    res.json({
+      doctors,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
   })
 );
 
@@ -65,7 +86,9 @@ router.get(
 router.get(
   '/:id',
   catchAsyncErrors(async (req, res) => {
-    const doctor = await Doctor.findById(req.params.id).select('-password');
+    const doctor = await Doctor.findById(req.params.id)
+      .select('-password')
+      .lean();
 
     if (!doctor) {
       return res.status(404).json({
@@ -73,6 +96,7 @@ router.get(
       });
     }
 
+    res.set('Cache-Control', 'public, max-age=600');
     res.json(doctor);
   })
 );
