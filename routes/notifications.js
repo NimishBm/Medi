@@ -55,4 +55,34 @@ router.put(
   })
 );
 
+// DELETE /api/notifications/:id — delete a single notification
+router.delete(
+  '/:id',
+  protect,
+  catchAsyncErrors(async (req, res) => {
+    const deleted = await Notification.findOneAndDelete({
+      _id: req.params.id,
+      $or: [{ recipientId: req.user.id }, { userId: req.user.id }],
+    });
+
+    if (!deleted) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+
+    res.json({ success: true });
+  })
+);
+
+// DELETE /api/notifications — clear ALL notifications for the logged-in user
+router.delete(
+  '/',
+  protect,
+  catchAsyncErrors(async (req, res) => {
+    await Notification.deleteMany({
+      $or: [{ recipientId: req.user.id }, { userId: req.user.id }],
+    });
+    res.json({ success: true });
+  })
+);
+
 export default router;

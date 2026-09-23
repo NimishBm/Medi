@@ -40,3 +40,20 @@ export const closeSocket = () => {
     socket = null;
   }
 };
+
+/**
+ * Join socket rooms so the client receives targeted server emits.
+ * Call once after authentication, e.g. in App.jsx or each page.
+ *
+ * @param {'doctor'|'patient'} role
+ * @param {string} id  - the user's _id
+ */
+export const joinRooms = (role, id) => {
+  const s = getSocket();
+  if (role === 'doctor') {
+    s.emit('join-queue', { doctorId: id });
+    s.emit('join-doctor-notifications', { doctorId: id });
+  } else if (role === 'patient') {
+    s.emit('join-notifications', { userId: id });
+  }
+};

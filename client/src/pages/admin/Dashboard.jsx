@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { adminAPI } from '../../services/api';
+import { adminAPI, adminBlogAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import {
   ShieldCheck, LogOut, LayoutDashboard, Stethoscope,
   Users, CheckCircle, XCircle, RefreshCw, Search, Clock,
-  Plus, Pencil, Trash2,
+  Plus, Pencil, Trash2, PenSquare, Globe, FileText,
+  AlertCircle, Eye, BookOpen,
 } from 'lucide-react';
 import { DoctorDetailView } from './DoctorDetailView';
 import { PatientDetailView } from './PatientDetailView';
@@ -293,7 +294,16 @@ const NAV = [
   { id: 'overview',  label: 'Overview',  icon: LayoutDashboard },
   { id: 'doctors',   label: 'Doctors',   icon: Stethoscope },
   { id: 'patients',  label: 'Patients',  icon: Users },
+  { id: 'blog',      label: 'Blog Posts', icon: PenSquare },
 ];
+
+const BLOG_STATUS_TABS = ['all', 'pending_review', 'published', 'rejected', 'draft'];
+const BLOG_STATUS_META = {
+  published:      { label: 'Published',     style: 'bg-green-100 text-green-700'  },
+  pending_review: { label: 'Pending Review',style: 'bg-yellow-100 text-yellow-700'},
+  draft:          { label: 'Draft',          style: 'bg-gray-100 text-gray-600'   },
+  rejected:       { label: 'Rejected',       style: 'bg-red-100 text-red-600'     },
+};
 
 const DOCTOR_STATUS_TABS = ['ALL', 'PENDING', 'APPROVED', 'REJECTED'];
 
@@ -331,6 +341,14 @@ export const AdminDashboard = () => {
   const [patSearch, setPatSearch]     = useState('');
   const [patientModal, setPatientModal] = useState(null);
   const [deletePatientConfirm, setDeletePatientConfirm] = useState(null);
+
+  // blog
+  const [blogPosts, setBlogPosts]         = useState([]);
+  const [blogLoading, setBlogLoading]     = useState(false);
+  const [blogTab, setBlogTab]             = useState('pending_review');
+  const [blogSearch, setBlogSearch]       = useState('');
+  const [blogActionLoading, setBlogActionLoading] = useState(null);
+  const [previewBlogPost, setPreviewBlogPost] = useState(null);
 
   // ── fetch helpers ──────────────────────────────────────────────────────────
 
@@ -370,9 +388,22 @@ export const AdminDashboard = () => {
     }
   }, []);
 
+  const fetchBlogPosts = useCallback(async () => {
+    setBlogLoading(true);
+    try {
+      const res = await adminBlogAPI.getPosts(blogTab === 'all' ? null : blogTab);
+      setBlogPosts(res.data);
+    } catch {
+      toast.error('Failed to load blog posts');
+    } finally {
+      setBlogLoading(false);
+    }
+  }, [blogTab]);
+
   useEffect(() => { fetchStats(); }, [fetchStats]);
   useEffect(() => { if (page === 'doctors')  fetchDoctors();  }, [page, fetchDoctors]);
   useEffect(() => { if (page === 'patients') fetchPatients(); }, [page, fetchPatients]);
+  useEffect(() => { if (page === 'blog')     fetchBlogPosts(); }, [page, fetchBlogPosts]);
 
   // ── doctor approve / reject ────────────────────────────────────────────────
 
@@ -492,6 +523,40 @@ export const AdminDashboard = () => {
       p.name.toLowerCase().includes(patSearch.toLowerCase()) ||
       p.email.toLowerCase().includes(patSearch.toLowerCase()) ||
       (p.phone || '').includes(patSearch),
+  );
+
+  // blog actions
+  const handleBlogStatus = async (id, status) => {
+    setBlogActionLoading(id);
+    try {
+      await adminBlogAPI.updateStatus(id, status);
+      toast.success(status === 'published' ? 'Post published!' : status === 'rejected' ? 'Post rejected' : 'Post updated');
+      fetchBlogPosts();
+    } catch {
+      toast.error('Failed to update post status');
+    } finally {
+      setBlogActionLoading(null);
+    }
+  };
+
+  const handleBlogDelete = async (id) => {
+    if (!window.confirm('Delete this blog post permanently?')) return;
+    setBlogActionLoading(id);
+    try {
+      await adminBlogAPI.deletePost(id);
+      toast.success('Post deleted');
+      setBlogPosts((prev) => prev.filter((p) => p._id !== id));
+    } catch {
+      toast.error('Failed to delete post');
+    } finally {
+      setBlogActionLoading(null);
+    }
+  };
+
+  const filteredBlogPosts = blogPosts.filter((p) =>
+    !blogSearch ||
+    p.title?.toLowerCase().includes(blogSearch.toLowerCase()) ||
+    p.doctorId?.name?.toLowerCase().includes(blogSearch.toLowerCase())
   );
 
   const docCounts = {
@@ -847,6 +912,174 @@ export const AdminDashboard = () => {
               </div>
               </>
               )}
+            </div>
+          )}
+
+          {/* ════ BLOG POSTS ════ */}
+          {page === 'blog' && (
+            <div>
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Blog Posts</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">Review and publish doctor-authored health articles</p>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {BLOG_STATUS_TABS.map((tab) => (
+                  <button key={tab} onClick={() => setBlogTab(tab)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                      blogTab === tab ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                    }`}>
+                    {tab === 'all' ? 'All' : BLOG_STATUS_META[tab]?.label || tab}
+                    {tab === 'pending_review' && blogPosts.filter(p => p.status === 'pending_review').length > 0 && (
+                      <span className="ml-1.5 bg-yellow-400 text-yellow-900 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                        {blogPosts.filter(p => p.status === 'pending_review').length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search */}
+              <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 w-full max-w-sm mb-5">
+                <Search size={14} className="text-gray-400 shrink-0" />
+                <input type="text" placeholder="Search by title or doctor…"
+                  value={blogSearch} onChange={(e) => setBlogSearch(e.target.value)}
+                  className="outline-none text-sm text-gray-700 flex-1" />
+              </div>
+
+              {/* Preview modal */}
+              {previewBlogPost && (
+                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+                      <span className="font-bold text-gray-900">Preview: {previewBlogPost.title}</span>
+                      <button onClick={() => setPreviewBlogPost(null)} className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100">
+                        <XCircle size={20} />
+                      </button>
+                    </div>
+                    <div className="overflow-y-auto flex-1 p-5">
+                      {previewBlogPost.coverImage && (
+                        <img src={previewBlogPost.coverImage} alt="" className="w-full h-48 object-cover rounded-lg mb-4" onError={(e) => { e.target.style.display='none'; }} />
+                      )}
+                      <div className="flex items-center gap-2 mb-3 text-xs">
+                        <span className="bg-teal-50 text-teal-700 px-2.5 py-1 rounded-full font-medium">{previewBlogPost.category}</span>
+                        <span className="text-gray-400">by Dr. {previewBlogPost.doctorId?.name}</span>
+                        <span className="text-gray-400">{previewBlogPost.doctorId?.specialization}</span>
+                      </div>
+                      <h2 className="text-xl font-bold text-gray-900 mb-2">{previewBlogPost.title}</h2>
+                      {previewBlogPost.excerpt && (
+                        <p className="text-gray-500 italic text-sm border-l-4 border-teal-400 pl-3 mb-4">{previewBlogPost.excerpt}</p>
+                      )}
+                      <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">{previewBlogPost.content}</p>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-100">
+                      {previewBlogPost.status === 'pending_review' && (
+                        <>
+                          <button
+                            onClick={() => { handleBlogStatus(previewBlogPost._id, 'rejected'); setPreviewBlogPost(null); }}
+                            className="px-4 py-2 text-sm font-semibold bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition">
+                            Reject
+                          </button>
+                          <button
+                            onClick={() => { handleBlogStatus(previewBlogPost._id, 'published'); setPreviewBlogPost(null); }}
+                            className="px-4 py-2 text-sm font-semibold bg-green-600 text-white hover:bg-green-700 rounded-lg transition">
+                            Publish
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Table */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                {blogLoading ? (
+                  <div className="flex items-center justify-center h-48 text-gray-400">Loading…</div>
+                ) : filteredBlogPosts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-48 text-gray-400 gap-2">
+                    <BookOpen size={32} className="text-gray-200" />
+                    <p>No posts found</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Title</th>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Doctor</th>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Category</th>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Status</th>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Views</th>
+                          <th className="px-5 py-3 text-left font-semibold text-gray-600">Date</th>
+                          <th className="px-5 py-3 text-right font-semibold text-gray-600">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {filteredBlogPosts.map((post) => {
+                          const sm = BLOG_STATUS_META[post.status] || BLOG_STATUS_META.draft;
+                          const isActing = blogActionLoading === post._id;
+                          return (
+                            <tr key={post._id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-5 py-4 max-w-xs">
+                                <p className="font-medium text-gray-900 truncate">{post.title}</p>
+                                {post.excerpt && <p className="text-gray-400 text-xs truncate">{post.excerpt}</p>}
+                              </td>
+                              <td className="px-5 py-4">
+                                <p className="text-gray-700 font-medium">{post.doctorId?.name || '—'}</p>
+                                <p className="text-gray-400 text-xs">{post.doctorId?.specialization || ''}</p>
+                              </td>
+                              <td className="px-5 py-4">
+                                <span className="text-xs px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 font-medium">{post.category}</span>
+                              </td>
+                              <td className="px-5 py-4">
+                                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${sm.style}`}>{sm.label}</span>
+                              </td>
+                              <td className="px-5 py-4 text-gray-600">{post.views ?? 0}</td>
+                              <td className="px-5 py-4 text-gray-500 text-xs whitespace-nowrap">
+                                {new Date(post.createdAt).toLocaleDateString()}
+                              </td>
+                              <td className="px-5 py-4">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button onClick={() => setPreviewBlogPost(post)} title="Preview"
+                                    className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors" disabled={isActing}>
+                                    <Eye size={15} />
+                                  </button>
+                                  {post.status === 'pending_review' && (
+                                    <>
+                                      <button onClick={() => handleBlogStatus(post._id, 'published')} title="Publish"
+                                        className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition-colors" disabled={isActing}>
+                                        {isActing ? <RefreshCw size={15} className="animate-spin" /> : <CheckCircle size={15} />}
+                                      </button>
+                                      <button onClick={() => handleBlogStatus(post._id, 'rejected')} title="Reject"
+                                        className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors" disabled={isActing}>
+                                        <XCircle size={15} />
+                                      </button>
+                                    </>
+                                  )}
+                                  {post.status === 'rejected' && (
+                                    <button onClick={() => handleBlogStatus(post._id, 'published')} title="Publish anyway"
+                                      className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition-colors" disabled={isActing}>
+                                      <Globe size={15} />
+                                    </button>
+                                  )}
+                                  <button onClick={() => handleBlogDelete(post._id)} title="Delete"
+                                    className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors" disabled={isActing}>
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

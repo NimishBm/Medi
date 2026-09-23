@@ -7,6 +7,7 @@ import { setUser } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import { Heart, LogOut, Save, Clock, Plus, X, Trash2, Copy, ArrowLeft } from 'lucide-react';
 import { NotificationBell } from '../../components/NotificationBell';
+import { useDoctorNotifications } from '../../hooks/useDoctorNotifications';
 
 const DAYS_OF_WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -15,6 +16,7 @@ export const DoctorSchedule = () => {
   const { user, token } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  useDoctorNotifications(user?._id);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeDay, setActiveDay] = useState('monday');
 

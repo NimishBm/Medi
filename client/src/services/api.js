@@ -51,6 +51,8 @@ export const notificationAPI = {
   getNotifications: ()   => api.get('/notifications'),
   markRead:         (id) => api.put(`/notifications/${id}/read`),
   markAllRead:      ()   => api.put('/notifications/read-all'),
+  deleteOne:        (id) => api.delete(`/notifications/${id}`),
+  clearAll:         ()   => api.delete('/notifications'),
 };
 
 export const authAPI = {
@@ -125,6 +127,7 @@ export const prescriptionAPI = {
 export const paymentAPI = {
   createPayment: (data) => api.post('/payments', data),
   getPaymentsByPatient: (patientId) => api.get(`/payments/patient/${patientId}`),
+  getPaymentsByDoctor: (doctorId) => api.get(`/payments/doctor/${doctorId}`),
   getPaymentById: (id) => api.get(`/payments/${id}`),
   refundPayment: (id, data) => api.post(`/payments/${id}/refund`, data),
   createRazorpayOrder: (amount) => api.post('/payments/razorpay/order', { amount }),
@@ -168,12 +171,24 @@ export const searchAPI = {
 
 
 export const blogAPI = {
-  getPosts: (status) => api.get('/blog/posts', { params: status ? { status } : {} }),
-  createPost: (data) => api.post('/blog/posts', data),
-  updatePost: (id, data) => api.put(`/blog/posts/${id}`, data),
-  deletePost: (id) => api.delete(`/blog/posts/${id}`),
-  incrementView: (id) => api.post(`/blog/posts/${id}/view`),
-  getPublicPosts: (category) => api.get('/blog/public/posts', { params: category && category !== 'all' ? { category } : {} }),
-  getPublicPost: (id) => api.get(`/blog/public/posts/${id}`),
+  getPosts:       (status) => api.get('/blog/posts', { params: status ? { status } : {} }),
+  getFeed:        (params) => api.get('/blog/feed', { params }),
+  createPost:     (data)   => api.post('/blog/posts', data),
+  updatePost:     (id, data) => api.put(`/blog/posts/${id}`, data),
+  deletePost:     (id)     => api.delete(`/blog/posts/${id}`),
+  incrementView:  (id)     => api.post(`/blog/posts/${id}/view`),
+  uploadImage:    (file)   => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return api.post('/blog/upload-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+};
+
+export const adminBlogAPI = {
+  getPosts:     (status) => api.get('/admin/blog', { params: status ? { status } : {} }),
+  updateStatus: (id, status) => api.put(`/admin/blog/${id}/status`, { status }),
+  deletePost:   (id)     => api.delete(`/admin/blog/${id}`),
 };
 export default api;

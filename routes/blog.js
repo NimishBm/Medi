@@ -1,9 +1,49 @@
 import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import BlogPost from '../models/BlogPost.js';
+import Doctor from '../models/Doctor.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
 const router = express.Router();
+
+// ── image upload setup ────────────────────────────────────────────────────────
+
+const blogUploadsDir = path.join(process.cwd(), 'uploads', 'blog');
+if (!fs.existsSync(blogUploadsDir)) {
+  fs.mkdirSync(blogUploadsDir, { recursive: true });
+}
+
+const blogStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, blogUploadsDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, `blog-${req.user.id}-${uniqueSuffix}${path.extname(file.originalname)}`);
+  },
+});
+
+const blogUpload = multer({
+  storage: blogStorage,
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed'), false);
+  },
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+});
+
+// GET /api/blog/stats — debug endpoint to see blog statistics
+router.get(
+  '/stats',
+  catchAsyncErrors(async (req, res) => {
+    const total = await BlogPost.countDocuments();
+    const published = await BlogPost.countDocuments({ status: 'published' });
+    const draft = await BlogPost.countDocuments({ status: 'draft' });
+    res.json({ total, published, draft });
+  })
+);
 
 // GET /api/blog/posts — doctor's own posts
 router.get(
@@ -15,10 +55,56 @@ router.get(
     const filter = { doctorId: req.user.id };
     if (status && status !== 'all') filter.status = status;
 
-    const posts = await BlogPost.find(filter).sort({ createdAt: -1 });
+    const posts = await BlogPost.find(filter)
+      .populate('doctorId', 'name specialization clinicName profilePhoto')
+      .sort({ createdAt: -1 });
     res.json(posts);
   })
 );
+
+// GET /api/blog/feed / GET /api/blog/published — all published blogs from all doctors
+const getPublishedFeed = catchAsyncErrors(async (req, res) => {
+  const { category, search } = req.query;
+  const filter = { status: 'published' };
+
+  if (category && category !== 'All') {
+    filter.category = category;
+  }
+
+  if (search && search.trim()) {
+    filter.$or = [
+      { title: { $regex: search.trim(), $options: 'i' } },
+      { content: { $regex: search.trim(), $options: 'i' } },
+      { excerpt: { $regex: search.trim(), $options: 'i' } },
+    ];
+  }
+
+  // First fetch without populate
+  const posts = await BlogPost.find(filter)
+    .sort({ publishedAt: -1, createdAt: -1 });
+
+  // Then populate doctor info separately
+  const postsWithDoctors = await Promise.all(
+    posts.map(async (post) => {
+      const postObj = post.toObject();
+      try {
+        const doctor = await Doctor.findById(post.doctorId)
+          .select('name specialization clinicName profilePhoto experience');
+        postObj.doctorId = doctor || post.doctorId;
+      } catch (err) {
+        console.warn('Could not fetch doctor:', err.message);
+      }
+      return postObj;
+    })
+  );
+
+  console.log(`[DEBUG] Blog feed returned ${postsWithDoctors.length} posts`);
+  res.json(postsWithDoctors);
+});
+
+// Allow unauthenticated access to feed for patients
+router.get('/feed', getPublishedFeed);
+router.get('/published', protect, getPublishedFeed);
 
 // POST /api/blog/posts — create
 router.post(
@@ -95,29 +181,54 @@ router.post(
   })
 );
 
-// GET /api/blog/public/posts — all published posts, visible to patients
-router.get(
-  '/public/posts',
+// POST /api/blog/upload-image — upload a cover image, returns { url }
+router.post(
+  '/upload-image',
+  protect,
+  authorize('DOCTOR'),
+  blogUpload.single('image'),
   catchAsyncErrors(async (req, res) => {
-    const { category } = req.query;
-    const filter = { status: 'published' };
-    if (category && category !== 'all') filter.category = category;
-    const posts = await BlogPost.find(filter)
-      .populate('doctorId', 'name specialization')
-      .sort({ publishedAt: -1 });
-    res.json(posts);
+    if (!req.file) {
+      return res.status(400).json({ message: 'No image file provided' });
+    }
+    // Build a publicly accessible URL path
+    const url = `/uploads/blog/${req.file.filename}`;
+    res.json({ url });
   })
 );
 
-// GET /api/blog/public/posts/:id — single published post
-router.get(
-  '/public/posts/:id',
-  catchAsyncErrors(async (req, res) => {
-    const post = await BlogPost.findOne({ _id: req.params.id, status: 'published' })
-      .populate('doctorId', 'name specialization');
-    if (!post) return res.status(404).json({ message: 'Post not found' });
-    res.json(post);
-  })
-);
+// ── Admin blog routes (protected by requireAdmin via admin.js middleware) ─────
+// These are mounted separately under /api/admin/blog in server.js — see below.
+// Exposed here as helpers that admin.js can import:
+
+export const getAdminBlogPosts = catchAsyncErrors(async (req, res) => {
+  const { status } = req.query;
+  const filter = status && status !== 'all' ? { status } : {};
+  const posts = await BlogPost.find(filter)
+    .populate('doctorId', 'name specialization')
+    .sort({ createdAt: -1 });
+  res.json(posts);
+});
+
+export const updateBlogPostStatus = catchAsyncErrors(async (req, res) => {
+  const { status } = req.body;
+  const allowed = ['published', 'draft', 'rejected'];
+  if (!allowed.includes(status)) {
+    return res.status(400).json({ message: 'Invalid status' });
+  }
+  const post = await BlogPost.findByIdAndUpdate(
+    req.params.id,
+    { status, ...(status === 'published' ? { publishedAt: new Date() } : {}) },
+    { new: true }
+  ).populate('doctorId', 'name specialization');
+  if (!post) return res.status(404).json({ message: 'Post not found' });
+  res.json(post);
+});
+
+export const deleteBlogPost = catchAsyncErrors(async (req, res) => {
+  const post = await BlogPost.findByIdAndDelete(req.params.id);
+  if (!post) return res.status(404).json({ message: 'Post not found' });
+  res.json({ message: 'Post deleted' });
+});
 
 export default router;

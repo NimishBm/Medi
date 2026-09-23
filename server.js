@@ -7,6 +7,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import path from 'path';
+import jwt from 'jsonwebtoken';
 import { fileURLToPath } from 'url';
 
 // Routes
@@ -21,7 +22,7 @@ import analyticsRoutes from './routes/analytics.js';
 import searchRoutes from './routes/search.js';
 import organizationRoutes from './routes/organizations.js';
 import adminRoutes from './routes/admin.js';
-import blogRoutes from './routes/blog.js';
+import blogRoutes, { getAdminBlogPosts, updateBlogPostStatus, deleteBlogPost } from './routes/blog.js';
 import notificationRoutes from './routes/notifications.js';
 
 dotenv.config();
@@ -122,6 +123,24 @@ app.use('/organizations', organizationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/admin', adminRoutes);
 
+// Admin blog management endpoints
+const adminBlogAuth = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No token provided' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'ADMIN') return res.status(403).json({ message: 'Admin access only' });
+    req.admin = decoded;
+    next();
+  } catch {
+    res.status(401).json({ message: 'Token is not valid' });
+  }
+};
+
+app.get(['/api/admin/blog', '/admin/blog'], adminBlogAuth, getAdminBlogPosts);
+app.put(['/api/admin/blog/:id/status', '/admin/blog/:id/status'], adminBlogAuth, updateBlogPostStatus);
+app.delete(['/api/admin/blog/:id', '/admin/blog/:id'], adminBlogAuth, deleteBlogPost);
+
 app.use('/api/blog', blogRoutes);
 app.use('/blog', blogRoutes);
 
@@ -170,11 +189,16 @@ app.get('*', (req, res, next) => {
 
 // Socket.IO events (used when running via node server.js)
 io.on('connection', (socket) => {
+  // Patient notification room
   socket.on('join-notifications', (data) => {
-    if (data?.userId) socket.join(`notifications-${data.userId}`);
+    if (data?.userId) {
+      socket.join(`patient-${data.userId}`);
+      socket.join(`notifications-${data.userId}`);
+    }
   });
+  // Doctor notification rooms — join both doctor-${id} and notifications-${id}
+  // so that any code emitting to either room reaches the doctor
   socket.on('join-doctor-notifications', (data) => {
-    // Keep legacy room + add unified notifications room
     if (data?.doctorId) {
       socket.join(`doctor-${data.doctorId}`);
       socket.join(`notifications-${data.doctorId}`);
