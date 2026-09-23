@@ -66,9 +66,11 @@ router.get(
 const getPublishedFeed = catchAsyncErrors(async (req, res) => {
   const { category, search } = req.query;
   const filter = { status: 'published' };
+
   if (category && category !== 'All') {
     filter.category = category;
   }
+
   if (search && search.trim()) {
     filter.$or = [
       { title: { $regex: search.trim(), $options: 'i' } },
@@ -77,19 +79,27 @@ const getPublishedFeed = catchAsyncErrors(async (req, res) => {
     ];
   }
 
-  try {
-    const posts = await BlogPost.find(filter)
-      .populate('doctorId', 'name specialization clinicName profilePhoto experience')
-      .sort({ publishedAt: -1, createdAt: -1 });
+  // First fetch without populate
+  const posts = await BlogPost.find(filter)
+    .sort({ publishedAt: -1, createdAt: -1 });
 
-    console.log(`[DEBUG] Blog feed - Filter: ${JSON.stringify(filter)}, Found: ${posts.length} posts`);
-    return res.json(posts || []);
-  } catch (populateError) {
-    console.error('[ERROR] Populate failed, fetching without doctor info:', populateError.message);
-    const posts = await BlogPost.find(filter)
-      .sort({ publishedAt: -1, createdAt: -1 });
-    return res.json(posts || []);
-  }
+  // Then populate doctor info separately
+  const postsWithDoctors = await Promise.all(
+    posts.map(async (post) => {
+      const postObj = post.toObject();
+      try {
+        const doctor = await Doctor.findById(post.doctorId)
+          .select('name specialization clinicName profilePhoto experience');
+        postObj.doctorId = doctor || post.doctorId;
+      } catch (err) {
+        console.warn('Could not fetch doctor:', err.message);
+      }
+      return postObj;
+    })
+  );
+
+  console.log(`[DEBUG] Blog feed returned ${postsWithDoctors.length} posts`);
+  res.json(postsWithDoctors);
 });
 
 // Allow unauthenticated access to feed for patients
