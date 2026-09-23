@@ -30,6 +30,7 @@ import {
   Edit2,
   Sparkles,
   PenSquare,
+  CreditCard,
 } from 'lucide-react';
 
 const FEATURES = [
@@ -37,6 +38,7 @@ const FEATURES = [
   { id: 'schedule', name: 'Smart Scheduling', icon: Calendar, color: 'from-emerald-400 to-emerald-600', path: '/doctor/schedule', desc: 'Manage your availability & slots' },
   { id: 'queue', name: 'Live Queue', icon: Clock, color: 'from-orange-400 to-orange-500', path: '/doctor/queue', desc: 'Real-time patient queue' },
   { id: 'patients', name: 'Patient Care', icon: Users, color: 'from-green-400 to-green-600', path: '/doctor/patients', desc: 'View all registered patients' },
+  { id: 'payments', name: 'Payment History', icon: CreditCard, color: 'from-blue-500 to-cyan-600', path: '/doctor/payments', desc: 'View all payments done by patients' },
   { id: 'blog', name: 'My Blog', icon: PenSquare, color: 'from-purple-400 to-purple-600', path: '/doctor/blog', desc: 'Write & manage health blog posts' },
 ];
 
@@ -150,6 +152,12 @@ export const DoctorDashboard = () => {
               className="text-slate-200 hover:text-teal-300 font-medium text-xs sm:text-sm px-2 sm:px-4 py-2 rounded-lg hover:bg-white/10 transition hidden lg:block"
             >
               Schedule
+            </button>
+            <button
+              onClick={() => navigate('/doctor/payments')}
+              className="text-slate-200 hover:text-teal-300 font-medium text-xs sm:text-sm px-2 sm:px-4 py-2 rounded-lg hover:bg-white/10 transition hidden lg:block"
+            >
+              Payments
             </button>
             <button
               onClick={() => navigate('/doctor/profile')}

@@ -125,6 +125,7 @@ export const prescriptionAPI = {
 export const paymentAPI = {
   createPayment: (data) => api.post('/payments', data),
   getPaymentsByPatient: (patientId) => api.get(`/payments/patient/${patientId}`),
+  getPaymentsByDoctor: (doctorId) => api.get(`/payments/doctor/${doctorId}`),
   getPaymentById: (id) => api.get(`/payments/${id}`),
   refundPayment: (id, data) => api.post(`/payments/${id}/refund`, data),
 };
@@ -167,6 +168,7 @@ export const searchAPI = {
 
 export const blogAPI = {
   getPosts:       (status) => api.get('/blog/posts', { params: status ? { status } : {} }),
+  getFeed:        (params) => api.get('/blog/feed', { params }),
   createPost:     (data)   => api.post('/blog/posts', data),
   updatePost:     (id, data) => api.put(`/blog/posts/${id}`, data),
   deletePost:     (id)     => api.delete(`/blog/posts/${id}`),

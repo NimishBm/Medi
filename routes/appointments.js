@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Appointment from '../models/Appointment.js';
 import Queue from '../models/Queue.js';
 import Notification from '../models/Notification.js';
+import Payment from '../models/Payment.js';
 import { io } from '../server.js';
 
 import { protect, authorize } from '../middleware/auth.js';
@@ -10,19 +11,48 @@ import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
 const router = express.Router();
 
-// Helper to generate token number for a given date and doctor
-const generateTokenNumber = async (doctorId, appointmentDate) => {
+// Helper to reassign/maintain sequential token numbers ordered by appointment booked timings
+const reassignTokensForDoctorDate = async (doctorId, appointmentDate) => {
   const startOfDay = new Date(appointmentDate);
   startOfDay.setHours(0, 0, 0, 0);
   const endOfDay = new Date(appointmentDate);
   endOfDay.setHours(23, 59, 59, 999);
 
-  const lastAppointment = await Appointment.findOne({
+  const appointments = await Appointment.find({
     doctorId,
     appointmentDate: { $gte: startOfDay, $lte: endOfDay },
-  }).sort({ tokenNumber: -1 });
+    status: { $ne: 'CANCELLED' },
+  }).sort({ appointmentTime: 1, createdAt: 1 });
 
-  return (lastAppointment?.tokenNumber || 0) + 1;
+  for (let i = 0; i < appointments.length; i++) {
+    const expectedToken = i + 1;
+    if (appointments[i].tokenNumber !== expectedToken) {
+      appointments[i].tokenNumber = expectedToken;
+      await appointments[i].save();
+      await Queue.updateMany(
+        { appointmentId: appointments[i]._id },
+        { $set: { tokenNumber: expectedToken } }
+      );
+    }
+  }
+};
+
+// Helper to generate token number based on chronological appointment booked timing
+const generateTokenNumber = async (doctorId, appointmentDate, appointmentTime = '00:00') => {
+  const startOfDay = new Date(appointmentDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(appointmentDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  // Count existing active appointments before this appointment time on this date
+  const countBefore = await Appointment.countDocuments({
+    doctorId,
+    appointmentDate: { $gte: startOfDay, $lte: endOfDay },
+    status: { $ne: 'CANCELLED' },
+    appointmentTime: { $lte: appointmentTime },
+  });
+
+  return countBefore + 1;
 };
 
 // Book appointment(s)
@@ -62,7 +92,7 @@ router.post(
 
     for (const attendee of attendeeList) {
       // Each person gets their own token
-      const tokenNumber = await generateTokenNumber(doctorId, new Date(appointmentDate));
+      const tokenNumber = await generateTokenNumber(doctorId, new Date(appointmentDate), appointmentTime);
 
       // Check for duplicate booking for this patientId + slot
       const existingAppointment = await Appointment.findOne({
@@ -150,6 +180,18 @@ router.post(
     io.to(`notifications-${doctorId}`).emit('new-notification', {
       recipientId: String(doctorId),
     });
+
+    // Ensure all tokens for the day are cleanly and sequentially ordered by appointment timing
+    try {
+      await reassignTokensForDoctorDate(doctorId, new Date(appointmentDate));
+      // Refresh created appointments with updated token numbers
+      for (let i = 0; i < createdAppointments.length; i++) {
+        const refreshed = await Appointment.findById(createdAppointments[i]._id).populate(['patientId', 'doctorId']);
+        if (refreshed) createdAppointments[i] = refreshed;
+      }
+    } catch (reErr) {
+      console.error('[Appointments] Error ordering tokens:', reErr.message);
+    }
 
     // Return single object for single booking, array for group booking (backward compatible)
     if (createdAppointments.length === 1) {
@@ -274,21 +316,49 @@ router.post(
     io.emit('queue-update', { doctorId: appointment.doctorId });
     io.to(`queue-${appointment.doctorId}`).emit('queue-update', { doctorId: appointment.doctorId });
 
+    // Automatic Refund: If doctor cancels (or refund requested), refund any PAID payment associated with this appointment
+    let refundInfo = null;
+    if (req.user.role === 'DOCTOR') {
+      const payment = await Payment.findOne({
+        appointmentId: appointment._id,
+        status: 'PAID',
+      });
+      if (payment) {
+        payment.status = 'REFUNDED';
+        payment.refundDate = new Date();
+        payment.refundReason = req.body?.reason || 'Appointment cancelled by doctor';
+        await payment.save();
+        refundInfo = payment;
+      }
+    }
+
+    // Reassign tokens for the rest of the day to maintain clean sequence without gaps
+    try {
+      await reassignTokensForDoctorDate(appointment.doctorId, appointment.appointmentDate);
+    } catch (tokErr) {
+      console.error('[Appointments] Error reordering tokens after cancellation:', tokErr.message);
+    }
+
     // Notify patient when a doctor cancels
     if (req.user.role === 'DOCTOR') {
       const dateStr = new Date(appointment.appointmentDate).toDateString();
+      const refundMsg = refundInfo ? ' Any payment made has been automatically refunded to your account.' : '';
       const notification = await Notification.create({
         recipientId:   appointment.patientId,
         recipientModel: 'Patient',
         type:          'APPOINTMENT_CANCELLED',
-        title:         'Appointment Cancelled',
-        message:       `Your appointment on ${dateStr} at ${appointment.appointmentTime} has been cancelled by your doctor.`,
+        title:         'Appointment Cancelled & Refund Processed',
+        message:       `Your appointment on ${dateStr} at ${appointment.appointmentTime} has been cancelled by your doctor.${refundMsg}`,
         appointmentId: appointment._id,
       });
       io.to(`patient-${appointment.patientId}`).emit('notification', notification);
     }
 
-    res.json({ message: 'Appointment cancelled successfully', appointment });
+    res.json({
+      message: 'Appointment cancelled successfully' + (refundInfo ? ' and payment refunded' : ''),
+      appointment,
+      refund: refundInfo,
+    });
   })
 );
 
@@ -308,6 +378,7 @@ router.put(
       return res.status(403).json({ message: 'Not authorized' });
     }
 
+    const oldDate = appointment.appointmentDate;
     const rescheduledToStr = new Date(appointmentDate).toISOString().split('T')[0];
     const todayCheckStr    = new Date().toISOString().split('T')[0];
 
@@ -317,6 +388,16 @@ router.put(
     appointment.appointmentDate = appointmentDate;
     appointment.appointmentTime = appointmentTime;
     await appointment.save();
+
+    // Reorder tokens for old date and new date
+    try {
+      await reassignTokensForDoctorDate(appointment.doctorId, oldDate);
+      await reassignTokensForDoctorDate(appointment.doctorId, appointmentDate);
+      const refreshed = await Appointment.findById(appointment._id);
+      if (refreshed) appointment.tokenNumber = refreshed.tokenNumber;
+    } catch (rErr) {
+      console.error('[Appointments] Error reordering tokens on reschedule:', rErr.message);
+    }
 
     // If rescheduled to today, create a fresh queue entry
     if (rescheduledToStr === todayCheckStr) {

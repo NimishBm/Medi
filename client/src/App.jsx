@@ -25,6 +25,7 @@ import { History } from './pages/patient/History';
 import { Payments } from './pages/patient/Payments';
 import { PatientProfile } from './pages/patient/Profile';
 import { CompleteProfile } from './pages/patient/CompleteProfile';
+import { PatientBlogs } from './pages/patient/Blogs';
 
 // Doctor Pages
 import { DoctorLanding } from './pages/doctor/Landing';
@@ -36,6 +37,7 @@ import { DoctorPatients } from './pages/doctor/Patients';
 import { DoctorSchedule } from './pages/doctor/Schedule';
 import { DoctorBlog } from './pages/doctor/Blog';
 import { SetupProfile } from './pages/doctor/SetupProfile';
+import { DoctorPayments } from './pages/doctor/Payments';
 
 
 // Admin Pages
@@ -214,6 +216,14 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/patient/blogs"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <PatientBlogs />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Doctor Routes */}
           <Route
@@ -281,6 +291,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRoles={['DOCTOR']}>
                 <DoctorBlog />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/payments"
+            element={
+              <ProtectedRoute requiredRoles={['DOCTOR']}>
+                <DoctorPayments />
               </ProtectedRoute>
             }
           />

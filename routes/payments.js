@@ -1,6 +1,8 @@
 import express from 'express';
 import Payment from '../models/Payment.js';
 import Doctor from '../models/Doctor.js';
+import Patient from '../models/Patient.js';
+import Appointment from '../models/Appointment.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
@@ -64,6 +66,23 @@ router.get(
       patientId: req.params.patientId,
     })
       .populate('doctorId', 'name specialization')
+      .sort({ createdAt: -1 });
+
+    res.json(payments);
+  })
+);
+
+// Get payments for doctor
+router.get(
+  '/doctor/:doctorId',
+  protect,
+  authorize('DOCTOR', 'ADMIN'),
+  catchAsyncErrors(async (req, res) => {
+    const payments = await Payment.find({
+      doctorId: req.params.doctorId,
+    })
+      .populate('patientId', 'name email phone age gender bloodGroup')
+      .populate('appointmentId', 'appointmentDate appointmentTime appointmentType tokenNumber')
       .sort({ createdAt: -1 });
 
     res.json(payments);

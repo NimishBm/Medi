@@ -9,6 +9,7 @@ import {
   BookOpen, Send, FileText, CheckCircle, AlertCircle,
   TrendingUp, Search, Filter, ChevronDown, Save,
   Globe, Lock, RefreshCw, Upload, Link, Image,
+  Sparkles, Compass, UserCheck, Stethoscope,
 } from 'lucide-react';
 import { blogAPI } from '../../services/api';
 import { NotificationBell } from '../../components/NotificationBell';
@@ -23,10 +24,8 @@ const CATEGORIES = [
 ];
 
 const STATUS_META = {
-  published:      { label: 'Published',      style: 'bg-emerald-100 text-emerald-700 border-emerald-200',  dot: 'bg-emerald-500' },
-  pending_review: { label: 'Pending Review', style: 'bg-amber-100 text-amber-700 border-amber-200',        dot: 'bg-amber-500'   },
-  draft:          { label: 'Draft',           style: 'bg-slate-100 text-slate-600 border-slate-200',        dot: 'bg-slate-400'   },
-  rejected:       { label: 'Rejected',        style: 'bg-red-100 text-red-600 border-red-200',             dot: 'bg-red-500'     },
+  published: { label: 'Published', style: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+  draft:     { label: 'Draft',     style: 'bg-slate-100 text-slate-600 border-slate-200',       dot: 'bg-slate-400' },
 };
 
 const CATEGORY_COLORS = {
@@ -147,7 +146,10 @@ export const DoctorBlog = () => {
   useDoctorNotifications(user?._id);
 
   const [posts, setPosts]             = useState([]);
-  const [isLoading, setIsLoading]     = useState(true);
+  const [feedPosts, setFeedPosts]     = useState([]);
+  const [blogSection, setBlogSection] = useState('all_published'); // 'all_published' | 'my_blogs'
+  const [isLoading, setIsLoading]         = useState(true);
+  const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [activeTab, setActiveTab]     = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView]               = useState('list'); // 'list' | 'create' | 'edit'
@@ -168,16 +170,38 @@ export const DoctorBlog = () => {
   const fetchPosts = async () => {
     setIsLoading(true);
     try {
-      const res = await blogAPI.getPosts();
-      setPosts(res.data);
-    } catch {
-      toast.error('Failed to load posts');
+      const myRes = await blogAPI.getPosts();
+      setPosts(myRes.data || []);
+    } catch (err) {
+      console.error('Error loading doctor posts:', err);
+      toast.error('Failed to load your posts');
     } finally {
       setIsLoading(false);
+    }
+
+    try {
+      const feedRes = await blogAPI.getFeed();
+      setFeedPosts(feedRes.data || []);
+    } catch (err) {
+      console.error('Error loading feed posts:', err);
     }
   };
 
   useEffect(() => { fetchPosts(); }, []);
+
+  const fetchFeed = async () => {
+    setIsLoadingFeed(true);
+    try {
+      const res = await blogAPI.getFeed();
+      setFeedPosts(res.data || []);
+      toast.success('Published blogs updated');
+    } catch (err) {
+      console.error('Failed to refresh feed:', err);
+      toast.error(err.response?.data?.message || 'Failed to refresh published blogs');
+    } finally {
+      setIsLoadingFeed(false);
+    }
+  };
 
   // Auto-grow textarea
   useEffect(() => {
@@ -189,17 +213,24 @@ export const DoctorBlog = () => {
 
   // ── derived ────────────────────────────────────────────────────────────────
 
-  const filtered = posts
+  const filteredMyPosts = posts
     .filter((p) => activeTab === 'all' || p.status === activeTab)
     .filter((p) => categoryFilter === 'All' || p.category === categoryFilter)
-    .filter((p) => !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    .filter((p) => !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || p.content?.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const filteredFeedPosts = feedPosts
+    .filter((p) => categoryFilter === 'All' || p.category === categoryFilter)
+    .filter((p) => {
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      const author = p.doctorId?.name?.toLowerCase() || '';
+      return p.title.toLowerCase().includes(q) || p.content?.toLowerCase().includes(q) || author.includes(q);
+    });
 
   const tabCounts = {
-    all:            posts.length,
-    published:      posts.filter((p) => p.status === 'published').length,
-    pending_review: posts.filter((p) => p.status === 'pending_review').length,
-    draft:          posts.filter((p) => p.status === 'draft').length,
-    rejected:       posts.filter((p) => p.status === 'rejected').length,
+    all:       posts.length,
+    published: posts.filter((p) => p.status === 'published').length,
+    draft:     posts.filter((p) => p.status === 'draft').length,
   };
 
   const totalViews = posts.reduce((s, p) => s + (p.views || 0), 0);
@@ -246,14 +277,15 @@ export const DoctorBlog = () => {
     if (!form.title.trim()) { toast.error('Title is required'); return; }
     if (!form.content.trim()) { toast.error('Content is required'); return; }
     setIsSaving(true);
-    const payload = { ...form, status: submitStatus || form.status };
+    const chosenStatus = submitStatus || form.status || 'draft';
+    const payload = { ...form, status: chosenStatus };
     try {
       if (view === 'edit' && editPost) {
         await blogAPI.updatePost(editPost._id, payload);
-        toast.success('Post updated successfully');
+        toast.success(chosenStatus === 'published' ? 'Post published successfully!' : 'Draft updated successfully!');
       } else {
         await blogAPI.createPost(payload);
-        toast.success(submitStatus === 'pending_review' ? 'Post submitted for review!' : 'Post saved as draft!');
+        toast.success(chosenStatus === 'published' ? 'Post published successfully!' : 'Post saved as draft!');
       }
       fetchPosts();
       setView('list');
@@ -280,6 +312,9 @@ export const DoctorBlog = () => {
 
   const handlePreview = (post) => {
     setPreviewPost(post);
+    if (post._id) {
+      blogAPI.incrementView(post._id).catch(() => {});
+    }
   };
 
   // ── render ─────────────────────────────────────────────────────────────────
@@ -509,14 +544,6 @@ export const DoctorBlog = () => {
 
                     <hr className="border-gray-100" />
 
-                    {/* How publishing works — info box */}
-                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700 leading-relaxed">
-                      <p className="font-semibold mb-1">How publishing works</p>
-                      <p>• <strong>Save as Draft</strong> — only you can see it.</p>
-                      <p>• <strong>Submit for Review</strong> — sends to the clinic admin for approval before going live.</p>
-                      <p>• Once approved by admin it becomes <strong>Published</strong> and visible to patients.</p>
-                    </div>
-
                     {/* Action buttons */}
                     <button
                       type="button"
@@ -528,24 +555,13 @@ export const DoctorBlog = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleSubmit('pending_review')}
+                      onClick={() => handleSubmit('published')}
                       disabled={isSaving}
                       className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#0D9488] hover:bg-teal-600 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition"
                     >
-                      {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Send size={14} />}
-                      {isSaving ? 'Saving…' : 'Submit for Review'}
+                      {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Globe size={14} />}
+                      {isSaving ? 'Saving…' : (view === 'edit' && editPost?.status === 'published' ? 'Update Published Post' : 'Publish Post')}
                     </button>
-                    {(view === 'edit' && editPost?.status === 'published') && (
-                      <button
-                        type="button"
-                        onClick={() => handleSubmit('published')}
-                        disabled={isSaving}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition"
-                      >
-                        {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                        {isSaving ? 'Saving…' : 'Update Published Post'}
-                      </button>
-                    )}
                   </div>
                 </div>
 
@@ -609,256 +625,498 @@ export const DoctorBlog = () => {
         ══════════════════════════════════════ */}
         {view === 'list' && (
           <>
-            {/* ── Stats banner ── */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-              {[
-                { label: 'Total Posts',      value: posts.length,             icon: FileText,    color: 'teal'    },
-                { label: 'Published',        value: tabCounts.published,      icon: Globe,       color: 'emerald' },
-                { label: 'Pending Review',   value: tabCounts.pending_review, icon: Clock,       color: 'amber'   },
-                { label: 'Total Views',      value: fmtViews(totalViews),     icon: TrendingUp,  color: 'blue'    },
-              ].map(({ label, value, icon: Icon, color }) => (
-                <div key={label} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition">
-                  <div className={`w-10 h-10 bg-${color}-100 rounded-lg flex items-center justify-center flex-shrink-0`}>
-                    <Icon size={18} className={`text-${color}-600`} />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">{value}</p>
-                    <p className="text-xs text-gray-500">{label}</p>
-                  </div>
-                </div>
-              ))}
+            {/* ── Section Selector Tabs (All Published vs My Articles) ── */}
+            <div className="flex items-center justify-between gap-4 mb-6 border-b border-gray-200 pb-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBlogSection('all_published')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-sm ${
+                    blogSection === 'all_published'
+                      ? 'bg-[#1E3A5F] text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  <Compass size={16} className={blogSection === 'all_published' ? 'text-teal-300' : 'text-gray-500'} />
+                  All Published Blogs
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                    blogSection === 'all_published' ? 'bg-teal-500/30 text-teal-200' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {feedPosts.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBlogSection('my_blogs')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-sm ${
+                    blogSection === 'my_blogs'
+                      ? 'bg-[#1E3A5F] text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  <PenSquare size={16} className={blogSection === 'my_blogs' ? 'text-teal-300' : 'text-gray-500'} />
+                  My Articles & Drafts
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                    blogSection === 'my_blogs' ? 'bg-teal-500/30 text-teal-200' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {posts.length}
+                  </span>
+                </button>
+              </div>
+
+              {blogSection === 'all_published' && (
+                <button
+                  type="button"
+                  onClick={fetchFeed}
+                  disabled={isLoadingFeed}
+                  className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-teal-700 bg-white border border-gray-200 hover:bg-gray-50 px-3 py-2 rounded-lg font-medium transition shadow-sm"
+                >
+                  <RefreshCw size={12} className={isLoadingFeed ? 'animate-spin text-teal-600' : ''} />
+                  Refresh Feed
+                </button>
+              )}
             </div>
 
-            {/* ── Hero CTA (only if no posts) ── */}
-            {posts.length === 0 && !isLoading && (
-              <div className="bg-gradient-to-r from-[#1E3A5F] to-[#0D5A8A] rounded-2xl p-6 mb-6 flex items-center justify-between overflow-hidden relative">
-                <div className="relative z-10">
-                  <h2 className="text-xl font-bold text-white mb-1">Start Your Health Blog</h2>
-                  <p className="text-teal-200 text-sm mb-4 max-w-md">
-                    Share your medical expertise, tips, and health insights with your patients.
-                    Build trust and educate your community.
-                  </p>
-                  <button type="button" onClick={openCreate}
-                    className="bg-[#0D9488] hover:bg-teal-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-lg">
-                    <Plus size={16} /> Write Your First Post
-                  </button>
+            {/* ── All Published Feed View ── */}
+            {blogSection === 'all_published' && (
+              <div>
+                {/* Search & Filter Header */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 mb-5 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                        <Sparkles size={16} className="text-teal-600" />
+                        Explore Medical Articles
+                      </h2>
+                      <p className="text-xs text-gray-500">Read approved health knowledge & clinical insights published by doctors</p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {/* Search */}
+                      <div className="relative flex-shrink-0">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search title, doctor, content…"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400 w-56"
+                        />
+                      </div>
+
+                      {/* Category filter */}
+                      <div className="relative flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setShowCategoryFilter(!showCategoryFilter)}
+                          className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition text-gray-600"
+                        >
+                          <Filter size={13} />
+                          {categoryFilter === 'All' ? 'All Categories' : categoryFilter.split(' ')[0]}
+                          <ChevronDown size={13} className={`transition ${showCategoryFilter ? 'rotate-180' : ''}`} />
+                        </button>
+                        {showCategoryFilter && (
+                          <div className="absolute right-0 top-10 z-30 bg-white border border-gray-200 rounded-xl shadow-lg w-52 py-1 max-h-64 overflow-y-auto">
+                            {['All', ...CATEGORIES].map((c) => (
+                              <button key={c} type="button"
+                                onClick={() => { setCategoryFilter(c); setShowCategoryFilter(false); }}
+                                className={`w-full text-left px-4 py-2 text-sm transition ${
+                                  categoryFilter === c ? 'bg-teal-50 text-teal-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                                }`}>
+                                {c}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                {/* Decorative */}
-                <div className="hidden sm:flex flex-col items-center justify-center opacity-20 absolute right-8 top-1/2 -translate-y-1/2">
-                  <BookOpen size={96} className="text-white" />
-                </div>
+
+                {/* Published Posts Grid */}
+                {isLoadingFeed || isLoading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div key={i} className="bg-white rounded-xl border border-gray-200 overflow-hidden animate-pulse">
+                        <div className="h-44 bg-gray-100" />
+                        <div className="p-4 space-y-3">
+                          <div className="h-4 bg-gray-100 rounded w-3/4" />
+                          <div className="h-3 bg-gray-100 rounded w-1/3" />
+                          <div className="h-3 bg-gray-100 rounded w-full" />
+                          <div className="h-3 bg-gray-100 rounded w-4/5" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : filteredFeedPosts.length === 0 ? (
+                  <div className="bg-white rounded-xl border border-gray-200 p-14 text-center">
+                    <div className="w-16 h-16 bg-teal-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <Compass size={32} className="text-teal-400" />
+                    </div>
+                    <p className="font-bold text-gray-700 text-lg">No published blogs found</p>
+                    <p className="text-sm text-gray-400 mt-1 mb-4">
+                      {searchQuery ? `No published articles match "${searchQuery}"` : 'Be the first doctor to publish an article!'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={openCreate}
+                      className="bg-[#0D9488] hover:bg-teal-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition shadow-sm"
+                    >
+                      Write a Post Now
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {filteredFeedPosts.map((post, idx) => {
+                      const doc = post.doctorId;
+                      const isMyPost = doc?._id === user?._id || post.doctorId === user?._id;
+                      return (
+                        <div key={post._id}
+                          className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col group">
+                          {/* Cover */}
+                          <div className="relative h-44 overflow-hidden flex-shrink-0">
+                            {post.coverImage ? (
+                              <img
+                                src={post.coverImage}
+                                alt={post.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextElementSibling.style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className={`w-full h-full bg-gradient-to-br ${COVER_GRADIENTS[idx % COVER_GRADIENTS.length]} flex items-center justify-center ${post.coverImage ? 'hidden' : 'flex'}`}
+                              style={{ position: post.coverImage ? 'absolute' : 'static', top: 0, left: 0 }}
+                            >
+                              <PenSquare size={40} className="text-white/40" />
+                            </div>
+
+                            {/* Author badge */}
+                            <div className="absolute top-3 left-3">
+                              <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-slate-900/80 text-white font-medium backdrop-blur-sm border border-white/20">
+                                <Stethoscope size={11} className="text-teal-300" />
+                                {doc?.name ? `Dr. ${doc.name.replace(/^Dr\.\s*/i, '')}` : 'Doctor'}
+                                {isMyPost && <span className="bg-teal-500 text-[10px] px-1 rounded text-white font-bold ml-1">You</span>}
+                              </span>
+                            </div>
+
+                            {/* Read time overlay */}
+                            <div className="absolute top-3 right-3">
+                              <span className="flex items-center gap-1 text-xs text-white bg-black/50 backdrop-blur-sm px-2 py-1 rounded-full font-medium">
+                                <Clock size={10} /> {readTime(post.content)} min
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Body */}
+                          <div className="p-4 flex flex-col flex-1">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className={`text-xs px-2.5 py-1 rounded-full font-medium w-fit ${CATEGORY_COLORS[post.category] || 'bg-teal-50 text-teal-700'}`}>
+                                {post.category}
+                              </span>
+                              {doc?.specialization && (
+                                <span className="text-[11px] text-gray-500 font-medium truncate max-w-[120px]">
+                                  {doc.specialization}
+                                </span>
+                              )}
+                            </div>
+
+                            <h4 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2 mb-1.5">
+                              {post.title}
+                            </h4>
+                            <p className="text-xs text-gray-500 line-clamp-2 flex-1 leading-relaxed">
+                              {post.excerpt || post.content?.substring(0, 120)}…
+                            </p>
+
+                            {/* Meta */}
+                            <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
+                              <span className="flex items-center gap-1"><Calendar size={11} /> {fmtDate(post.publishedAt || post.createdAt)}</span>
+                              <span className="flex items-center gap-1"><Eye size={11} /> {fmtViews(post.views)}</span>
+                              <span className="flex items-center gap-1 ml-auto"><FileText size={11} /> {wordCount(post.content)}w</span>
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="flex items-center gap-2 mt-3">
+                              <button
+                                type="button"
+                                onClick={() => handlePreview(post)}
+                                className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 bg-[#0D9488] hover:bg-teal-700 text-white rounded-lg transition shadow-sm"
+                              >
+                                <Eye size={12} /> Read Full Article
+                              </button>
+                              {isMyPost && (
+                                <button
+                                  type="button"
+                                  onClick={() => openEdit(post)}
+                                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition"
+                                  title="Edit your post"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
-            {/* ── Tabs + Search + Filter bar ── */}
-            <div className="bg-white border border-gray-200 rounded-xl p-4 mb-5 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                {/* Tabs */}
-                <div className="flex flex-wrap gap-1.5 flex-1">
+            {/* ── My Articles View ── */}
+            {blogSection === 'my_blogs' && (
+              <div>
+                {/* ── Stats banner ── */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
                   {[
-                    { key: 'all',            label: 'All',            icon: BookOpen   },
-                    { key: 'published',      label: 'Published',      icon: Globe      },
-                    { key: 'pending_review', label: 'Pending',        icon: Clock      },
-                    { key: 'draft',          label: 'Drafts',         icon: FileText   },
-                    { key: 'rejected',       label: 'Rejected',       icon: AlertCircle },
-                  ].map(({ key, label, icon: Icon }) => (
-                    <button key={key} type="button"
-                      onClick={() => setActiveTab(key)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                        activeTab === key
-                          ? 'bg-[#1E3A5F] text-white shadow-sm'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`}>
-                      <Icon size={12} />
-                      {label}
-                      {tabCounts[key] > 0 && (
-                        <span className={`text-xs rounded-full px-1.5 py-0.5 font-bold ${
-                          activeTab === key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {tabCounts[key]}
-                        </span>
-                      )}
-                    </button>
+                    { label: 'Total Posts',      value: posts.length,             icon: FileText,    color: 'teal'    },
+                    { label: 'Published',        value: tabCounts.published,      icon: Globe,       color: 'emerald' },
+                    { label: 'Drafts',           value: tabCounts.draft,          icon: Clock,       color: 'slate'   },
+                  ].map(({ label, value, icon: Icon, color }) => (
+                    <div key={label} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition">
+                      <div className={`w-10 h-10 bg-${color}-100 rounded-lg flex items-center justify-center flex-shrink-0`}>
+                        <Icon size={18} className={`text-${color}-600`} />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-gray-900">{value}</p>
+                        <p className="text-xs text-gray-500">{label}</p>
+                      </div>
+                    </div>
                   ))}
                 </div>
 
-                {/* Search */}
-                <div className="relative flex-shrink-0">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search posts…"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400 w-44"
-                  />
-                </div>
+                {/* ── Hero CTA (only if no posts) ── */}
+                {posts.length === 0 && !isLoading && (
+                  <div className="bg-gradient-to-r from-[#1E3A5F] to-[#0D5A8A] rounded-2xl p-6 mb-6 flex items-center justify-between overflow-hidden relative">
+                    <div className="relative z-10">
+                      <h2 className="text-xl font-bold text-white mb-1">Start Your Health Blog</h2>
+                      <p className="text-teal-200 text-sm mb-4 max-w-md">
+                        Share your medical expertise, tips, and health insights with your patients.
+                        Build trust and educate your community.
+                      </p>
+                      <button type="button" onClick={openCreate}
+                        className="bg-[#0D9488] hover:bg-teal-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-lg">
+                        <Plus size={16} /> Write Your First Post
+                      </button>
+                    </div>
+                    {/* Decorative */}
+                    <div className="hidden sm:flex flex-col items-center justify-center opacity-20 absolute right-8 top-1/2 -translate-y-1/2">
+                      <BookOpen size={96} className="text-white" />
+                    </div>
+                  </div>
+                )}
 
-                {/* Category filter */}
-                <div className="relative flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setShowCategoryFilter(!showCategoryFilter)}
-                    className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition text-gray-600"
-                  >
-                    <Filter size={13} />
-                    {categoryFilter === 'All' ? 'Category' : categoryFilter.split(' ')[0]}
-                    <ChevronDown size={13} className={`transition ${showCategoryFilter ? 'rotate-180' : ''}`} />
-                  </button>
-                  {showCategoryFilter && (
-                    <div className="absolute right-0 top-10 z-30 bg-white border border-gray-200 rounded-xl shadow-lg w-52 py-1 max-h-64 overflow-y-auto">
-                      {['All', ...CATEGORIES].map((c) => (
-                        <button key={c} type="button"
-                          onClick={() => { setCategoryFilter(c); setShowCategoryFilter(false); }}
-                          className={`w-full text-left px-4 py-2 text-sm transition ${
-                            categoryFilter === c ? 'bg-teal-50 text-teal-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                {/* ── Tabs + Search + Filter bar ── */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 mb-5 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    {/* Tabs */}
+                    <div className="flex flex-wrap gap-1.5 flex-1">
+                      {[
+                        { key: 'all',       label: 'All',       icon: BookOpen },
+                        { key: 'published', label: 'Published', icon: Globe    },
+                        { key: 'draft',     label: 'Drafts',    icon: FileText },
+                      ].map(({ key, label, icon: Icon }) => (
+                        <button key={key} type="button"
+                          onClick={() => setActiveTab(key)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                            activeTab === key
+                              ? 'bg-[#1E3A5F] text-white shadow-sm'
+                              : 'text-gray-600 hover:bg-gray-100'
                           }`}>
-                          {c}
+                          <Icon size={12} />
+                          {label}
+                          {tabCounts[key] > 0 && (
+                            <span className={`text-xs rounded-full px-1.5 py-0.5 font-bold ${
+                              activeTab === key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              {tabCounts[key]}
+                            </span>
+                          )}
                         </button>
                       ))}
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
 
-            {/* ── Loading skeleton ── */}
-            {isLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="bg-white rounded-xl border border-gray-200 overflow-hidden animate-pulse">
-                    <div className="h-44 bg-gray-100" />
-                    <div className="p-4 space-y-3">
-                      <div className="h-4 bg-gray-100 rounded w-3/4" />
-                      <div className="h-3 bg-gray-100 rounded w-1/3" />
-                      <div className="h-3 bg-gray-100 rounded w-full" />
-                      <div className="h-3 bg-gray-100 rounded w-4/5" />
+                    {/* Search */}
+                    <div className="relative flex-shrink-0">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search my posts…"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400 w-44"
+                      />
+                    </div>
+
+                    {/* Category filter */}
+                    <div className="relative flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setShowCategoryFilter(!showCategoryFilter)}
+                        className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition text-gray-600"
+                      >
+                        <Filter size={13} />
+                        {categoryFilter === 'All' ? 'Category' : categoryFilter.split(' ')[0]}
+                        <ChevronDown size={13} className={`transition ${showCategoryFilter ? 'rotate-180' : ''}`} />
+                      </button>
+                      {showCategoryFilter && (
+                        <div className="absolute right-0 top-10 z-30 bg-white border border-gray-200 rounded-xl shadow-lg w-52 py-1 max-h-64 overflow-y-auto">
+                          {['All', ...CATEGORIES].map((c) => (
+                            <button key={c} type="button"
+                              onClick={() => { setCategoryFilter(c); setShowCategoryFilter(false); }}
+                              className={`w-full text-left px-4 py-2 text-sm transition ${
+                                categoryFilter === c ? 'bg-teal-50 text-teal-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                              }`}>
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-
-            ) : filtered.length === 0 ? (
-              /* Empty state */
-              <div className="bg-white rounded-xl border border-gray-200 p-14 text-center">
-                <div className="w-16 h-16 bg-teal-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <PenSquare size={32} className="text-teal-300" />
                 </div>
-                <p className="font-bold text-gray-600 text-lg">No posts found</p>
-                <p className="text-sm text-gray-400 mt-1 mb-5">
-                  {searchQuery
-                    ? `No results for "${searchQuery}"`
-                    : activeTab === 'all'
-                      ? 'Start sharing your health knowledge with patients.'
-                      : `No ${STATUS_META[activeTab]?.label?.toLowerCase() || activeTab} posts.`}
-                </p>
-                {activeTab === 'all' && !searchQuery && (
-                  <button type="button" onClick={openCreate}
-                    className="bg-[#0D9488] hover:bg-teal-600 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition">
-                    Write Your First Post
-                  </button>
-                )}
-              </div>
 
-            ) : (
-              /* ── Card grid ── */
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filtered.map((post, idx) => {
-                  const sm = STATUS_META[post.status] || STATUS_META.draft;
-                  return (
-                    <div key={post._id}
-                      className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col group">
-
-                      {/* Cover */}
-                      <div className="relative h-44 overflow-hidden flex-shrink-0">
-                        {post.coverImage ? (
-                          <img
-                            src={post.coverImage}
-                            alt={post.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                              e.target.nextElementSibling.style.display = 'flex';
-                            }}
-                          />
-                        ) : null}
-                        <div
-                          className={`w-full h-full bg-gradient-to-br ${COVER_GRADIENTS[idx % COVER_GRADIENTS.length]} flex items-center justify-center ${post.coverImage ? 'hidden' : 'flex'}`}
-                          style={{ position: post.coverImage ? 'absolute' : 'static', top: 0, left: 0 }}
-                        >
-                          <PenSquare size={40} className="text-white/40" />
-                        </div>
-
-                        {/* Status badge overlay */}
-                        <div className="absolute top-3 left-3">
-                          <span className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-semibold backdrop-blur-sm bg-white/90 ${sm.style}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`} />
-                            {sm.label}
-                          </span>
-                        </div>
-
-                        {/* Read time overlay */}
-                        <div className="absolute top-3 right-3">
-                          <span className="flex items-center gap-1 text-xs text-white bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full">
-                            <Clock size={10} /> {readTime(post.content)} min
-                          </span>
+                {/* ── Loading skeleton ── */}
+                {isLoading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div key={i} className="bg-white rounded-xl border border-gray-200 overflow-hidden animate-pulse">
+                        <div className="h-44 bg-gray-100" />
+                        <div className="p-4 space-y-3">
+                          <div className="h-4 bg-gray-100 rounded w-3/4" />
+                          <div className="h-3 bg-gray-100 rounded w-1/3" />
+                          <div className="h-3 bg-gray-100 rounded w-full" />
+                          <div className="h-3 bg-gray-100 rounded w-4/5" />
                         </div>
                       </div>
+                    ))}
+                  </div>
 
-                      {/* Body */}
-                      <div className="p-4 flex flex-col flex-1">
-                        {/* Category */}
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium w-fit mb-2 ${CATEGORY_COLORS[post.category] || 'bg-teal-50 text-teal-700'}`}>
-                          {post.category}
-                        </span>
-
-                        <h4 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2 mb-1.5">
-                          {post.title}
-                        </h4>
-                        <p className="text-xs text-gray-500 line-clamp-2 flex-1 leading-relaxed">
-                          {post.excerpt || post.content?.substring(0, 120)}…
-                        </p>
-
-                        {/* Meta */}
-                        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
-                          <span className="flex items-center gap-1"><Calendar size={11} /> {fmtDate(post.createdAt)}</span>
-                          <span className="flex items-center gap-1"><Eye size={11} /> {fmtViews(post.views)}</span>
-                          <span className="flex items-center gap-1 ml-auto"><FileText size={11} /> {wordCount(post.content)}w</span>
-                        </div>
-
-                        {/* Action buttons */}
-                        <div className="flex items-center gap-1 mt-3">
-                          <button
-                            type="button"
-                            onClick={() => openEdit(post)}
-                            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-[#1E3A5F] hover:bg-[#2D4F7C] text-white rounded-lg transition"
-                          >
-                            <Edit2 size={11} /> Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handlePreview(post)}
-                            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg transition"
-                          >
-                            <Eye size={11} /> Preview
-                          </button>
-                          {post.status === 'draft' && (
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(post._id)}
-                              disabled={isDeleting === post._id}
-                              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition ml-auto disabled:opacity-50"
-                            >
-                              {isDeleting === post._id
-                                ? <RefreshCw size={11} className="animate-spin" />
-                                : <Trash2 size={11} />}
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                ) : filteredMyPosts.length === 0 ? (
+                  /* Empty state */
+                  <div className="bg-white rounded-xl border border-gray-200 p-14 text-center">
+                    <div className="w-16 h-16 bg-teal-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <PenSquare size={32} className="text-teal-300" />
                     </div>
-                  );
-                })}
+                    <p className="font-bold text-gray-600 text-lg">No posts found</p>
+                    <p className="text-sm text-gray-400 mt-1 mb-5">
+                      {searchQuery
+                        ? `No results for "${searchQuery}"`
+                        : activeTab === 'all'
+                          ? 'Start sharing your health knowledge with patients.'
+                          : `No ${STATUS_META[activeTab]?.label?.toLowerCase() || activeTab} posts.`}
+                    </p>
+                    {activeTab === 'all' && !searchQuery && (
+                      <button type="button" onClick={openCreate}
+                        className="bg-[#0D9488] hover:bg-teal-600 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition">
+                        Write Your First Post
+                      </button>
+                    )}
+                  </div>
+
+                ) : (
+                  /* ── Card grid ── */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {filteredMyPosts.map((post, idx) => {
+                      const sm = STATUS_META[post.status] || STATUS_META.draft;
+                      return (
+                        <div key={post._id}
+                          className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col group">
+
+                          {/* Cover */}
+                          <div className="relative h-44 overflow-hidden flex-shrink-0">
+                            {post.coverImage ? (
+                              <img
+                                src={post.coverImage}
+                                alt={post.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextElementSibling.style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className={`w-full h-full bg-gradient-to-br ${COVER_GRADIENTS[idx % COVER_GRADIENTS.length]} flex items-center justify-center ${post.coverImage ? 'hidden' : 'flex'}`}
+                              style={{ position: post.coverImage ? 'absolute' : 'static', top: 0, left: 0 }}
+                            >
+                              <PenSquare size={40} className="text-white/40" />
+                            </div>
+
+                            {/* Status badge overlay */}
+                            <div className="absolute top-3 left-3">
+                              <span className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-semibold backdrop-blur-sm bg-white/90 ${sm.style}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`} />
+                                {sm.label}
+                              </span>
+                            </div>
+
+                            {/* Read time overlay */}
+                            <div className="absolute top-3 right-3">
+                              <span className="flex items-center gap-1 text-xs text-white bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full">
+                                <Clock size={10} /> {readTime(post.content)} min
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Body */}
+                          <div className="p-4 flex flex-col flex-1">
+                            {/* Category */}
+                            <span className={`text-xs px-2.5 py-1 rounded-full font-medium w-fit mb-2 ${CATEGORY_COLORS[post.category] || 'bg-teal-50 text-teal-700'}`}>
+                              {post.category}
+                            </span>
+
+                            <h4 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2 mb-1.5">
+                              {post.title}
+                            </h4>
+                            <p className="text-xs text-gray-500 line-clamp-2 flex-1 leading-relaxed">
+                              {post.excerpt || post.content?.substring(0, 120)}…
+                            </p>
+
+                            {/* Meta */}
+                            <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
+                              <span className="flex items-center gap-1"><Calendar size={11} /> {fmtDate(post.createdAt)}</span>
+                              <span className="flex items-center gap-1"><Eye size={11} /> {fmtViews(post.views)}</span>
+                              <span className="flex items-center gap-1 ml-auto"><FileText size={11} /> {wordCount(post.content)}w</span>
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="flex items-center gap-1 mt-3">
+                              <button
+                                type="button"
+                                onClick={() => openEdit(post)}
+                                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-[#1E3A5F] hover:bg-[#2D4F7C] text-white rounded-lg transition"
+                              >
+                                <Edit2 size={11} /> Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handlePreview(post)}
+                                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg transition"
+                              >
+                                <Eye size={11} /> Preview
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(post._id)}
+                                disabled={isDeleting === post._id}
+                                className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition ml-auto disabled:opacity-50"
+                              >
+                                {isDeleting === post._id
+                                  ? <RefreshCw size={11} className="animate-spin" />
+                                  : <Trash2 size={11} />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </>

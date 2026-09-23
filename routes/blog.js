@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import BlogPost from '../models/BlogPost.js';
+import Doctor from '../models/Doctor.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
@@ -33,6 +34,17 @@ const blogUpload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
 });
 
+// GET /api/blog/stats — debug endpoint to see blog statistics
+router.get(
+  '/stats',
+  catchAsyncErrors(async (req, res) => {
+    const total = await BlogPost.countDocuments();
+    const published = await BlogPost.countDocuments({ status: 'published' });
+    const draft = await BlogPost.countDocuments({ status: 'draft' });
+    res.json({ total, published, draft });
+  })
+);
+
 // GET /api/blog/posts — doctor's own posts
 router.get(
   '/posts',
@@ -43,10 +55,46 @@ router.get(
     const filter = { doctorId: req.user.id };
     if (status && status !== 'all') filter.status = status;
 
-    const posts = await BlogPost.find(filter).sort({ createdAt: -1 });
+    const posts = await BlogPost.find(filter)
+      .populate('doctorId', 'name specialization clinicName profilePhoto')
+      .sort({ createdAt: -1 });
     res.json(posts);
   })
 );
+
+// GET /api/blog/feed / GET /api/blog/published — all published blogs from all doctors
+const getPublishedFeed = catchAsyncErrors(async (req, res) => {
+  const { category, search } = req.query;
+  const filter = { status: 'published' };
+  if (category && category !== 'All') {
+    filter.category = category;
+  }
+  if (search && search.trim()) {
+    filter.$or = [
+      { title: { $regex: search.trim(), $options: 'i' } },
+      { content: { $regex: search.trim(), $options: 'i' } },
+      { excerpt: { $regex: search.trim(), $options: 'i' } },
+    ];
+  }
+
+  try {
+    const posts = await BlogPost.find(filter)
+      .populate('doctorId', 'name specialization clinicName profilePhoto experience')
+      .sort({ publishedAt: -1, createdAt: -1 });
+
+    console.log(`[DEBUG] Blog feed - Filter: ${JSON.stringify(filter)}, Found: ${posts.length} posts`);
+    return res.json(posts || []);
+  } catch (populateError) {
+    console.error('[ERROR] Populate failed, fetching without doctor info:', populateError.message);
+    const posts = await BlogPost.find(filter)
+      .sort({ publishedAt: -1, createdAt: -1 });
+    return res.json(posts || []);
+  }
+});
+
+// Allow unauthenticated access to feed for patients
+router.get('/feed', getPublishedFeed);
+router.get('/published', protect, getPublishedFeed);
 
 // POST /api/blog/posts — create
 router.post(

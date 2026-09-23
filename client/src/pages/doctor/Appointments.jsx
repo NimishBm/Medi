@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { logout } from '../../store/slices/authSlice';
 import { appointmentAPI, consultationAPI, prescriptionAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { Heart, LogOut, ArrowLeft, FileText, Plus, Trash2, X, CalendarClock, ListOrdered } from 'lucide-react';
+import { Heart, LogOut, ArrowLeft, FileText, Plus, Trash2, X, CalendarClock, ListOrdered, Ban, AlertTriangle } from 'lucide-react';
 import { NotificationBell } from '../../components/NotificationBell';
 import { initSocket, joinRooms } from '../../services/socket';
 import { useDoctorNotifications } from '../../hooks/useDoctorNotifications';
@@ -244,6 +244,9 @@ export const DoctorAppointments = () => {
   const [consultationNotes, setConsultationNotes] = useState({});
   const [prescriptionPatient, setPrescriptionPatient] = useState(null);
   const [reschedulingApt, setReschedulingApt] = useState(null);
+  const [cancellingApt, setCancellingApt] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -287,8 +290,26 @@ export const DoctorAppointments = () => {
 
   const handleRescheduleSaved = (updated) => {
     setAppointments((prev) =>
-      prev.map((a) => (a._id === updated._id ? { ...a, appointmentDate: updated.appointmentDate, appointmentTime: updated.appointmentTime } : a))
+      prev.map((a) => (a._id === updated._id ? { ...a, appointmentDate: updated.appointmentDate, appointmentTime: updated.appointmentTime, tokenNumber: updated.tokenNumber } : a))
     );
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!cancellingApt) return;
+    try {
+      setIsCancelling(true);
+      const res = await appointmentAPI.cancelAppointment(cancellingApt._id);
+      toast.success(res.data?.message || 'Appointment cancelled & refund processed if paid');
+      setAppointments((prev) =>
+        prev.map((a) => (a._id === cancellingApt._id ? { ...a, status: 'CANCELLED' } : a))
+      );
+      setCancellingApt(null);
+      setCancelReason('');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to cancel appointment');
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   const filteredAppointments = useMemo(() => {
@@ -370,6 +391,81 @@ export const DoctorAppointments = () => {
         />
       )}
 
+      {/* Cancel Appointment & Refund Modal */}
+      {cancellingApt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in">
+            <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 flex-shrink-0">
+                <AlertTriangle size={22} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Cancel Appointment</h3>
+                <p className="text-xs text-red-600 font-medium">Automatic Patient Refund</p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 space-y-1.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Patient:</span>
+                  <span className="font-semibold text-gray-900">{cancellingApt.patientId?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Scheduled:</span>
+                  <span className="font-semibold text-gray-900">
+                    {new Date(cancellingApt.appointmentDate).toLocaleDateString()} at {cancellingApt.appointmentTime}
+                  </span>
+                </div>
+                {cancellingApt.tokenNumber != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Token Number:</span>
+                    <span className="font-bold text-teal-700">#{cancellingApt.tokenNumber}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 leading-relaxed">
+                💰 <strong>Automatic Refund:</strong> If the patient already completed payment for this appointment, their payment will be marked <strong>REFUNDED</strong> immediately and the patient will be notified.
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Cancellation Reason (Optional)
+                </label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="e.g., Doctor unavailable, emergency schedule change..."
+                  rows={3}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => { setCancellingApt(null); setCancelReason(''); }}
+                disabled={isCancelling}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-100 rounded-lg transition"
+              >
+                Keep Appointment
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancel}
+                disabled={isCancelling}
+                className="px-5 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 rounded-lg transition flex items-center gap-1.5 shadow-sm"
+              >
+                <Ban size={15} />
+                {isCancelling ? 'Cancelling & Refunding...' : 'Confirm Cancellation & Refund'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="sticky top-0 z-50 bg-[#1E3A5F] border-b border-[#2D4F7C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -401,6 +497,12 @@ export const DoctorAppointments = () => {
               className="text-slate-200 hover:text-teal-300 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-white/10 transition hidden sm:block"
             >
               Live Queue
+            </button>
+            <button
+              onClick={() => navigate('/doctor/payments')}
+              className="text-slate-200 hover:text-teal-300 font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-white/10 transition hidden sm:block"
+            >
+              Payments
             </button>
             <button
               onClick={() => navigate('/doctor/profile')}
@@ -555,13 +657,23 @@ export const DoctorAppointments = () => {
                         </button>
                       )}
                       {!['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(apt.status) && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setReschedulingApt(apt); }}
-                          className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition"
-                        >
-                          <CalendarClock size={13} />
-                          <span className="hidden sm:inline">Reschedule</span>
-                        </button>
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setReschedulingApt(apt); }}
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition"
+                          >
+                            <CalendarClock size={13} />
+                            <span className="hidden sm:inline">Reschedule</span>
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setCancellingApt(apt); }}
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition"
+                            title="Cancel appointment and automatically refund patient"
+                          >
+                            <Ban size={13} />
+                            <span className="hidden sm:inline">Cancel</span>
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={(e) => { e.stopPropagation(); setPrescriptionPatient(apt.patientId); }}
