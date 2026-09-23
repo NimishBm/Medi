@@ -127,8 +127,6 @@ export const paymentAPI = {
   getPaymentsByPatient: (patientId) => api.get(`/payments/patient/${patientId}`),
   getPaymentById: (id) => api.get(`/payments/${id}`),
   refundPayment: (id, data) => api.post(`/payments/${id}/refund`, data),
-  createRazorpayOrder: (amount) => api.post('/payments/razorpay/order', { amount }),
-  verifyRazorpayPayment: (data) => api.post('/payments/razorpay/verify', data),
 };
 
 export const adminAPI = {
