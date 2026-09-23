@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { doctorAPI } from '../../services/api';
+import { doctorAPI, appointmentAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import { ChevronLeft, Stethoscope, Calendar, Clock, User, Users, Paperclip, X } from 'lucide-react';
@@ -33,6 +33,7 @@ export const BookingPage = () => {
   const isMobile = useIsMobile();
   const [doctor, setDoctor]   = useState(null);
   const [loading, setLoading] = useState(true);
+  const [booking, setBooking] = useState(false);
   const [form, setForm] = useState({
     appointmentDate: new Date().toISOString().split('T')[0],
     appointmentTime: '',
@@ -67,39 +68,50 @@ export const BookingPage = () => {
 
   const set = (key, val) => setForm(p => ({ ...p, [key]: val }));
 
-  const handleSubmit = e => {
+  const handleSubmit = async e => {
     e.preventDefault();
     if (!form.appointmentDate || !form.appointmentTime) { toast.error('Select date and time'); return; }
+    setBooking(true);
+    try {
+      // Build attendees list from selected checkboxes
+      const attendees = [];
+      if (selectedAttendees.has('self')) {
+        attendees.push({ isFamilyMember: false });
+      }
+      if (user?.familyMembers?.length > 0) {
+        user.familyMembers.forEach((fm, i) => {
+          if (selectedAttendees.has(String(i))) {
+            attendees.push({
+              isFamilyMember: true,
+              name: fm.name,
+              relationship: fm.relationship,
+              dateOfBirth: fm.dateOfBirth,
+              gender: fm.gender,
+              bloodGroup: fm.bloodGroup,
+              phone: fm.phone,
+              allergies: fm.allergies,
+              medicalHistory: fm.medicalHistory,
+            });
+          }
+        });
+      }
 
-    const attendees = [];
-    if (selectedAttendees.has('self')) attendees.push({ isFamilyMember: false });
-    if (user?.familyMembers?.length > 0) {
-      user.familyMembers.forEach((fm, i) => {
-        if (selectedAttendees.has(String(i))) {
-          attendees.push({
-            isFamilyMember: true,
-            name: fm.name, relationship: fm.relationship, dateOfBirth: fm.dateOfBirth,
-            gender: fm.gender, bloodGroup: fm.bloodGroup, phone: fm.phone,
-            allergies: fm.allergies, medicalHistory: fm.medicalHistory,
-          });
-        }
-      });
-    }
-
-    const payload = {
-      patientId: user._id,
-      doctorId,
-      appointmentDate: form.appointmentDate,
-      appointmentTime: form.appointmentTime,
-      appointmentType: form.appointmentType,
-      reason: form.reason || 'Consultation',
-      bookedBy: user._id,
-      attendees,
-    };
-
-    navigate('/patient/payment', {
-      state: { payload, doctor, attendeeCount: selectedAttendees.size },
-    });
+      const payload = {
+        patientId: user._id,
+        doctorId,
+        appointmentDate: form.appointmentDate,
+        appointmentTime: form.appointmentTime,
+        appointmentType: form.appointmentType,
+        reason: form.reason || 'Consultation',
+        bookedBy: user._id,
+        attendees,
+      };
+      await appointmentAPI.createAppointment(payload);
+      toast.success('Appointment booked!');
+      navigate('/patient/payments');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to book appointment');
+    } finally { setBooking(false); }
   };
 
   if (loading) return (
@@ -318,9 +330,9 @@ export const BookingPage = () => {
               </div>
             )}
 
-            <button type="submit" disabled={!form.appointmentTime}
-              style={{ width: '100%', background: !form.appointmentTime ? '#9CA3AF' : T, color: '#fff', fontWeight: 800, fontSize: 15, padding: '14px', borderRadius: 14, border: 'none', cursor: form.appointmentTime ? 'pointer' : 'not-allowed', transition: 'background 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              💳 Pay & Confirm{selectedAttendees.size > 1 ? ` (${selectedAttendees.size})` : ''}
+            <button type="submit" disabled={booking || !form.appointmentTime}
+              style={{ width: '100%', background: booking || !form.appointmentTime ? '#9CA3AF' : T, color: '#fff', fontWeight: 800, fontSize: 15, padding: '14px', borderRadius: 14, border: 'none', cursor: form.appointmentTime ? 'pointer' : 'not-allowed', transition: 'background 0.15s' }}>
+              {booking ? 'Confirming...' : `Confirm Booking${selectedAttendees.size > 1 ? ` (${selectedAttendees.size})` : ''}`}
             </button>
 
             <p style={{ fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginTop: -6 }}>
