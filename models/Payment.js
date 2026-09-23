@@ -37,7 +37,7 @@ const paymentSchema = new mongoose.Schema(
 
     paymentMethod: {
       type: String,
-      enum: ['CASH', 'UPI', 'CARD'],
+      enum: ['CASH', 'UPI', 'CARD', 'RAZORPAY'],
       required: true,
     },
 
@@ -46,6 +46,9 @@ const paymentSchema = new mongoose.Schema(
       enum: ['PENDING', 'PAID', 'REFUNDED'],
       default: 'PENDING',
     },
+
+    razorpayOrderId:   { type: String },
+    razorpayPaymentId: { type: String },
 
     paymentDate: Date,
     refundDate: Date,

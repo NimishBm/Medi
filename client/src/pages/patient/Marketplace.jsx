@@ -84,7 +84,8 @@ export const Marketplace = () => {
         ]);
 
         if (doctorsResult.status === 'fulfilled') {
-          setDoctors(Array.isArray(doctorsResult.value.data) ? doctorsResult.value.data : []);
+          const d = doctorsResult.value.data;
+          setDoctors(Array.isArray(d) ? d : (d?.doctors || []));
         } else {
           setDoctors([]);
           if (doctorsResult.reason?.response?.status !== 401) {
