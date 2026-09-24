@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { organizationAPI } from '../../services/api';
+import { doctorAPI } from '../../services/api';
 import {
   ChevronLeft, MapPin, Phone, Globe, Building2, Stethoscope, Star,
 } from 'lucide-react';
@@ -36,9 +37,17 @@ export const OrganizationDetail = () => {
     const load = async () => {
       try {
         setLoading(true);
-        const res = await organizationAPI.getOrganizationById(orgId);
+        const res = await organizationAPI.getById(orgId);
         setOrg(res.data.organization);
-        setDoctors(res.data.doctors || []);
+        console.log(res.data.doctors);
+
+        const doctorIds = res.data.doctors || [];
+        const doctorRequests = doctorIds.map(id => doctorAPI.getDoctorById(id));
+        const responses = await Promise.all(doctorRequests);
+        // 3. Extract the data from each response and update state
+        const fullDoctorsData = responses.map(r => r.data);
+        setDoctors(fullDoctorsData || []);
+
       } catch {
         toast.error('Failed to load organization');
         navigate(-1);
