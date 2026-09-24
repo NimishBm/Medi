@@ -54,6 +54,38 @@ app.use(cors());
 app.use(compression());
 app.use(express.json());
 
+// Health check and root API endpoint (before DB connection to avoid blocking health checks)
+app.get(['/api', '/api/'], (req, res) => {
+  res.json({
+    message: 'ClinicFlow API is running',
+    status: 'OK',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth',
+      doctors: '/api/doctors',
+      appointments: '/api/appointments',
+      queue: '/api/queue',
+      notifications: '/api/notifications',
+      consultations: '/api/consultations',
+      prescriptions: '/api/prescriptions',
+      payments: '/api/payments',
+      analytics: '/api/analytics',
+      search: '/api/search',
+      organizations: '/api/organizations',
+      admin: '/api/admin',
+      blog: '/api/blog',
+    },
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', env: process.env.NODE_ENV || 'production' });
+});
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK' });
+});
+
 // Serverless / persistent DB connection handler
 let connPromise = null;
 const connectDB = async () => {
@@ -154,38 +186,6 @@ app.use('/blog', blogRoutes);
 
 app.use('/api/notifications', notificationRoutes);
 app.use('/notifications', notificationRoutes);
-
-// Health check and root API endpoint
-app.get(['/api', '/api/'], (req, res) => {
-  res.json({
-    message: 'ClinicFlow API is running',
-    status: 'OK',
-    version: '1.0.0',
-    endpoints: {
-      health: '/api/health',
-      auth: '/api/auth',
-      doctors: '/api/doctors',
-      appointments: '/api/appointments',
-      queue: '/api/queue',
-      notifications: '/api/notifications',
-      consultations: '/api/consultations',
-      prescriptions: '/api/prescriptions',
-      payments: '/api/payments',
-      analytics: '/api/analytics',
-      search: '/api/search',
-      organizations: '/api/organizations',
-      admin: '/api/admin',
-      blog: '/api/blog',
-    },
-  });
-});
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', env: process.env.NODE_ENV || 'production' });
-});
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK' });
-});
 
 // SPA catch-all route for frontend navigation
 app.get('*', (req, res, next) => {
