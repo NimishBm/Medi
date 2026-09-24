@@ -73,7 +73,7 @@ export const DoctorRegister = () => {
           <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center mb-6">
             <Heart className="text-white" size={28} strokeWidth={2.5} />
           </div>
-          <h1 className="text-4xl font-bold mb-1">ClinicFlow</h1>
+          <h1 className="text-4xl font-bold mb-1">MediQ</h1>
           <p className="text-blue-100 text-lg mb-12">for Doctors</p>
           <div className="space-y-6 text-sm text-blue-100">
             <p>Join our network of verified doctors and manage your clinic digitally.</p>
@@ -92,7 +92,7 @@ export const DoctorRegister = () => {
               <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Heart className="text-white" size={22} strokeWidth={2.5} />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">ClinicFlow</h1>
+              <h1 className="text-2xl font-bold text-gray-900">MediQ</h1>
             </div>
 
             <h2 className="text-3xl font-bold text-gray-900 mb-1">Doctor Registration</h2>

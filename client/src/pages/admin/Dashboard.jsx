@@ -575,7 +575,7 @@ export const AdminDashboard = () => {
       <header className="bg-slate-800 text-white px-6 py-4 flex items-center justify-between shadow z-10">
         <div className="flex items-center gap-3">
           <ShieldCheck size={22} />
-          <span className="font-bold text-lg">ClinicFlow Admin</span>
+          <span className="font-bold text-lg">MediQ Admin</span>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-slate-300 text-sm hidden sm:block">{user?.email}</span>

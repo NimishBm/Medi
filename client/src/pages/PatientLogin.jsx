@@ -71,7 +71,7 @@ export const PatientLogin = () => {
           <div style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.2)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Stethoscope size={24} color="#fff" strokeWidth={2.5} />
           </div>
-          <span style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '-0.5px' }}>ClinicFlow</span>
+          <span style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '-0.5px' }}>MediQ</span>
         </div>
 
         <h2 style={{ fontSize: 32, fontWeight: 900, color: '#fff', lineHeight: 1.2, marginBottom: 8 }}>
@@ -97,7 +97,7 @@ export const PatientLogin = () => {
 
         <div style={{ marginTop: 52, padding: '16px 20px', background: 'rgba(255,255,255,0.1)', borderRadius: 14, borderLeft: '3px solid rgba(255,255,255,0.4)' }}>
           <p style={{ color: '#E0FDF4', fontSize: 13, fontStyle: 'italic', lineHeight: 1.6 }}>
-            "ClinicFlow cut my waiting room time in half. I knew exactly when to arrive."
+            "MediQ cut my waiting room time in half. I knew exactly when to arrive."
           </p>
           <p style={{ color: '#99F6E4', fontSize: 12, fontWeight: 600, marginTop: 8 }}>— Patient, Mumbai</p>
         </div>
@@ -114,7 +114,7 @@ export const PatientLogin = () => {
             <div style={{ width: 38, height: 38, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Stethoscope size={20} color="#fff" strokeWidth={2.5} />
             </div>
-            <span style={{ fontSize: 20, fontWeight: 900, color: T }}>ClinicFlow</span>
+            <span style={{ fontSize: 20, fontWeight: 900, color: T }}>MediQ</span>
           </div>
 
           <div style={{ background: '#fff', borderRadius: 20, padding: '36px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)', border: '1.5px solid #E5E7EB' }}>

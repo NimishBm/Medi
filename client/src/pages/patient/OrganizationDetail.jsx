@@ -76,7 +76,7 @@ export const OrganizationDetail = () => {
             <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#1D4ED8,#2563EB)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Building2 size={16} color="#fff" strokeWidth={2.5} />
             </div>
-            <span style={{ fontWeight: 800, fontSize: 16, color: '#1D4ED8', letterSpacing: '-0.3px' }}>ClinicFlow</span>
+            <span style={{ fontWeight: 800, fontSize: 16, color: '#1D4ED8', letterSpacing: '-0.3px' }}>MediQ</span>
           </div>
         </div>
       </header>

@@ -191,7 +191,7 @@ export const Marketplace = () => {
           </button>
           <div onClick={() => navigate(user ? '/patient' : '/')} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <div style={S.logo}><Stethoscope size={16} color="#fff" strokeWidth={2.5} /></div>
-            <span style={S.logoText}>ClinicFlow</span>
+            <span style={S.logoText}>MediQ</span>
           </div>
           {!isMobile && <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginLeft: 8 }}>/ Browse Doctors</span>}
 
@@ -301,7 +301,7 @@ export const Marketplace = () => {
         {activeTab === 'hospitals' ? (
           <>
             <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
-              <span style={{ fontWeight: 700, color: '#111827' }}>{organizations.length}</span> hospital{organizations.length !== 1 ? 's' : ''} &amp; clinic{organizations.length !== 1 ? 's' : ''} on ClinicFlow
+              <span style={{ fontWeight: 700, color: '#111827' }}>{organizations.length}</span> hospital{organizations.length !== 1 ? 's' : ''} &amp; clinic{organizations.length !== 1 ? 's' : ''} on MediQ
             </p>
             {organizations.length === 0 ? (
               <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '56px 16px', textAlign: 'center' }}>

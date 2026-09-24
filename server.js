@@ -57,7 +57,7 @@ app.use(express.json());
 // Health check and root API endpoint (before DB connection to avoid blocking health checks)
 app.get(['/api', '/api/'], (req, res) => {
   res.json({
-    message: 'ClinicFlow API is running',
+    message: 'MediQ API is running',
     status: 'OK',
     version: '1.0.0',
     endpoints: {

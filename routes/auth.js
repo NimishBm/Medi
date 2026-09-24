@@ -21,7 +21,7 @@ const generateToken = (user, role) => {
       role,
       email: user.email
     },
-    process.env.JWT_SECRET || 'clinicflow_super_secret_jwt_key_2026',
+    process.env.JWT_SECRET || 'MediQ_super_secret_jwt_key_2026',
     { expiresIn: '7d' }
   );
 };

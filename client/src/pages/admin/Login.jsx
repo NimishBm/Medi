@@ -45,7 +45,7 @@ export const AdminLogin = () => {
             <ShieldCheck className="text-white" size={30} />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Admin Portal</h1>
-          <p className="text-gray-500 text-sm mt-1">ClinicFlow Administration</p>
+          <p className="text-gray-500 text-sm mt-1">MediQ Administration</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
@@ -55,7 +55,7 @@ export const AdminLogin = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@clinicflow.com"
+              placeholder="admin@MediQ.com"
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 text-sm"
             />
           </div>

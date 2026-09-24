@@ -93,7 +93,7 @@ export const PatientBlog = () => {
             <div style={{ width: 32, height: 32, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Stethoscope size={16} color="#fff" strokeWidth={2.5} />
             </div>
-            <span style={{ fontWeight: 800, fontSize: 16, color: T }}>ClinicFlow</span>
+            <span style={{ fontWeight: 800, fontSize: 16, color: T }}>MediQ</span>
           </div>
           {!isMobile && (
             <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginLeft: 4 }}>

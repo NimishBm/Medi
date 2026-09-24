@@ -56,7 +56,7 @@ export const DoctorLogin = () => {
             <Stethoscope size={24} color="#fff" strokeWidth={2.5} />
           </div>
           <div>
-            <span style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '-0.5px' }}>ClinicFlow</span>
+            <span style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '-0.5px' }}>MediQ</span>
             <span style={{ fontSize: 12, color: '#99F6E4', display: 'block', fontWeight: 600, marginTop: -2 }}>for Doctors</span>
           </div>
         </div>
@@ -93,7 +93,7 @@ export const DoctorLogin = () => {
             <div style={{ width: 38, height: 38, background: 'linear-gradient(135deg,#1E3A5F,#0D9488)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Stethoscope size={20} color="#fff" strokeWidth={2.5} />
             </div>
-            <span style={{ fontSize: 20, fontWeight: 900, color: '#1E3A5F' }}>ClinicFlow</span>
+            <span style={{ fontSize: 20, fontWeight: 900, color: '#1E3A5F' }}>MediQ</span>
           </div>
 
           <div style={{ background: '#fff', borderRadius: 20, padding: '36px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)', border: '1.5px solid #E5E7EB' }}>

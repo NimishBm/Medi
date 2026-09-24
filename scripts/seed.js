@@ -13,7 +13,7 @@ dotenv.config();
 
 const seedDatabase = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/clinicflow');
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/MediQ');
     console.log('Connected to MongoDB');
 
     // Clear existing data
