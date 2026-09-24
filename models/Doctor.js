@@ -39,6 +39,11 @@ organizationIds: [
   }
 ],
 
+organization: {
+  type: String,
+  trim: true
+},
+
     experience: {
       type: Number,
       default: 0

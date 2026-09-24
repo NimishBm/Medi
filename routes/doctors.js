@@ -49,7 +49,7 @@ router.get(
     const skip = (page - 1) * limit;
 
     const doctors = await Doctor.find({ isActive: true })
-      .select('name specialization consultationFee profilePhoto averageRating totalReviews experience organizationIds')
+      .select('name specialization consultationFee profilePhoto averageRating totalReviews experience organizationIds organization')
       .populate('organizationIds', 'name city type logo')
       .lean()
       .skip(skip)

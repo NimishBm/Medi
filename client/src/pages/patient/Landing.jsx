@@ -360,12 +360,47 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
         )}
 
         {/* ── Greeting row ── */}
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: isMobile ? 14 : 20 }}>
           <h2 style={{ fontSize: 22, fontWeight: 800, color: '#111827', marginBottom: 2 }}>
             Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {user?.name?.split(' ')[0]} 👋
           </h2>
           <p style={{ color: '#6B7280', fontSize: 14 }}>How can we help you today?</p>
         </div>
+
+        {/* ── Mobile search bar ── */}
+        {isMobile && (
+          <div style={{ position: 'relative', marginBottom: 20 }}>
+            <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', zIndex: 1 }} />
+            <input
+              type="text"
+              placeholder="Search doctor, symptom, specialty..."
+              value={searchInput}
+              onChange={e => { setSearchInput(e.target.value); setShowSuggestions(true); }}
+              onKeyPress={handleSearch}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              style={{ width: '100%', paddingLeft: 42, paddingRight: 14, paddingTop: 12, paddingBottom: 12, background: '#F5F7FA', border: '1.5px solid #E5E7EB', borderRadius: 28, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 14, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 100, overflow: 'hidden' }}>
+                {suggestions.map(s => (
+                  <button
+                    key={s}
+                    onMouseDown={() => {
+                      setSearchInput(s);
+                      setShowSuggestions(false);
+                      navigate('/patient/marketplace', { state: { search: s } });
+                    }}
+                    style={{ width: '100%', textAlign: 'left', padding: '11px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#111827', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #F3F4F6' }}
+                  >
+                    <Search size={12} color="#0D9488" />
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Quick action tiles ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 28 }}>
