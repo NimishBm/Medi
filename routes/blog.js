@@ -12,7 +12,7 @@ const router = express.Router();
 // ── image upload setup ────────────────────────────────────────────────────────
 
 const blogUploadsDir = path.join(process.cwd(), 'uploads', 'blog');
-if (!fs.existsSync(blogUploadsDir)) {
+if (process.env.VERCEL !== '1' && !fs.existsSync(blogUploadsDir)) {
   fs.mkdirSync(blogUploadsDir, { recursive: true });
 }
 
