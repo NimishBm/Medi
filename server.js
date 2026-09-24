@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import mongoose from 'mongoose';
 import 'express-async-errors';
 import http from 'http';
@@ -30,18 +31,27 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const server = http.createServer(app);
 
-// Export io for use in routes
-export const io = new Server(server, {
-  cors: {
-    origin: process.env.CLIENT_URL || '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  },
-});
+// Only create HTTP server and Socket.IO locally (not on Vercel)
+let server;
+let io;
+
+if (process.env.VERCEL !== '1') {
+  server = http.createServer(app);
+  io = new Server(server, {
+    cors: {
+      origin: process.env.CLIENT_URL || '*',
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    },
+  });
+} else {
+  // Vercel doesn't support Socket.IO in serverless - skip it
+  server = app;
+}
 
 // Middleware
 app.use(cors());
+app.use(compression());
 app.use(express.json());
 
 // Serverless / persistent DB connection handler
@@ -55,14 +65,18 @@ const connectDB = async () => {
   }
   if (!connPromise || mongoose.connection.readyState === 0) {
     connPromise = mongoose.connect(process.env.MONGO_URI, {
-      serverSelectionTimeoutMS: 8000,
-      connectTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      family: 4,
+      maxPoolSize: 10,
+      minPoolSize: 5,
     });
   }
   try {
     await connPromise;
   } catch (err) {
-    connPromise = null; // reset promise so next request retries fresh connection
+    connPromise = null;
     throw err;
   }
   return mongoose.connection;
@@ -181,31 +195,33 @@ app.get('*', (req, res, next) => {
   res.sendFile(path.join(clientDistPath, 'index.html'));
 });
 
-// Socket.IO events (used when running via node server.js)
-io.on('connection', (socket) => {
-  // Patient notification room
-  socket.on('join-notifications', (data) => {
-    if (data?.userId) {
-      socket.join(`patient-${data.userId}`);
-      socket.join(`notifications-${data.userId}`);
-    }
+// Socket.IO events (only used when running via node server.js, not on Vercel)
+if (io) {
+  io.on('connection', (socket) => {
+    // Patient notification room
+    socket.on('join-notifications', (data) => {
+      if (data?.userId) {
+        socket.join(`patient-${data.userId}`);
+        socket.join(`notifications-${data.userId}`);
+      }
+    });
+    // Doctor notification rooms — join both doctor-${id} and notifications-${id}
+    // so that any code emitting to either room reaches the doctor
+    socket.on('join-doctor-notifications', (data) => {
+      if (data?.doctorId) {
+        socket.join(`doctor-${data.doctorId}`);
+        socket.join(`notifications-${data.doctorId}`);
+      }
+    });
+    socket.on('join-queue', (data) => {
+      if (data?.doctorId) socket.join(`queue-${data.doctorId}`);
+    });
+    socket.on('leave-queue', (data) => {
+      if (data?.doctorId) socket.leave(`queue-${data.doctorId}`);
+    });
+    socket.on('disconnect', () => {});
   });
-  // Doctor notification rooms — join both doctor-${id} and notifications-${id}
-  // so that any code emitting to either room reaches the doctor
-  socket.on('join-doctor-notifications', (data) => {
-    if (data?.doctorId) {
-      socket.join(`doctor-${data.doctorId}`);
-      socket.join(`notifications-${data.doctorId}`);
-    }
-  });
-  socket.on('join-queue', (data) => {
-    if (data?.doctorId) socket.join(`queue-${data.doctorId}`);
-  });
-  socket.on('leave-queue', (data) => {
-    if (data?.doctorId) socket.leave(`queue-${data.doctorId}`);
-  });
-  socket.on('disconnect', () => {});
-});
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -222,5 +238,8 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
     console.log(`Server running on port ${PORT}`);
   });
 }
+
+// Export io globally (will be null/undefined on Vercel)
+export { io };
 
 export default app;
