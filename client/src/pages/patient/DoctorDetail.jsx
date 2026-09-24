@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { doctorAPI, queueAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
-import { ChevronLeft, Stethoscope, Star, Clock, MapPin, Phone, CheckCircle, Calendar } from 'lucide-react';
+import { ChevronLeft, Stethoscope, Star, Clock, MapPin, Phone, CheckCircle, Calendar, Building2 } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 const T = '#0D9488';
@@ -118,6 +118,17 @@ export const DoctorDetail = () => {
                     {doctor.isVerified && <VerifiedBadge />}
                   </div>
                   <p style={{ fontSize: 14, color: '#6B7280', fontWeight: 600 }}>{doctor.specialization}</p>
+                  {doctor.organizationIds?.length > 0 && (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                      {doctor.organizationIds.map(org => (
+                        <button key={org._id}
+                          onClick={() => navigate(user ? `/patient/organizations/${org._id}` : `/organizations/${org._id}`)}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, padding: '3px 9px', background: '#EFF6FF', color: '#1D4ED8', border: '1.5px solid #BFDBFE', borderRadius: 20, cursor: 'pointer' }}>
+                          <Building2 size={11} />{org.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <button onClick={handleBook}

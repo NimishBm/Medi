@@ -191,4 +191,18 @@ export const adminBlogAPI = {
   updateStatus: (id, status) => api.put(`/admin/blog/${id}/status`, { status }),
   deletePost:   (id)     => api.delete(`/admin/blog/${id}`),
 };
+
+export const organizationAPI = {
+  getOrganizations:    ()    => api.get('/organizations'),
+  getOrganizationById: (id)  => api.get(`/organizations/${id}`),
+  searchOrganizations: (q)   => api.get('/organizations/search', { params: { q } }),
+  createOrganization:  (data) => api.post('/organizations', data),
+  updateOrganization:  (id, data) => api.put(`/organizations/${id}`, data),
+  addDoctor:           (id, doctorId) => api.post(`/organizations/${id}/doctors`, { doctorId }),
+  removeDoctor:        (id, doctorId) => api.delete(`/organizations/${id}/doctors/${doctorId}`),
+  getMyOrganizations:  ()    => api.get('/organizations/my'),
+  joinOrganization:    (orgId) => api.post('/organizations/join', { organizationId: orgId }),
+  leaveOrganization:   (orgId) => api.delete(`/organizations/leave/${orgId}`),
+};
+
 export default api;

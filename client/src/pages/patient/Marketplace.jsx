@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { doctorAPI, queueAPI, searchAPI } from '../../services/api';
+import { doctorAPI, queueAPI, searchAPI, organizationAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import {
   ChevronLeft, Search, Heart, Activity, Star, SearchX, MapPin, Stethoscope,
   Eye, Smile, Thermometer, Layers, Shield, Zap, SlidersHorizontal, ChevronDown,
+  Building2, Phone, Globe,
 } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { NotificationBell } from '../../components/NotificationBell';
@@ -65,6 +66,9 @@ export const Marketplace = () => {
   const [searchResults, setSearchResults] = useState(null);
   const [searchType, setSearchType]       = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [activeTab, setActiveTab]         = useState('doctors');
+  const [organizations, setOrganizations] = useState([]);
+  const [orgsLoading, setOrgsLoading]     = useState(false);
 
   useEffect(() => {
     if (location.state?.category) {
@@ -79,13 +83,15 @@ export const Marketplace = () => {
       try {
         setLoading(true);
 
-        const [doctorsResult, queueResult] = await Promise.allSettled([
+        const [doctorsResult, queueResult, orgsResult] = await Promise.allSettled([
           doctorAPI.getDoctors(),
           queueAPI.getQueueStats(),
+          organizationAPI.getOrganizations(),
         ]);
 
         if (doctorsResult.status === 'fulfilled') {
-          setDoctors(Array.isArray(doctorsResult.value.data) ? doctorsResult.value.data : []);
+          const data = doctorsResult.value.data;
+          setDoctors(Array.isArray(data) ? data : (data?.doctors || []));
         } else {
           setDoctors([]);
           if (doctorsResult.reason?.response?.status !== 401) {
@@ -96,6 +102,10 @@ export const Marketplace = () => {
         setQueueStats(
           queueResult.status === 'fulfilled' ? (queueResult.value.data || {}) : {}
         );
+
+        if (orgsResult.status === 'fulfilled') {
+          setOrganizations(orgsResult.value.data?.organizations || []);
+        }
       } finally {
         setLoading(false);
       }
@@ -241,7 +251,29 @@ export const Marketplace = () => {
           </div>
         </div>
 
-        {/* Category pills */}
+        {/* Tab switcher: Doctors / Hospitals */}
+        <div style={{ background: '#fff', borderTop: '1px solid #F3F4F6', padding: '0 16px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', gap: 0 }}>
+            {[
+              { id: 'doctors', label: 'Doctors', icon: <Stethoscope size={14} style={{ marginRight: 5 }} /> },
+              { id: 'hospitals', label: 'Hospitals & Clinics', icon: <Building2 size={14} style={{ marginRight: 5 }} /> },
+            ].map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', padding: '10px 18px', fontWeight: 700, fontSize: 13,
+                  background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                  color: activeTab === tab.id ? T : '#6B7280',
+                  borderBottom: `3px solid ${activeTab === tab.id ? T : 'transparent'}`,
+                  transition: 'all 0.15s',
+                }}>
+                {tab.icon}{tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Category pills — only for Doctors tab */}
+        {activeTab === 'doctors' && (
         <div style={{ background: '#FAFAFA', borderTop: '1px solid #F3F4F6', padding: '8px 16px', overflowX: 'auto' }}>
           <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', gap: 8 }}>
             {CATEGORIES.map(cat => (
@@ -262,90 +294,178 @@ export const Marketplace = () => {
             ))}
           </div>
         </div>
+        )}
       </header>
 
       <div style={S.body}>
-        <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
-          <span style={{ fontWeight: 700, color: '#111827' }}>{filtered.length}</span> doctor{filtered.length !== 1 ? 's' : ''} available
-          {selectedCategory !== 'all' && <span> in <span style={{ color: T, fontWeight: 600 }}>{CATEGORIES.find(c => c.id === selectedCategory)?.name}</span></span>}
-        </p>
-
-        {filtered.length === 0 ? (
-          <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '56px 16px', textAlign: 'center' }}>
-            <SearchX size={48} color="#D1D5DB" style={{ margin: '0 auto 16px' }} />
-            <p style={{ fontWeight: 700, color: '#111827', marginBottom: 6 }}>No doctors found</p>
-            <p style={{ fontSize: 13, color: '#6B7280' }}>Try adjusting filters or searching differently</p>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 16 }}>
-            {filtered.map(doc => {
-              const stats = queueStats[doc._id] || { waiting: 0 };
-              const wait = getWait(doc._id);
-              const rating = doc.averageRating > 0 ? doc.averageRating.toFixed(1) : null;
-              return (
-                <div key={doc._id}
-                  style={{ background: '#fff', borderRadius: 16, border: '1.5px solid #E5E7EB', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer', transition: 'box-shadow 0.15s, border-color 0.15s' }}
-                  onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.09)'; e.currentTarget.style.borderColor = '#99F6E4'; }}
-                  onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#E5E7EB'; }}
-                  onClick={() => navigate(user ? `/patient/doctors/${doc._id}` : `/doctors/${doc._id}`)}>
-                  {/* Accent strip */}
-                  <div style={{ height: 6, background: `linear-gradient(90deg,${T},#14B8A6)` }} />
-                  <div style={{ padding: '14px 16px 0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                      <div style={{ width: 50, height: 50, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 20 }}>
-                        {doc.name.charAt(0)}
-                      </div>
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 20,
-                        background: wait === 0 ? '#D1FAE5' : wait <= 20 ? '#FEF9C3' : '#FEE2E2',
-                        color: wait === 0 ? '#065F46' : wait <= 20 ? '#92400E' : '#991B1B',
-                      }}>
-                        {wait === 0 ? 'Available' : `~${wait}m wait`}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: 2 }}>
-                      <p style={{ fontWeight: 800, fontSize: 15, color: '#111827', lineHeight: 1.3, margin: 0 }}>
-                        Dr. {doc.name.replace(/^Dr\.?\s+/, '')}
-                      </p>
-                      {doc.isVerified && (
-                        <div title="Verified Doctor" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, background: '#059669', borderRadius: '50%', flexShrink: 0 }}>
-                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
-                            <path d="M5 12L10 17L19 8" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
+        {activeTab === 'hospitals' ? (
+          <>
+            <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
+              <span style={{ fontWeight: 700, color: '#111827' }}>{organizations.length}</span> hospital{organizations.length !== 1 ? 's' : ''} &amp; clinic{organizations.length !== 1 ? 's' : ''} on ClinicFlow
+            </p>
+            {organizations.length === 0 ? (
+              <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '56px 16px', textAlign: 'center' }}>
+                <Building2 size={48} color="#D1D5DB" style={{ margin: '0 auto 16px' }} />
+                <p style={{ fontWeight: 700, color: '#111827', marginBottom: 6 }}>No hospitals listed yet</p>
+                <p style={{ fontSize: 13, color: '#6B7280' }}>Partner hospitals will appear here</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 16 }}>
+                {organizations.map(org => {
+                  const orgPath = user ? `/patient/organizations/${org._id}` : `/organizations/${org._id}`;
+                  const initials = org.name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                  const typeColors = { HOSPITAL: '#EFF6FF', CLINIC: '#F0FDF4', CHAIN: '#FFF7ED', DIAGNOSTIC_CENTER: '#FDF4FF' };
+                  const typeTextColors = { HOSPITAL: '#1D4ED8', CLINIC: '#065F46', CHAIN: '#9A3412', DIAGNOSTIC_CENTER: '#7E22CE' };
+                  const typeBg = typeColors[org.type] || '#F3F4F6';
+                  const typeText = typeTextColors[org.type] || '#374151';
+                  return (
+                    <div key={org._id}
+                      style={{ background: '#fff', borderRadius: 16, border: '1.5px solid #E5E7EB', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer', transition: 'box-shadow 0.15s, border-color 0.15s' }}
+                      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.09)'; e.currentTarget.style.borderColor = '#99F6E4'; }}
+                      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#E5E7EB'; }}
+                      onClick={() => navigate(orgPath)}>
+                      <div style={{ height: 6, background: `linear-gradient(90deg,#1D4ED8,${T})` }} />
+                      <div style={{ padding: '16px 16px 0' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 12 }}>
+                          <div style={{ width: 54, height: 54, background: `linear-gradient(135deg,#1D4ED8,${T})`, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 18, flexShrink: 0 }}>
+                            {org.logo ? <img src={org.logo} alt={org.name} style={{ width: 54, height: 54, borderRadius: 14, objectFit: 'cover' }} /> : initials}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontWeight: 800, fontSize: 15, color: '#111827', margin: '0 0 4px', lineHeight: 1.3 }}>{org.name}</p>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: typeBg, color: typeText }}>
+                                {org.type?.replace('_', ' ')}
+                              </span>
+                              {org.city && (
+                                <span style={{ fontSize: 11, color: '#6B7280', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                  <MapPin size={10} />{org.city}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      )}
+
+                        {org.description && (
+                          <p style={{ fontSize: 12, color: '#6B7280', marginBottom: 10, lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                            {org.description}
+                          </p>
+                        )}
+
+                        {org.specialties?.length > 0 && (
+                          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
+                            {org.specialties.slice(0, 3).map(s => (
+                              <span key={s} style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', background: '#F0FDF4', color: T, borderRadius: 8 }}>{s}</span>
+                            ))}
+                            {org.specialties.length > 3 && (
+                              <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', background: '#F3F4F6', color: '#6B7280', borderRadius: 8 }}>+{org.specialties.length - 3}</span>
+                            )}
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }}>
+                          <span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '3px 8px', borderRadius: 6 }}>
+                            {org.doctorCount ?? 0} doctor{org.doctorCount !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ padding: '0 16px 16px', marginTop: 'auto' }}>
+                        <button
+                          onClick={e => { e.stopPropagation(); navigate(orgPath); }}
+                          style={{ width: '100%', background: 'linear-gradient(135deg,#1D4ED8,#2563EB)', color: '#fff', fontWeight: 700, fontSize: 13, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer' }}>
+                          View Doctors
+                        </button>
+                      </div>
                     </div>
-                    <p style={{ fontSize: 12, color: T, fontWeight: 600, marginBottom: 10 }}>{doc.specialization}</p>
-                    <div style={{ display: 'flex', gap: 10, fontSize: 12, color: '#6B7280', marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span>{doc.experience}yr</span>
-                      <span style={{ color: '#D1D5DB' }}>·</span>
-                      <span>₹{doc.consultationFee}</span>
-                      {rating && <>
-                        <span style={{ color: '#D1D5DB' }}>·</span>
-                        <span style={{ color: '#F59E0B', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Star size={11} fill="#F59E0B" color="#F59E0B" /> {rating}
-                        </span>
-                      </>}
+                  );
+                })}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
+              <span style={{ fontWeight: 700, color: '#111827' }}>{filtered.length}</span> doctor{filtered.length !== 1 ? 's' : ''} available
+              {selectedCategory !== 'all' && <span> in <span style={{ color: T, fontWeight: 600 }}>{CATEGORIES.find(c => c.id === selectedCategory)?.name}</span></span>}
+            </p>
+
+            {filtered.length === 0 ? (
+              <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '56px 16px', textAlign: 'center' }}>
+                <SearchX size={48} color="#D1D5DB" style={{ margin: '0 auto 16px' }} />
+                <p style={{ fontWeight: 700, color: '#111827', marginBottom: 6 }}>No doctors found</p>
+                <p style={{ fontSize: 13, color: '#6B7280' }}>Try adjusting filters or searching differently</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 16 }}>
+                {filtered.map(doc => {
+                  const stats = queueStats[doc._id] || { waiting: 0 };
+                  const wait = getWait(doc._id);
+                  const rating = doc.averageRating > 0 ? doc.averageRating.toFixed(1) : null;
+                  return (
+                    <div key={doc._id}
+                      style={{ background: '#fff', borderRadius: 16, border: '1.5px solid #E5E7EB', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer', transition: 'box-shadow 0.15s, border-color 0.15s' }}
+                      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.09)'; e.currentTarget.style.borderColor = '#99F6E4'; }}
+                      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#E5E7EB'; }}
+                      onClick={() => navigate(user ? `/patient/doctors/${doc._id}` : `/doctors/${doc._id}`)}>
+                      {/* Accent strip */}
+                      <div style={{ height: 6, background: `linear-gradient(90deg,${T},#14B8A6)` }} />
+                      <div style={{ padding: '14px 16px 0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                          <div style={{ width: 50, height: 50, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 20 }}>
+                            {doc.name.charAt(0)}
+                          </div>
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 20,
+                            background: wait === 0 ? '#D1FAE5' : wait <= 20 ? '#FEF9C3' : '#FEE2E2',
+                            color: wait === 0 ? '#065F46' : wait <= 20 ? '#92400E' : '#991B1B',
+                          }}>
+                            {wait === 0 ? 'Available' : `~${wait}m wait`}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: 2 }}>
+                          <p style={{ fontWeight: 800, fontSize: 15, color: '#111827', lineHeight: 1.3, margin: 0 }}>
+                            Dr. {doc.name.replace(/^Dr\.?\s+/, '')}
+                          </p>
+                          {doc.isVerified && (
+                            <div title="Verified Doctor" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, background: '#059669', borderRadius: '50%', flexShrink: 0 }}>
+                              <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+                                <path d="M5 12L10 17L19 8" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        <p style={{ fontSize: 12, color: T, fontWeight: 600, marginBottom: 10 }}>{doc.specialization}</p>
+                        <div style={{ display: 'flex', gap: 10, fontSize: 12, color: '#6B7280', marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span>{doc.experience}yr</span>
+                          <span style={{ color: '#D1D5DB' }}>·</span>
+                          <span>₹{doc.consultationFee}</span>
+                          {rating && <>
+                            <span style={{ color: '#D1D5DB' }}>·</span>
+                            <span style={{ color: '#F59E0B', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <Star size={11} fill="#F59E0B" color="#F59E0B" /> {rating}
+                            </span>
+                          </>}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }}>
+                          <span style={{ background: '#F3F4F6', color: '#374151', padding: '3px 8px', borderRadius: 6 }}>{stats.waiting || 0} waiting</span>
+                        </div>
+                      </div>
+                      <div style={{ padding: '0 16px 16px', marginTop: 'auto' }}>
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (user) navigate(`/patient/doctors/${doc._id}/book`);
+                            else { toast.error('Login to book'); navigate('/login/patient'); }
+                          }}
+                          style={{ width: '100%', background: T, color: '#fff', fontWeight: 700, fontSize: 13, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer' }}>
+                          Book Appointment
+                        </button>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }}>
-                      <span style={{ background: '#F3F4F6', color: '#374151', padding: '3px 8px', borderRadius: 6 }}>{stats.waiting || 0} waiting</span>
-                    </div>
-                  </div>
-                  <div style={{ padding: '0 16px 16px', marginTop: 'auto' }}>
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        if (user) navigate(`/patient/doctors/${doc._id}/book`);
-                        else { toast.error('Login to book'); navigate('/login/patient'); }
-                      }}
-                      style={{ width: '100%', background: T, color: '#fff', fontWeight: 700, fontSize: 13, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer' }}>
-                      Book Appointment
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

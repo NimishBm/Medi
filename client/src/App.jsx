@@ -28,6 +28,7 @@ import { PatientProfile } from './pages/patient/Profile';
 import { CompleteProfile } from './pages/patient/CompleteProfile';
 import { PatientBlog } from './pages/patient/Blog';
 import { BookingConfirmed } from './pages/patient/BookingConfirmed';
+import { OrganizationDetail } from './pages/patient/OrganizationDetail';
 
 // Doctor Pages
 import { DoctorLanding } from './pages/doctor/Landing';
@@ -117,6 +118,7 @@ function AppRoutes() {
           {/* Public Browse Routes - No Login Required */}
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/doctors/:doctorId" element={<DoctorDetail />} />
+          <Route path="/organizations/:orgId" element={<OrganizationDetail />} />
 
           {/* Patient Routes */}
           <Route
@@ -244,6 +246,14 @@ function AppRoutes() {
             element={
               <ProtectedRoute requiredRoles={['PATIENT']}>
                 <BookingConfirmed />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/organizations/:orgId"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <OrganizationDetail />
               </ProtectedRoute>
             }
           />

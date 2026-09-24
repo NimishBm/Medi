@@ -49,7 +49,8 @@ router.get(
     const skip = (page - 1) * limit;
 
     const doctors = await Doctor.find({ isActive: true })
-      .select('name specialization consultationFee profilePhoto averageRating totalReviews experience')
+      .select('name specialization consultationFee profilePhoto averageRating totalReviews experience organizationIds')
+      .populate('organizationIds', 'name city type logo')
       .lean()
       .skip(skip)
       .limit(limit)
@@ -88,6 +89,7 @@ router.get(
   catchAsyncErrors(async (req, res) => {
     const doctor = await Doctor.findById(req.params.id)
       .select('-password')
+      .populate('organizationIds', 'name city type logo')
       .lean();
 
     if (!doctor) {
@@ -106,7 +108,9 @@ router.get(
   '/:id/details',
   protect,
   catchAsyncErrors(async (req, res) => {
-    const doctor = await Doctor.findById(req.params.id).select('-password');
+    const doctor = await Doctor.findById(req.params.id)
+      .select('-password')
+      .populate('organizationIds', 'name city type logo');
 
     if (!doctor) {
       return res.status(404).json({
