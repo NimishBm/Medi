@@ -38,6 +38,7 @@ import { DoctorPatients } from './pages/doctor/Patients';
 import { DoctorSchedule } from './pages/doctor/Schedule';
 import { DoctorBlog } from './pages/doctor/Blog';
 import { SetupProfile } from './pages/doctor/SetupProfile';
+import { DoctorPayments } from './pages/doctor/Payments';
 
 
 // Admin Pages
@@ -47,16 +48,12 @@ import { AdminDashboard } from './pages/admin/Dashboard';
 // Display
 import { WaitingRoomDisplay } from './pages/WaitingRoomDisplay';
 
-// Inner component so it can use useNavigate (which requires BrowserRouter context)
 function AppRoutes() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user, token, authInitialized } = useSelector((state) => state.auth);
   const restoringRef = useRef(false);
 
-  // Restore user session when a token exists but user is not yet in the store.
-  // This runs ONCE per token value. On completion (success OR failure) we mark
-  // authInitialized=true so ProtectedRoute knows it can now make a routing decision.
   useEffect(() => {
     if (token && !user && !restoringRef.current) {
       restoringRef.current = true;
@@ -65,15 +62,11 @@ function AppRoutes() {
           dispatch(setUser({ user: response.data, token }));
         })
         .catch(() => {
-          // getMe() failed (network error, invalid token, etc.).
-          // Clear the stale token so ProtectedRoute can redirect cleanly.
           dispatch(logout());
         });
-      // Note: restoringRef is NOT reset — we only want one getMe() call per mount.
     }
-  }, [token, dispatch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, dispatch]);
 
-  // Handle 401 responses from the API interceptor without a hard page reload.
   useEffect(() => {
     const handleUnauthorized = () => {
       closeSocket();
@@ -84,8 +77,6 @@ function AppRoutes() {
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, [dispatch, navigate]);
 
-  // Close the socket singleton when the user logs out so a fresh connection
-  // is established on the next login (avoids stale socket with old user context).
   const prevTokenRef = useRef(token);
   useEffect(() => {
     if (prevTokenRef.current && !token) {
@@ -94,8 +85,6 @@ function AppRoutes() {
     prevTokenRef.current = token;
   }, [token]);
 
-  // While session is being restored from a stored token, render nothing.
-  // This prevents ProtectedRoute from redirecting to /login prematurely.
   if (!authInitialized) return null;
 
   return (
@@ -242,7 +231,7 @@ function AppRoutes() {
             }
           />
           <Route
-            path="/patient/blog"
+            path="/patient/blogs"
             element={
               <ProtectedRoute requiredRoles={['PATIENT']}>
                 <PatientBlog />
@@ -316,6 +305,14 @@ function AppRoutes() {
             element={
               <ProtectedRoute requiredRoles={['DOCTOR']}>
                 <DoctorBlog />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/payments"
+            element={
+              <ProtectedRoute requiredRoles={['DOCTOR']}>
+                <DoctorPayments />
               </ProtectedRoute>
             }
           />

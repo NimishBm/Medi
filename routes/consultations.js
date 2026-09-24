@@ -12,10 +12,21 @@ router.post(
   protect,
   authorize('DOCTOR'),
   catchAsyncErrors(async (req, res) => {
-    const { appointmentId, patientId, symptoms, diagnosis, treatmentPlan, followUpDate, followUpNotes } = req.body;
+    let { appointmentId, patientId, symptoms, diagnosis, treatmentPlan, followUpDate, followUpNotes } = req.body;
 
-    if (!appointmentId || !patientId) {
-      return res.status(400).json({ message: 'appointmentId and patientId are required' });
+    if (!appointmentId) {
+      return res.status(400).json({ message: 'appointmentId is required' });
+    }
+
+    if (!patientId) {
+      const appt = await Appointment.findById(appointmentId);
+      if (appt) {
+        patientId = appt.patientId;
+      }
+    }
+
+    if (!patientId) {
+      return res.status(400).json({ message: 'patientId could not be determined' });
     }
 
     // Upsert: one consultation per appointment

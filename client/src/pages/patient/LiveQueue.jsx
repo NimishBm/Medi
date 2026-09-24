@@ -64,7 +64,10 @@ export const LiveQueue = () => {
     </div>
   );
 
-  const myPos       = queue.find(q => q.patientId?._id === user._id);
+  const myPos       = queue.find(q =>
+    (q.patientId?._id === user._id || q.patientId === user._id) &&
+    (!nextAppt || String(q.appointmentId?._id || q.appointmentId) === String(nextAppt._id))
+  ) || queue.find(q => q.patientId?._id === user._id || q.patientId === user._id);
   const consulting  = queue.find(q => q.status === 'CONSULTING');
   const waiting     = queue.filter(q => q.status === 'WAITING');
   const ahead       = waiting.filter(q => q.tokenNumber < (myPos?.tokenNumber || 0)).length;
@@ -177,14 +180,22 @@ export const LiveQueue = () => {
               {queue.length === 0 ? (
                 <p style={{ padding: '24px 18px', color: '#9CA3AF', fontSize: 13, textAlign: 'center' }}>Queue is empty</p>
               ) : queue.map(item => {
-                const isMe = item.patientId?._id === user._id;
+                const isMe = (item.patientId?._id === user._id || item.patientId === user._id) &&
+                  (!nextAppt || String(item.appointmentId?._id || item.appointmentId) === String(nextAppt._id));
+                const isFamily = item.appointmentId?.bookedFor?.isFamilyMember;
+                const displayName = isFamily && item.appointmentId.bookedFor.name
+                  ? item.appointmentId.bookedFor.name
+                  : item.patientId?.name || 'Patient';
                 const sc = STATUS_COLORS[item.status] || STATUS_COLORS.WAITING;
                 return (
                   <div key={item._id} style={{ padding: '12px 18px', borderBottom: '1px solid #F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: isMe ? '#F0FDF4' : '#fff', borderLeft: isMe ? `4px solid ${T}` : '4px solid transparent' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <span style={{ fontSize: 18, fontWeight: 900, color: isMe ? T : '#374151', minWidth: 36 }}>#{item.tokenNumber}</span>
                       <div>
-                        <p style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{item.patientId?.name || 'Patient'}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{displayName}</p>
+                          {isFamily && <span style={{ fontSize: 10, background: '#F3E8FF', color: '#7C3AED', padding: '1px 6px', borderRadius: 8, fontWeight: 700 }}>{item.appointmentId.bookedFor.relationship || 'Family'}</span>}
+                        </div>
                         {isMe && <p style={{ fontSize: 11, color: T, fontWeight: 700 }}>You</p>}
                       </div>
                     </div>
