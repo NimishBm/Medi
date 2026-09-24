@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { adminAPI, adminBlogAPI } from '../../services/api';
+import { adminAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import {
@@ -368,8 +368,9 @@ export const AdminDashboard = () => {
     setDocLoading(true);
     try {
       const res = await adminAPI.getDoctors(null);
-      setDoctors(res.data);
-    } catch {
+      setDoctors(Array.isArray(res.data) ? res.data : []);
+    } catch (error) {
+      console.error('Fetch doctors error:', error);
       toast.error('Failed to load doctors');
     } finally {
       setDocLoading(false);

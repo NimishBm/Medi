@@ -49,8 +49,8 @@ router.get(
     const skip = (page - 1) * limit;
 
     const doctors = await Doctor.find({ isActive: true ,verificationStatus: { $ne: 'REJECTED' }})
-      .select('name specialization consultationFee profilePhoto averageRating totalReviews experience organizationIds')
-      .populate('organizationIds', 'name city type logo')
+      .select('name specialization consultationFee profilePhoto averageRating totalReviews experience organizationId')
+      .populate('organizationId', 'name city type logo')
       .lean()
       .skip(skip)
       .limit(limit)
@@ -90,7 +90,7 @@ router.get(
   catchAsyncErrors(async (req, res) => {
     const doctor = await Doctor.findById(req.params.id)
       .select('-password')
-      .populate('organizationIds', 'name city type logo')
+      .populate('organizationId', 'name city type logo')
       .lean();
 
     if (!doctor) {
@@ -117,7 +117,7 @@ router.get(
   catchAsyncErrors(async (req, res) => {
     const doctor = await Doctor.findById(req.params.id)
       .select('-password')
-      .populate('organizationIds', 'name city type logo');
+      .populate('organizationId', 'name city type logo');
 
     if (!doctor) {
       return res.status(404).json({

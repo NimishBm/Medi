@@ -27,15 +27,22 @@ const doctorSchema = new mongoose.Schema(
     },
 
     specialization: {
-      type: String,
-      required: true,
-      trim: true
-    },
+  type: String,
+  required: true,
+  trim: true
+},
 
-    organizationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization'
-    },
+organizationId: 
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization'
+  },
+
+organization: {
+  type: String,
+  trim: true
+},
+
     experience: {
       type: Number,
       default: 0
@@ -174,7 +181,14 @@ const doctorSchema = new mongoose.Schema(
     verificationNote: {
       type: String,
       default: ''
-    }
+    },
+
+    patientsSeen: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Patient'
+      }
+    ]
   },
   {
     timestamps: true

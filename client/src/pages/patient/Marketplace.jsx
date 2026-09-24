@@ -69,6 +69,8 @@ export const Marketplace = () => {
   const [activeTab, setActiveTab]         = useState('doctors');
   const [organizations, setOrganizations] = useState([]);
   const [orgsLoading, setOrgsLoading]     = useState(false);
+  const [currentPage, setCurrentPage]     = useState(1);
+  const DOCS_PER_PAGE = 12;
 
   useEffect(() => {
     if (location.state?.category) {
@@ -171,6 +173,18 @@ export const Marketplace = () => {
     });
   }, [doctors, searchResults, search, selectedCategory, sortBy, queueStats]);
 
+  useEffect(() => { setCurrentPage(1); }, [filtered]);
+
+  const totalPages = Math.ceil(filtered.length / DOCS_PER_PAGE);
+  const paginatedDocs = filtered.slice((currentPage - 1) * DOCS_PER_PAGE, currentPage * DOCS_PER_PAGE);
+
+  const getPageNumbers = () => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (currentPage <= 4) return [1, 2, 3, 4, 5, '...', totalPages];
+    if (currentPage >= totalPages - 3) return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+  };
+
   const getWait = id => {
     const s = queueStats[id] || { waiting: 0 };
     return (s.waiting || 0) * (doctors.find(d => d._id === id)?.averageConsultationTime || 10);
@@ -199,13 +213,15 @@ export const Marketplace = () => {
           </div>
           {!isMobile && <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginLeft: 8 }}>/ Browse Doctors</span>}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 20, padding: '4px 10px', marginLeft: 12 }}>
-            <MapPin size={12} color={T} />
-            <select value={selectedLocation} onChange={e => setLocation(e.target.value)}
-              style={{ fontSize: 12, fontWeight: 600, color: T, background: 'transparent', border: 'none', outline: 'none', cursor: 'pointer' }}>
-              {LOCATIONS.map(l => <option key={l}>{l}</option>)}
-            </select>
-          </div>
+          {!isMobile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 20, padding: '4px 10px', marginLeft: 12 }}>
+              <MapPin size={12} color={T} />
+              <select value={selectedLocation} onChange={e => setLocation(e.target.value)}
+                style={{ fontSize: 12, fontWeight: 600, color: T, background: 'transparent', border: 'none', outline: 'none', cursor: 'pointer' }}>
+                {LOCATIONS.map(l => <option key={l}>{l}</option>)}
+              </select>
+            </div>
+          )}
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             {user && <NotificationBell userId={user._id} />}
@@ -245,13 +261,15 @@ export const Marketplace = () => {
                 </div>
               )}
             </div>
-            <div style={{ position: 'relative' }}>
-              <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-                style={{ fontSize: 12, fontWeight: 600, color: '#374151', background: '#F5F7FA', border: '1.5px solid #E5E7EB', borderRadius: 10, padding: '8px 28px 8px 10px', appearance: 'none', outline: 'none', cursor: 'pointer' }}>
-                {SORT_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-              </select>
-              <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6B7280' }} />
-            </div>
+            {!isMobile && (
+              <div style={{ position: 'relative' }}>
+                <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+                  style={{ fontSize: 12, fontWeight: 600, color: '#374151', background: '#F5F7FA', border: '1.5px solid #E5E7EB', borderRadius: 10, padding: '8px 28px 8px 10px', appearance: 'none', outline: 'none', cursor: 'pointer' }}>
+                  {SORT_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+                <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6B7280' }} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -387,10 +405,17 @@ export const Marketplace = () => {
           </>
         ) : (
           <>
-            <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
-              <span style={{ fontWeight: 700, color: '#111827' }}>{filtered.length}</span> doctor{filtered.length !== 1 ? 's' : ''} available
-              {selectedCategory !== 'all' && <span> in <span style={{ color: T, fontWeight: 600 }}>{CATEGORIES.find(c => c.id === selectedCategory)?.name}</span></span>}
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+              <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>
+                <span style={{ fontWeight: 700, color: '#111827' }}>{filtered.length}</span> doctor{filtered.length !== 1 ? 's' : ''} available
+                {selectedCategory !== 'all' && <span> in <span style={{ color: T, fontWeight: 600 }}>{CATEGORIES.find(c => c.id === selectedCategory)?.name}</span></span>}
+              </p>
+              {totalPages > 1 && (
+                <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>
+                  Page {currentPage} of {totalPages}
+                </p>
+              )}
+            </div>
 
             {filtered.length === 0 ? (
               <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 16, padding: '56px 16px', textAlign: 'center' }}>
@@ -400,7 +425,7 @@ export const Marketplace = () => {
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 16 }}>
-                {filtered.map(doc => {
+                {paginatedDocs.map(doc => {
                   const stats = queueStats[doc._id] || { waiting: 0 };
                   const wait = getWait(doc._id);
                   const rating = doc.averageRating > 0 ? doc.averageRating.toFixed(1) : null;
@@ -437,7 +462,13 @@ export const Marketplace = () => {
                             </div>
                           )}
                         </div>
-                        <p style={{ fontSize: 12, color: T, fontWeight: 600, marginBottom: 10 }}>{doc.specialization}</p>
+                        <p style={{ fontSize: 12, color: T, fontWeight: 600, marginBottom: (doc.organization || doc.organizationIds?.length > 0) ? 4 : 10 }}>{doc.specialization}</p>
+                        {(doc.organization || doc.organizationIds?.length > 0) && (
+                          <p style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Building2 size={11} color="#9CA3AF" />
+                            {doc.organizationIds?.[0]?.name || doc.organization}
+                          </p>
+                        )}
                         <div style={{ display: 'flex', gap: 10, fontSize: 12, color: '#6B7280', marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
                           <span>{doc.experience}yr</span>
                           <span style={{ color: '#D1D5DB' }}>·</span>
@@ -467,6 +498,42 @@ export const Marketplace = () => {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 32, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  disabled={currentPage === 1}
+                  style={{ padding: '8px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', background: currentPage === 1 ? '#F9FAFB' : '#fff', color: currentPage === 1 ? '#D1D5DB' : '#374151', fontWeight: 600, fontSize: 13, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}>
+                  ← Prev
+                </button>
+
+                {getPageNumbers().map((pg, idx) =>
+                  pg === '...' ? (
+                    <span key={`ellipsis-${idx}`} style={{ padding: '8px 4px', color: '#9CA3AF', fontSize: 13 }}>…</span>
+                  ) : (
+                    <button key={pg}
+                      onClick={() => { setCurrentPage(pg); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      style={{
+                        width: 36, height: 36, borderRadius: 10, border: '1.5px solid', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                        background: currentPage === pg ? T : '#fff',
+                        color: currentPage === pg ? '#fff' : '#374151',
+                        borderColor: currentPage === pg ? T : '#E5E7EB',
+                      }}>
+                      {pg}
+                    </button>
+                  )
+                )}
+
+                <button
+                  onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  disabled={currentPage === totalPages}
+                  style={{ padding: '8px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', background: currentPage === totalPages ? '#F9FAFB' : '#fff', color: currentPage === totalPages ? '#D1D5DB' : '#374151', fontWeight: 600, fontSize: 13, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}>
+                  Next →
+                </button>
               </div>
             )}
           </>

@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import Organization from '../models/Organization.js';
 import Doctor from '../models/Doctor.js';
-import OrganizationDoctor from '../models/OrganizationDoctor.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
 
 const router = express.Router();
@@ -187,19 +186,9 @@ router.get(
       return res.status(404).json({ message: 'Organization not found' });
     }
 
-    const orgDoctors = await OrganizationDoctor.find({ organizationId: req.org.id })
-      .populate('doctorId')
+    const doctors = await Doctor.find({ organizationId: req.org.id })
+      .select('-password')
       .sort({ createdAt: -1 });
-
-    const doctors = orgDoctors
-      .map(od => {
-        const doc = od.doctorId;
-        if (!doc) return null;
-        const docObj = doc.toObject ? doc.toObject() : JSON.parse(JSON.stringify(doc));
-        delete docObj.password;
-        return docObj;
-      })
-      .filter(Boolean);
 
     res.json({
       organization: org.name,
@@ -250,12 +239,7 @@ router.get(
       return res.status(404).json({ message: 'Doctor not found' });
     }
 
-    const link = await OrganizationDoctor.findOne({
-      organizationId: req.org.id,
-      doctorId: req.params.doctorId
-    });
-
-    if (!link) {
+    if (!doctor.organizationId || doctor.organizationId.toString() !== req.org.id) {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
 
