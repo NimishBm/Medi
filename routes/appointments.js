@@ -4,6 +4,7 @@ import Appointment from '../models/Appointment.js';
 import Queue from '../models/Queue.js';
 import Notification from '../models/Notification.js';
 import Payment from '../models/Payment.js';
+import Doctor from '../models/Doctor.js';
 import { io } from '../server.js';
 
 import { protect, authorize } from '../middleware/auth.js';
@@ -127,6 +128,18 @@ router.post(
       await appointment.save();
       await appointment.populate(['patientId', 'doctorId']);
       createdAppointments.push(appointment);
+
+      // Auto-add patient to doctor's patientsSeen list
+      try {
+        await Doctor.findByIdAndUpdate(
+          doctorId,
+          { $addToSet: { patientsSeen: patientId } },
+          { new: true }
+        );
+        console.log('[Doctor] patient added to patientsSeen for doctor', doctorId);
+      } catch (dErr) {
+        console.error('[Doctor] failed to update patientsSeen:', dErr.message);
+      }
 
       // Auto-create queue entry for today's appointments so doctor sees them in Live Queue immediately
       if (isToday) {

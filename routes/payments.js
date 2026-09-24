@@ -6,6 +6,7 @@ import Appointment from '../models/Appointment.js';
 import Doctor from '../models/Doctor.js';
 import Patient from '../models/Patient.js';
 import Notification from '../models/Notification.js';
+import Queue from '../models/Queue.js';
 import { io } from '../server.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
@@ -242,6 +243,17 @@ router.post(
         bookedFor: attendee,
       });
       createdAppointments.push(appt);
+
+      // Auto-add patient to doctor's patientsSeen list
+      try {
+        await Doctor.findByIdAndUpdate(
+          doctorId,
+          { $addToSet: { patientsSeen: patientId } },
+          { new: true }
+        );
+      } catch (dErr) {
+        console.error('[Doctor] failed to update patientsSeen:', dErr.message);
+      }
     }
 
     // Save a Payment record
