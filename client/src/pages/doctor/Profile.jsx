@@ -7,6 +7,7 @@ import { setUser } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import { Heart, LogOut, Plus, X, Edit2, MapPin, Clock, DollarSign, Globe, Briefcase, Award, Users, Star, CheckCircle, Camera, Upload } from 'lucide-react';
 import { NotificationBell } from '../../components/NotificationBell';
+import { useDoctorNotifications } from '../../hooks/useDoctorNotifications';
 
 const DAYS_OF_WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const COMMON_QUALIFICATIONS = ['MBBS', 'MD', 'MS', 'DM', 'DNB', 'MCh', 'FRCS', 'MRCP', 'MBA'];
@@ -15,6 +16,7 @@ export const DoctorProfile = () => {
   const { user, token } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  useDoctorNotifications(user?._id);
   const fileInputRef = useRef(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
