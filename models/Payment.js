@@ -37,13 +37,13 @@ const paymentSchema = new mongoose.Schema(
 
     paymentMethod: {
       type: String,
-      enum: ['CASH', 'UPI', 'CARD'],
+      enum: ['CASH', 'UPI', 'CARD', 'RAZORPAY'],
       required: true,
     },
 
     status: {
       type: String,
-      enum: ['PENDING', 'PAID', 'REFUNDED'],
+      enum: ['PENDING', 'PAID', 'REFUNDED', 'FAILED'],
       default: 'PENDING',
     },
 
@@ -51,9 +51,11 @@ const paymentSchema = new mongoose.Schema(
     refundDate: Date,
     refundReason: String,
 
+    razorpayOrderId:   String,
+    razorpayPaymentId: String,
+
     processedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Doctor',
     },
 
     notes: String,

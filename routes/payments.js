@@ -187,8 +187,12 @@ router.post(
     } = req.body;
 
     // Verify HMAC-SHA256 signature
+    const secret = process.env.RAZORPAY_KEY_SECRET?.trim();
+    if (!secret) {
+      return res.status(500).json({ message: 'RAZORPAY_KEY_SECRET is not configured' });
+    }
     const expected = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .createHmac('sha256', secret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex');
 

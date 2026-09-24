@@ -130,6 +130,8 @@ export const paymentAPI = {
   getPaymentsByDoctor: (doctorId) => api.get(`/payments/doctor/${doctorId}`),
   getPaymentById: (id) => api.get(`/payments/${id}`),
   refundPayment: (id, data) => api.post(`/payments/${id}/refund`, data),
+  createRazorpayOrder: (data) => api.post('/payments/razorpay/order', data),
+  verifyRazorpayPayment: (data) => api.post('/payments/razorpay/verify', data),
 };
 
 export const adminAPI = {
