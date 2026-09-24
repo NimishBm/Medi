@@ -44,6 +44,16 @@ organization: {
   trim: true
 },
 
+city: {
+  type: String,
+  trim: true
+},
+
+state: {
+  type: String,
+  trim: true
+},
+
     experience: {
       type: Number,
       default: 0

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
@@ -11,6 +11,7 @@ import {
   Zap, Shield, Phone, Clock, ArrowRight, Menu, X as XIcon, BookOpen,
 } from 'lucide-react';
 import { NotificationBell } from '../../components/NotificationBell';
+import { LocationPicker } from '../../components/LocationPicker';
 
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 
@@ -46,7 +47,8 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
   const [queueStats, setQueueStats]               = useState({});
   const [upcomingAppt, setUpcomingAppt]           = useState(null);
   const [loadingDoctors, setLoadingDoctors]       = useState(true);
-  const [selectedLocation, setSelectedLocation]   = useState('Current Location');
+  const [detectedCity, setDetectedCity]     = useState(() => localStorage.getItem('medi_city') || null);
+  const [locationLoading, setLocationLoading] = useState(false);
 
   useEffect(() => {
     const loadDoctors = async () => {
@@ -113,6 +115,43 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  const requestLocation = async () => {
+    if (!navigator.geolocation) return;
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          const data = await res.json();
+          const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county || null;
+          if (city) { localStorage.setItem('medi_city', city); setDetectedCity(city); }
+        } catch { /* silent */ }
+        finally { setLocationLoading(false); }
+      },
+      () => { setLocationLoading(false); },
+      { timeout: 8000 }
+    );
+  };
+
+  useEffect(() => {
+    if (!detectedCity) requestLocation();
+  }, []);
+
+  const availableCities = useMemo(() => {
+    const fromDoctors = [...new Set(doctors.map(d => d.city).filter(Boolean))].sort();
+    if (detectedCity && !fromDoctors.includes(detectedCity)) return [detectedCity, ...fromDoctors];
+    return fromDoctors;
+  }, [doctors, detectedCity]);
+
+  const handleLocationSelect = (city) => {
+    if (!city) { setDetectedCity(null); localStorage.removeItem('medi_city'); }
+    else { localStorage.setItem('medi_city', city); setDetectedCity(city); }
+  };
+
   const getWait = (d) => {
     const s = queueStats[d._id] || { waiting: 0 };
     return (s.waiting || 0) * (d.averageConsultationTime || 10);
@@ -144,16 +183,13 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
 
           {/* Location — hidden on mobile */}
           {!isMobile && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 20, padding: '4px 12px', flexShrink: 0 }}>
-              <MapPin size={13} color="#0D9488" />
-              <select
-                value={selectedLocation}
-                onChange={e => setSelectedLocation(e.target.value)}
-                style={{ fontSize: 12, fontWeight: 600, color: '#0D9488', background: 'transparent', border: 'none', outline: 'none', cursor: 'pointer' }}
-              >
-                {LOCATIONS.map(l => <option key={l}>{l}</option>)}
-              </select>
-            </div>
+            <LocationPicker
+              detectedCity={detectedCity}
+              availableCities={availableCities}
+              locationLoading={locationLoading}
+              onSelect={handleLocationSelect}
+              onDetect={requestLocation}
+            />
           )}
 
           {/* Search — hidden on mobile */}

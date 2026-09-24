@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { NotificationBell } from '../../components/NotificationBell';
+import { LocationPicker } from '../../components/LocationPicker';
 
 const T = '#0D9488';
 
@@ -36,8 +37,6 @@ const SORT_OPTIONS = [
 ];
 
 
-const LOCATIONS = ['Current Location', 'Mumbai', 'Delhi', 'Bangalore', 'Pune', 'Hyderabad'];
-
 const S = {
   page: { minHeight: '100vh', background: '#F5F7FA', fontFamily: 'system-ui,-apple-system,sans-serif' },
   header: { background: '#fff', borderBottom: '1px solid #E8ECF0', position: 'sticky', top: 0, zIndex: 50 },
@@ -62,7 +61,9 @@ export const Marketplace = () => {
   const [selectedCategory, setSelected]  = useState('all');
   const [sortBy, setSortBy]               = useState('relevant');
   const [loading, setLoading]             = useState(true);
-  const [selectedLocation, setLocation]  = useState('Current Location');
+  const [detectedCity, setDetectedCity]   = useState(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationDenied, setLocationDenied]   = useState(false);
   const [searchResults, setSearchResults] = useState(null);
   const [searchType, setSearchType]       = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -148,6 +149,50 @@ export const Marketplace = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
+  const requestLocation = async () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+    setLocationLoading(true);
+    setLocationDenied(false);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          const data = await res.json();
+          const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county || null;
+          if (city) {
+            localStorage.setItem('medi_city', city);
+            setDetectedCity(city);
+            toast.success(`Showing doctors near ${city}`);
+          } else {
+            toast.error('Could not determine your city');
+          }
+        } catch {
+          toast.error('Location lookup failed');
+        } finally {
+          setLocationLoading(false);
+        }
+      },
+      () => {
+        setLocationDenied(true);
+        setLocationLoading(false);
+        toast.error('Location access denied. Showing all doctors.');
+      },
+      { timeout: 8000 }
+    );
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem('medi_city');
+    if (saved) setDetectedCity(saved);
+  }, []);
+
   const filtered = useMemo(() => {
     const base = searchResults !== null ? searchResults : doctors;
     let r = base;
@@ -156,6 +201,10 @@ export const Marketplace = () => {
       if (cat?.specializations) {
         r = r.filter(d => cat.specializations.includes(d.specialization));
       }
+    }
+    if (detectedCity && !search.trim()) {
+      const cityFiltered = r.filter(d => d.city?.toLowerCase() === detectedCity.toLowerCase());
+      if (cityFiltered.length > 0) r = cityFiltered;
     }
     return [...r].sort((a, b) => {
       const wA = (queueStats[a._id]?.waiting || 0) * (a.averageConsultationTime || 10);
@@ -167,7 +216,24 @@ export const Marketplace = () => {
       if (sortBy === 'experience') return b.experience - a.experience;
       return 0;
     });
-  }, [doctors, searchResults, search, selectedCategory, sortBy, queueStats]);
+  }, [doctors, searchResults, search, selectedCategory, sortBy, queueStats, detectedCity]);
+
+  const cityFallback = useMemo(() => {
+    if (!detectedCity || search.trim()) return false;
+    const base = searchResults !== null ? searchResults : doctors;
+    return base.filter(d => d.city?.toLowerCase() === detectedCity.toLowerCase()).length === 0;
+  }, [detectedCity, doctors, searchResults, search]);
+
+  const availableCities = useMemo(() => {
+    const fromDoctors = [...new Set(doctors.map(d => d.city).filter(Boolean))].sort();
+    if (detectedCity && !fromDoctors.includes(detectedCity)) return [detectedCity, ...fromDoctors];
+    return fromDoctors;
+  }, [doctors, detectedCity]);
+
+  const handleLocationSelect = (city) => {
+    if (!city) { setDetectedCity(null); localStorage.removeItem('medi_city'); }
+    else { localStorage.setItem('medi_city', city); setDetectedCity(city); }
+  };
 
   useEffect(() => { setCurrentPage(1); }, [filtered]);
 
@@ -210,12 +276,14 @@ export const Marketplace = () => {
           {!isMobile && <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginLeft: 8 }}>/ Browse Doctors</span>}
 
           {!isMobile && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 20, padding: '4px 10px', marginLeft: 12 }}>
-              <MapPin size={12} color={T} />
-              <select value={selectedLocation} onChange={e => setLocation(e.target.value)}
-                style={{ fontSize: 12, fontWeight: 600, color: T, background: 'transparent', border: 'none', outline: 'none', cursor: 'pointer' }}>
-                {LOCATIONS.map(l => <option key={l}>{l}</option>)}
-              </select>
+            <div style={{ marginLeft: 12 }}>
+              <LocationPicker
+                detectedCity={detectedCity}
+                availableCities={availableCities}
+                locationLoading={locationLoading}
+                onSelect={handleLocationSelect}
+                onDetect={requestLocation}
+              />
             </div>
           )}
 
@@ -257,6 +325,16 @@ export const Marketplace = () => {
                 </div>
               )}
             </div>
+            {isMobile && (
+              <LocationPicker
+                detectedCity={detectedCity}
+                availableCities={availableCities}
+                locationLoading={locationLoading}
+                onSelect={handleLocationSelect}
+                onDetect={requestLocation}
+                compact
+              />
+            )}
             {!isMobile && (
               <div style={{ position: 'relative' }}>
                 <select value={sortBy} onChange={e => setSortBy(e.target.value)}
@@ -402,10 +480,18 @@ export const Marketplace = () => {
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-              <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>
-                <span style={{ fontWeight: 700, color: '#111827' }}>{filtered.length}</span> doctor{filtered.length !== 1 ? 's' : ''} available
-                {selectedCategory !== 'all' && <span> in <span style={{ color: T, fontWeight: 600 }}>{CATEGORIES.find(c => c.id === selectedCategory)?.name}</span></span>}
-              </p>
+              <div>
+                <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>
+                  <span style={{ fontWeight: 700, color: '#111827' }}>{filtered.length}</span> doctor{filtered.length !== 1 ? 's' : ''} available
+                  {selectedCategory !== 'all' && <span> in <span style={{ color: T, fontWeight: 600 }}>{CATEGORIES.find(c => c.id === selectedCategory)?.name}</span></span>}
+                  {detectedCity && !cityFallback && !search.trim() && <span> near <span style={{ color: T, fontWeight: 600 }}>{detectedCity}</span></span>}
+                </p>
+                {cityFallback && (
+                  <p style={{ fontSize: 12, color: '#D97706', margin: '4px 0 0', fontWeight: 600 }}>
+                    No doctors near {detectedCity} — showing all doctors
+                  </p>
+                )}
+              </div>
               {totalPages > 1 && (
                 <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>
                   Page {currentPage} of {totalPages}
