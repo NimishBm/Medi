@@ -84,13 +84,14 @@ export const Marketplace = () => {
         ]);
 
         if (doctorsResult.status === 'fulfilled') {
-          setDoctors(Array.isArray(doctorsResult.value.data) ? doctorsResult.value.data : []);
-        } else {
-          setDoctors([]);
-          if (doctorsResult.reason?.response?.status !== 401) {
-            toast.error('Failed to load doctors');
-          }
-        }
+  setDoctors(doctorsResult.value.data?.doctors || []);
+} else {
+  setDoctors([]);
+
+  if (doctorsResult.reason?.response?.status !== 401) {
+    toast.error('Failed to load doctors');
+  }
+}
 
         setQueueStats(
           queueResult.status === 'fulfilled' ? (queueResult.value.data || {}) : {}
