@@ -7,7 +7,11 @@ export const BookingConfirmed = () => {
   const { state } = useLocation();
   const navigate  = useNavigate();
 
-  const { appointment, doctor, totalAmount, paymentId } = state || {};
+  const stored = (() => {
+    try { return JSON.parse(sessionStorage.getItem('bookingConfirmed') || 'null'); }
+    catch { return null; }
+  })();
+  const { appointment, doctor, totalAmount, paymentId } = state || stored || {};
 
   const fmtDate = (iso) =>
     iso ? new Date(iso).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—';

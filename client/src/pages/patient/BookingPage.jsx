@@ -164,16 +164,30 @@ export const BookingPage = () => {
               totalAmount,
             });
             toast.success('Payment successful! Appointment booked.');
+            const appointment = Array.isArray(appt) ? appt[0] : appt;
+            // Use window.location as a fallback if navigate doesn't fire
+            const confirmed = new URL('/patient/booking-confirmed', window.location.origin);
+            sessionStorage.setItem('bookingConfirmed', JSON.stringify({
+              appointment,
+              doctor,
+              totalAmount,
+              paymentId: response.razorpay_payment_id,
+            }));
             navigate('/patient/booking-confirmed', {
-              state: {
-                appointment: Array.isArray(appt) ? appt[0] : appt,
-                doctor,
-                totalAmount,
-                paymentId: response.razorpay_payment_id,
-              },
+              state: { appointment, doctor, totalAmount, paymentId: response.razorpay_payment_id },
+              replace: true,
             });
+            // Hard fallback after 300ms if navigate didn't work
+            setTimeout(() => {
+              if (!window.location.pathname.includes('booking-confirmed')) {
+                window.location.href = confirmed.toString();
+              }
+            }, 300);
           } catch (err) {
-            toast.error(err.response?.data?.message || 'Payment verification failed');
+            const msg = err.response?.data?.message || err.message || 'Payment verification failed';
+            console.error('Verify error:', err);
+            toast.error(msg);
+            setBooking(false);
           }
         },
         prefill: { name: user?.name, email: user?.email, contact: user?.phone },
