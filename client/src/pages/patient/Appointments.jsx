@@ -6,6 +6,8 @@ import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import { ChevronLeft, Stethoscope, Star, Calendar, Clock, MapPin } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { NotificationBell } from '../../components/NotificationBell';
+import { initSocket } from '../../services/socket';
 
 const T = '#0D9488';
 
@@ -38,6 +40,21 @@ export const Appointments = () => {
       .catch(() => toast.error('Failed to load appointments'))
       .finally(() => setIsLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!user?._id) return;
+    try {
+      const socket = initSocket();
+      if (!socket) return;
+      const onUpdate = () => {
+        appointmentAPI.getAppointments()
+          .then(r => setAppointments(r.data))
+          .catch(() => {});
+      };
+      socket.on('new-notification', onUpdate);
+      return () => socket.off('new-notification', onUpdate);
+    } catch {}
+  }, [user?._id]);
 
   const filtered = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -96,6 +113,7 @@ export const Appointments = () => {
           </div>
           {!isMobile && <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginLeft: 4 }}>/ My Appointments</span>}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <NotificationBell userId={user?._id} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F3F4F6', padding: '5px 10px', borderRadius: 20 }}>
               <div style={{ width: 24, height: 24, background: T, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12 }}>
                 {user?.name?.charAt(0)}

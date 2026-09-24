@@ -9,6 +9,7 @@ import {
   Eye, Smile, Thermometer, Layers, Shield, Zap, SlidersHorizontal, ChevronDown,
 } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { NotificationBell } from '../../components/NotificationBell';
 
 const T = '#0D9488';
 
@@ -84,13 +85,14 @@ export const Marketplace = () => {
         ]);
 
         if (doctorsResult.status === 'fulfilled') {
-          setDoctors(Array.isArray(doctorsResult.value.data) ? doctorsResult.value.data : []);
-        } else {
-          setDoctors([]);
-          if (doctorsResult.reason?.response?.status !== 401) {
-            toast.error('Failed to load doctors');
-          }
-        }
+  setDoctors(doctorsResult.value.data?.doctors || []);
+} else {
+  setDoctors([]);
+
+  if (doctorsResult.reason?.response?.status !== 401) {
+    toast.error('Failed to load doctors');
+  }
+}
 
         setQueueStats(
           queueResult.status === 'fulfilled' ? (queueResult.value.data || {}) : {}
@@ -193,6 +195,7 @@ export const Marketplace = () => {
           </div>
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {user && <NotificationBell userId={user._id} />}
             {user ? (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F3F4F6', padding: '5px 10px', borderRadius: 20 }}>

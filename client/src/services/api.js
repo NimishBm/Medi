@@ -37,7 +37,9 @@ api.interceptors.response.use(
       if (!isAuthEndpoint && !isAdminEndpoint) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        // Dispatch a custom event so App.jsx can handle logout/redirect via React Router
+        // instead of a hard page reload (window.location.href).
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
       }
     }
     return Promise.reject(error);
@@ -128,6 +130,8 @@ export const paymentAPI = {
   getPaymentsByDoctor: (doctorId) => api.get(`/payments/doctor/${doctorId}`),
   getPaymentById: (id) => api.get(`/payments/${id}`),
   refundPayment: (id, data) => api.post(`/payments/${id}/refund`, data),
+  createRazorpayOrder: (data) => api.post('/payments/razorpay/order', data),
+  verifyRazorpayPayment: (data) => api.post('/payments/razorpay/verify', data),
 };
 
 export const adminAPI = {

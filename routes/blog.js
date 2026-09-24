@@ -11,13 +11,16 @@ const router = express.Router();
 
 // ── image upload setup ────────────────────────────────────────────────────────
 
-const blogUploadsDir = path.join(process.cwd(), 'uploads', 'blog');
-if (process.env.VERCEL !== '1' && !fs.existsSync(blogUploadsDir)) {
-  fs.mkdirSync(blogUploadsDir, { recursive: true });
-}
+const getBlogUploadsDir = () => {
+  const dir = process.env.VERCEL
+    ? '/tmp/uploads/blog'
+    : path.join(process.cwd(), 'uploads', 'blog');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+};
 
 const blogStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, blogUploadsDir),
+  destination: (req, file, cb) => cb(null, getBlogUploadsDir()),
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     cb(null, `blog-${req.user.id}-${uniqueSuffix}${path.extname(file.originalname)}`);

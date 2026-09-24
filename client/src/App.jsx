@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
 
@@ -9,7 +9,8 @@ import { DoctorLogin } from './pages/DoctorLogin';
 import { DoctorRegister } from './pages/DoctorRegister';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { authAPI } from './services/api';
-import { setUser } from './store/slices/authSlice';
+import { setUser, logout } from './store/slices/authSlice';
+import { closeSocket } from './services/socket';
 
 // Patient Pages
 import { Landing } from './pages/patient/Landing';
@@ -25,7 +26,8 @@ import { History } from './pages/patient/History';
 import { Payments } from './pages/patient/Payments';
 import { PatientProfile } from './pages/patient/Profile';
 import { CompleteProfile } from './pages/patient/CompleteProfile';
-import { PatientBlogs } from './pages/patient/Blogs';
+import { PatientBlog } from './pages/patient/Blog';
+import { BookingConfirmed } from './pages/patient/BookingConfirmed';
 
 // Doctor Pages
 import { DoctorLanding } from './pages/doctor/Landing';
@@ -47,33 +49,46 @@ import { AdminDashboard } from './pages/admin/Dashboard';
 // Display
 import { WaitingRoomDisplay } from './pages/WaitingRoomDisplay';
 
-export default function App() {
+function AppRoutes() {
   const dispatch = useDispatch();
-  const { user, token } = useSelector((state) => state.auth);
-  const fetchingRef = useRef(false);
+  const navigate = useNavigate();
+  const { user, token, authInitialized } = useSelector((state) => state.auth);
+  const restoringRef = useRef(false);
 
-  // Restore user from token on hard refresh
   useEffect(() => {
-    if (token && !user && !fetchingRef.current) {
-      fetchingRef.current = true;
-      const fetchUser = async () => {
-        try {
-          const response = await authAPI.getMe();
+    if (token && !user && !restoringRef.current) {
+      restoringRef.current = true;
+      authAPI.getMe()
+        .then((response) => {
           dispatch(setUser({ user: response.data, token }));
-        } catch (error) {
-          console.error('Failed to fetch user', error);
-        } finally {
-          fetchingRef.current = false;
-        }
-      };
-      fetchUser();
+        })
+        .catch(() => {
+          dispatch(logout());
+        });
     }
   }, [token, dispatch]);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      closeSocket();
+      dispatch(logout());
+      navigate('/login', { replace: true });
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, [dispatch, navigate]);
+
+  const prevTokenRef = useRef(token);
+  useEffect(() => {
+    if (prevTokenRef.current && !token) {
+      closeSocket();
+    }
+    prevTokenRef.current = token;
+  }, [token]);
+
+  if (!authInitialized) return null;
+
   return (
-    <>
-      <Toaster position="top-right" />
-      <BrowserRouter future={{ v7_relativeSplatPath: true }}>
         <Routes>
           {/* Auth Routes */}
           <Route path="/login" element={<Navigate to="/login/patient" replace />} />
@@ -220,7 +235,15 @@ export default function App() {
             path="/patient/blogs"
             element={
               <ProtectedRoute requiredRoles={['PATIENT']}>
-                <PatientBlogs />
+                <PatientBlog />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/booking-confirmed"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <BookingConfirmed />
               </ProtectedRoute>
             }
           />
@@ -307,6 +330,15 @@ export default function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <>
+      <Toaster position="top-right" />
+      <BrowserRouter future={{ v7_relativeSplatPath: true }}>
+        <AppRoutes />
       </BrowserRouter>
     </>
   );

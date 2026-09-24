@@ -42,7 +42,9 @@ export const Register = () => {
     setIsLoading(true);
     try {
       const res = await authAPI.register({ ...form, role: 'PATIENT' });
-      dispatch(setUser({ user: res.data.user, token: res.data.token }));
+      // The register endpoint returns the user without a role field.
+      // Inject it so ProtectedRoute and role-based checks work immediately.
+      dispatch(setUser({ user: { ...res.data.user, role: 'PATIENT' }, token: res.data.token }));
       toast.success('Account created! Welcome to ClinicFlow.');
       navigate('/patient');
     } catch (err) {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { doctorAPI, appointmentAPI } from '../../services/api';
+import { doctorAPI, appointmentAPI, paymentAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import { ChevronLeft, Stethoscope, Calendar, Clock, User, Users, Paperclip, X } from 'lucide-react';
@@ -14,7 +14,33 @@ const APPOINTMENT_TYPES = [
   'Specialist Consultation', 'Routine Check-up', 'Emergency', 'Vaccination', 'Teleconsultation',
 ];
 
-const DEFAULT_SLOTS = ['09:00','09:30','10:00','10:30','11:00','11:30','14:00','14:30','15:00','15:30'];
+const DAY_KEYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+
+const generateSlots = (start, end, intervalMin) => {
+  const slots = [];
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  let cur = sh * 60 + sm;
+  const endTotal = eh * 60 + em;
+  while (cur + intervalMin <= endTotal) {
+    slots.push(`${String(Math.floor(cur / 60)).padStart(2,'0')}:${String(cur % 60).padStart(2,'0')}`);
+    cur += intervalMin;
+  }
+  return slots;
+};
+
+const computeSlots = (doctor, dateStr) => {
+  if (!doctor || !dateStr) return [];
+  const dayKey  = DAY_KEYS[new Date(dateStr + 'T00:00:00').getDay()];
+  if (doctor.daysOff?.includes(dayKey)) return [];
+  const dayAvail = doctor.availability?.[dayKey];
+  // Day toggled off in Schedule page (start/end set to empty string)
+  if (dayAvail && (!dayAvail.start || !dayAvail.end)) return [];
+  const start    = dayAvail?.start || doctor.availabilityStart || '09:00';
+  const end      = dayAvail?.end   || doctor.availabilityEnd   || '17:00';
+  const interval = doctor.consultationDuration || doctor.averageConsultationTime || 30;
+  return generateSlots(start, end, interval);
+};
 
 export const BookingPage = () => {
   const { doctorId } = useParams();
@@ -73,7 +99,6 @@ export const BookingPage = () => {
     if (!form.appointmentDate || !form.appointmentTime) { toast.error('Select date and time'); return; }
     setBooking(true);
     try {
-      // Build attendees list from selected checkboxes
       const attendees = [];
       if (selectedAttendees.has('self')) {
         attendees.push({ isFamilyMember: false });
@@ -96,7 +121,7 @@ export const BookingPage = () => {
         });
       }
 
-      const payload = {
+      const appointmentPayload = {
         patientId: user._id,
         doctorId,
         appointmentDate: form.appointmentDate,
@@ -106,9 +131,78 @@ export const BookingPage = () => {
         bookedBy: user._id,
         attendees,
       };
-      await appointmentAPI.createAppointment(payload);
-      toast.success('Appointment booked!');
-      navigate('/patient/payments');
+
+      const totalAmount = (doctor.consultationFee || 0) * (attendees.length || 1);
+
+      // Free consultation — skip Razorpay, create appointment directly
+      if (totalAmount === 0) {
+        await appointmentAPI.createAppointment(appointmentPayload);
+        toast.success('Appointment booked!');
+        navigate('/patient/booking-confirmed', {
+          state: { doctor, appointmentPayload, totalAmount: 0 },
+        });
+        return;
+      }
+
+      // Paid — open Razorpay checkout
+      const { data: order } = await paymentAPI.createRazorpayOrder({ amount: totalAmount });
+
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.id,
+        name: 'ClinicFlow',
+        description: `Appointment with Dr. ${doctor.name}`,
+        handler: async (response) => {
+          try {
+            const { data: appt } = await paymentAPI.verifyRazorpayPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              appointmentPayload,
+              totalAmount,
+            });
+            toast.success('Payment successful! Appointment booked.');
+            const appointment = Array.isArray(appt) ? appt[0] : appt;
+            // Use window.location as a fallback if navigate doesn't fire
+            const confirmed = new URL('/patient/booking-confirmed', window.location.origin);
+            sessionStorage.setItem('bookingConfirmed', JSON.stringify({
+              appointment,
+              doctor,
+              totalAmount,
+              paymentId: response.razorpay_payment_id,
+            }));
+            navigate('/patient/booking-confirmed', {
+              state: { appointment, doctor, totalAmount, paymentId: response.razorpay_payment_id },
+              replace: true,
+            });
+            // Hard fallback after 300ms if navigate didn't work
+            setTimeout(() => {
+              if (!window.location.pathname.includes('booking-confirmed')) {
+                window.location.href = confirmed.toString();
+              }
+            }, 300);
+          } catch (err) {
+            const msg = err.response?.data?.message || err.message || 'Payment verification failed';
+            console.error('Verify error:', err);
+            toast.error(msg);
+            setBooking(false);
+          }
+        },
+        prefill: { name: user?.name, email: user?.email, contact: user?.phone },
+        theme: { color: '#0D9488' },
+        modal: { ondismiss: () => setBooking(false) },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', () => {
+        toast.error('Payment failed. Please try again.');
+        setBooking(false);
+      });
+      rzp.open();
+      // booking state stays true until handler resolves or modal dismissed
+      return;
     } catch (e) {
       toast.error(e.response?.data?.message || 'Failed to book appointment');
     } finally { setBooking(false); }
@@ -125,7 +219,7 @@ export const BookingPage = () => {
 
   if (!doctor) return null;
 
-  const slots = doctor.availableTimeSlots?.length ? doctor.availableTimeSlots : DEFAULT_SLOTS;
+  const slots = computeSlots(doctor, form.appointmentDate);
 
   return (
     <div style={{ minHeight: '100vh', background: '#F5F7FA', fontFamily: 'system-ui,-apple-system,sans-serif' }}>
@@ -197,7 +291,7 @@ export const BookingPage = () => {
               <p style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Calendar size={15} color={T} /> Select Date
               </p>
-              <input type="date" value={form.appointmentDate} onChange={e => set('appointmentDate', e.target.value)}
+              <input type="date" value={form.appointmentDate} onChange={e => setForm(p => ({ ...p, appointmentDate: e.target.value, appointmentTime: '' }))}
                 min={new Date().toISOString().split('T')[0]} required
                 style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
             </div>
@@ -207,6 +301,11 @@ export const BookingPage = () => {
               <p style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Clock size={15} color={T} /> Select Time Slot
               </p>
+              {slots.length === 0 ? (
+                <p style={{ fontSize: 13, color: '#EF4444', fontWeight: 600 }}>
+                  Doctor is not available on this day. Please pick another date.
+                </p>
+              ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(80px,1fr))', gap: 8 }}>
                 {slots.map(slot => (
                   <button key={slot} type="button" onClick={() => set('appointmentTime', slot)}
@@ -220,6 +319,7 @@ export const BookingPage = () => {
                   </button>
                 ))}
               </div>
+              )}
             </div>
 
             {/* Booking for */}
@@ -330,9 +430,9 @@ export const BookingPage = () => {
               </div>
             )}
 
-            <button type="submit" disabled={booking || !form.appointmentTime}
-              style={{ width: '100%', background: booking || !form.appointmentTime ? '#9CA3AF' : T, color: '#fff', fontWeight: 800, fontSize: 15, padding: '14px', borderRadius: 14, border: 'none', cursor: form.appointmentTime ? 'pointer' : 'not-allowed', transition: 'background 0.15s' }}>
-              {booking ? 'Confirming...' : `Confirm Booking${selectedAttendees.size > 1 ? ` (${selectedAttendees.size})` : ''}`}
+            <button type="submit" disabled={!form.appointmentTime || slots.length === 0}
+              style={{ width: '100%', background: !form.appointmentTime ? '#9CA3AF' : T, color: '#fff', fontWeight: 800, fontSize: 15, padding: '14px', borderRadius: 14, border: 'none', cursor: form.appointmentTime ? 'pointer' : 'not-allowed', transition: 'background 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              💳 Pay & Confirm{selectedAttendees.size > 1 ? ` (${selectedAttendees.size})` : ''}
             </button>
 
             <p style={{ fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginTop: -6 }}>

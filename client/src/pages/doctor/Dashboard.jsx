@@ -44,6 +44,30 @@ const FEATURES = [
 
 const LOCATIONS = ['Current Location', 'Mumbai', 'Delhi', 'Bangalore', 'Pune', 'Hyderabad'];
 
+// Defined outside the component so its reference is stable across parent re-renders.
+// Defining it inside DoctorDashboard would cause React to treat it as a new component
+// type on every render, unmounting and remounting every StatCard instance.
+const StatCard = ({ icon: Icon, label, value, color, trend, subtext, delay = 0, isAnimated }) => (
+  <div
+    className={`bg-white rounded-lg border border-teal-200 p-4 hover:shadow-md hover:scale-102 transition-all duration-300 transform ${
+      isAnimated ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
+    }`}
+    style={{ transitionDelay: `${delay}ms` }}
+  >
+    <div className="flex items-start justify-between mb-3">
+      <div className={`w-10 h-10 bg-${color}-100 rounded-lg flex items-center justify-center`}>
+        <Icon className={`text-${color}-600`} size={20} />
+      </div>
+      {trend && <div className="flex items-center gap-1 text-green-600 text-xs font-semibold animate-pulse">
+        <ArrowUpRight size={14} /> {trend}%
+      </div>}
+    </div>
+    <p className="text-gray-600 text-xs mb-1">{label}</p>
+    <p className="text-2xl font-bold text-gray-900">{value}</p>
+    {subtext && <p className="text-xs text-gray-500 mt-1">{subtext}</p>}
+  </div>
+);
+
 export const DoctorDashboard = () => {
   const { user, token } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
@@ -53,16 +77,15 @@ export const DoctorDashboard = () => {
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [patientsSeen, setPatientsSeen] = useState(0);
 
-  // If not logged in as DOCTOR, redirect them
-  if (!user || user.role !== 'DOCTOR') {
-    return <Navigate to="/login/doctor" replace />;
-  }
-
+  // All hooks must be called unconditionally before any conditional return
   useEffect(() => {
     setIsAnimated(true);
   }, []);
 
   useEffect(() => {
+    // Only fetch when a valid doctor is logged in
+    if (!user?._id) return;
+
     // Fetch today's queue to get the live patients-seen count
     const fetchPatientsSeen = async () => {
       try {
@@ -77,7 +100,12 @@ export const DoctorDashboard = () => {
     // Refresh every 30 seconds while the doctor is on the dashboard
     const interval = setInterval(fetchPatientsSeen, 30000);
     return () => clearInterval(interval);
-  }, [user._id]);
+  }, [user?._id]);
+
+  // Guard: if not logged in as DOCTOR, redirect — placed after all hooks
+  if (!user || user.role !== 'DOCTOR') {
+    return <Navigate to="/login/doctor" replace />;
+  }
 
   const getWorkingDays = () => {
     if (!user?.availability) return 0;
@@ -103,27 +131,6 @@ export const DoctorDashboard = () => {
       setIsDeletingPhoto(false);
     }
   };
-
-  const StatCard = ({ icon: Icon, label, value, color, trend, subtext, delay = 0 }) => (
-    <div
-      className={`bg-white rounded-lg border border-teal-200 p-4 hover:shadow-md hover:scale-102 transition-all duration-300 transform ${
-        isAnimated ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
-      }`}
-      style={{ transitionDelay: `${delay}ms` }}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className={`w-10 h-10 bg-${color}-100 rounded-lg flex items-center justify-center`}>
-          <Icon className={`text-${color}-600`} size={20} />
-        </div>
-        {trend && <div className="flex items-center gap-1 text-green-600 text-xs font-semibold animate-pulse">
-          <ArrowUpRight size={14} /> {trend}%
-        </div>}
-      </div>
-      <p className="text-gray-600 text-xs mb-1">{label}</p>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      {subtext && <p className="text-xs text-gray-500 mt-1">{subtext}</p>}
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -264,6 +271,7 @@ export const DoctorDashboard = () => {
             color="teal"
             subtext="Per week"
             delay={0}
+            isAnimated={isAnimated}
           />
           <StatCard
             icon={DollarSign}
@@ -272,6 +280,7 @@ export const DoctorDashboard = () => {
             color="green"
             subtext="Standard rate"
             delay={100}
+            isAnimated={isAnimated}
           />
           <StatCard
             icon={Users}
@@ -280,6 +289,7 @@ export const DoctorDashboard = () => {
             color="emerald"
             subtext="Today"
             delay={200}
+            isAnimated={isAnimated}
           />
           <StatCard
             icon={Clock}
@@ -288,6 +298,7 @@ export const DoctorDashboard = () => {
             color="orange"
             subtext="Minutes"
             delay={300}
+            isAnimated={isAnimated}
           />
         </div>
       </section>

@@ -74,7 +74,7 @@ router.get("/suggestions", async (req, res) => {
         { rootSnomedName: searchRegex },
       ],
     })
-      .limit(8)
+      .limit(5000)
       .lean();
 
     const suggestions = [
