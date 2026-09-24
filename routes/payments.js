@@ -1,23 +1,8 @@
 import express from 'express';
-import crypto from 'crypto';
-import Razorpay from 'razorpay';
 import Payment from '../models/Payment.js';
-import Appointment from '../models/Appointment.js';
 import Doctor from '../models/Doctor.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
-
-// Lazy init — env vars are only available after dotenv.config() runs in server.js
-let _razorpay = null;
-const getRazorpay = () => {
-  if (!_razorpay) {
-    _razorpay = new Razorpay({
-      key_id:     process.env.RAZORPAY_KEY_ID?.trim(),
-      key_secret: process.env.RAZORPAY_KEY_SECRET?.trim(),
-    });
-  }
-  return _razorpay;
-};
 
 const router = express.Router();
 
@@ -131,99 +116,6 @@ router.post(
       message: 'Payment refunded successfully',
       payment,
     });
-  })
-);
-
-// POST /api/payments/razorpay/order — create a Razorpay order before showing checkout
-router.post(
-  '/razorpay/order',
-  protect,
-  authorize('PATIENT'),
-  catchAsyncErrors(async (req, res) => {
-    const { amount } = req.body; // amount in INR (not paise)
-    if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' });
-
-    const order = await getRazorpay().orders.create({
-      amount:   Math.round(amount * 100), // convert to paise
-      currency: 'INR',
-      receipt:  `rcpt_${Date.now()}`,
-    });
-
-    res.json(order);
-  })
-);
-
-// POST /api/payments/razorpay/verify — verify signature, create appointment + payment record
-router.post(
-  '/razorpay/verify',
-  protect,
-  authorize('PATIENT'),
-  catchAsyncErrors(async (req, res) => {
-    const {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-      appointmentPayload,
-      totalAmount,
-    } = req.body;
-
-    // Verify HMAC-SHA256 signature
-    const expected = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest('hex');
-
-    if (expected !== razorpay_signature) {
-      return res.status(400).json({ message: 'Payment verification failed — invalid signature' });
-    }
-
-    // Create appointment(s) — reuse the same logic as POST /api/appointments
-    const {
-      patientId, doctorId, appointmentDate, appointmentTime,
-      appointmentType, reason, bookedBy, attendees,
-    } = appointmentPayload;
-
-    const attendeeList = attendees?.length > 0 ? attendees : [{ isFamilyMember: false }];
-    const createdAppointments = [];
-
-    for (const attendee of attendeeList) {
-      const startOfDay = new Date(appointmentDate); startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay   = new Date(appointmentDate); endOfDay.setHours(23, 59, 59, 999);
-      const last = await Appointment.findOne({ doctorId, appointmentDate: { $gte: startOfDay, $lte: endOfDay } }).sort({ tokenNumber: -1 });
-      const tokenNumber = (last?.tokenNumber || 0) + 1;
-
-      const appt = await Appointment.create({
-        patientId,
-        doctorId,
-        appointmentDate: new Date(appointmentDate),
-        appointmentTime,
-        appointmentType: appointmentType || 'General Consultation',
-        reason:          reason || 'Consultation',
-        bookedBy,
-        tokenNumber,
-        status: 'BOOKED',
-        bookedFor: attendee,
-      });
-      createdAppointments.push(appt);
-    }
-
-    // Save a Payment record
-    const doctor = await Doctor.findById(doctorId);
-    await Payment.create({
-      appointmentId:     createdAppointments[0]._id,
-      patientId,
-      doctorId,
-      consultationFee:   doctor?.consultationFee || 0,
-      totalAmount:       totalAmount || 0,
-      paymentMethod:     'RAZORPAY',
-      status:            'PAID',
-      razorpayOrderId:   razorpay_order_id,
-      razorpayPaymentId: razorpay_payment_id,
-      paymentDate:       new Date(),
-      processedBy:       patientId,
-    });
-
-    res.json(createdAppointments.length === 1 ? createdAppointments[0] : createdAppointments);
   })
 );
 

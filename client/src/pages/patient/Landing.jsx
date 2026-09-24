@@ -456,7 +456,7 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
             <div style={{ background: '#fff', borderRadius: 16, border: '1.5px solid #E5E7EB', padding: '32px 16px', textAlign: 'center' }}>
               <p style={{ color: '#6B7280', fontSize: 14, marginBottom: 8 }}>No doctors found for this specialty.</p>
               <button
-                onClick={() => navigate('/patient/marketplace')}
+                onClick={() => setActiveSpec('all')}
                 style={{ color: '#0D9488', fontWeight: 600, fontSize: 14, background: 'none', border: 'none', cursor: 'pointer' }}
               >
                 Show all doctors
