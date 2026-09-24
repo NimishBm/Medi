@@ -422,7 +422,8 @@ router.get(
         Patient.countDocuments(),
       ]);
 
-    res.json({ totalDoctors, pendingDoctors, approvedDoctors, rejectedDoctors, totalPatients });
+    const ALL = approvedDoctors + rejectedDoctors + pendingDoctors;
+    res.json({ totalDoctors: ALL, pendingDoctors, approvedDoctors, rejectedDoctors, totalPatients });
   })
 );
 

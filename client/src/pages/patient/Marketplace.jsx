@@ -91,7 +91,9 @@ export const Marketplace = () => {
 
         if (doctorsResult.status === 'fulfilled') {
           const data = doctorsResult.value.data;
-          setDoctors(Array.isArray(data) ? data : (data?.doctors || []));
+          const allDoctors = Array.isArray(data) ? data : (data?.doctors || []);
+          const activeDoctors = allDoctors.filter(d => d.verificationStatus !== 'REJECTED');
+          setDoctors(activeDoctors);
         } else {
           setDoctors([]);
           if (doctorsResult.reason?.response?.status !== 401) {

@@ -560,10 +560,10 @@ export const AdminDashboard = () => {
   );
 
   const docCounts = {
-    ALL:      doctors.length,
-    PENDING:  doctors.filter((d) => d.verificationStatus === 'PENDING').length,
-    APPROVED: doctors.filter((d) => d.verificationStatus === 'APPROVED').length,
-    REJECTED: doctors.filter((d) => d.verificationStatus === 'REJECTED').length,
+    ALL:      stats?.totalDoctors ?? 0,
+    PENDING:  stats?.pendingDoctors ?? 0,
+    APPROVED: stats?.approvedDoctors ?? 0,
+    REJECTED: stats?.rejectedDoctors ?? 0,
   };
 
   // ── render ─────────────────────────────────────────────────────────────────

@@ -104,7 +104,10 @@ const ProfileTab = ({ doctor }) => (
 
     <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-2.5">
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Verification</p>
-      <InfoRow label="Status"        value={doctor.verificationStatus} />
+      <div className="flex gap-2 text-sm">
+        <span className="text-gray-500 w-40 shrink-0">Verification Status</span>
+        <StatusBadge status={doctor.verificationStatus} />
+      </div>
       <InfoRow label="License Check" value={doctor.licenseVerified ? 'Verified ✓' : 'Not verified'} />
       {doctor.verificationNote && <InfoRow label="Note" value={doctor.verificationNote} />}
       <InfoRow label="Active"        value={doctor.isActive ? 'Yes' : 'No'} />
@@ -352,7 +355,7 @@ export const DoctorDetailView = ({ doctorId, onBack }) => {
               </span>
               {doctor.licenseVerified && (
                 <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
-                  <CheckCircle size={11} /> License Verified
+                  <CheckCircle size={11} /> License ✓
                 </span>
               )}
             </div>

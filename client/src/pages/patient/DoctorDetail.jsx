@@ -27,6 +27,11 @@ export const DoctorDetail = () => {
           doctorAPI.getDoctorById(doctorId),
           queueAPI.getQueueByDoctorId(doctorId),
         ]);
+        if (docRes.data.verificationStatus === 'REJECTED') {
+          toast.error('This doctor profile is not available');
+          navigate(user ? '/patient/marketplace' : '/marketplace');
+          return;
+        }
         setDoctor(docRes.data);
         setQueueStats(qRes.data);
       } catch {
@@ -35,7 +40,7 @@ export const DoctorDetail = () => {
       } finally { setLoading(false); }
     };
     fetch();
-  }, [doctorId]);
+  }, [doctorId, navigate, user]);
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F5F7FA' }}>
@@ -107,7 +112,7 @@ export const DoctorDetail = () => {
           <div style={{ padding: '0 24px 24px', marginTop: -32 }}>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
-                <div style={{ width: 72, height: 72, background: '#fff', borderRadius: '50%', border: `4px solid #fff`, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T, fontWeight: 900, fontSize: 28 }}>
+                <div style={{ width: 72, height: 72, background: '#fff', borderRadius: '50%', border: `4px solid #fff`,marginTop:'-16px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T, fontWeight: 900, fontSize: 28 }}>
                   {doctor.name.replace(/^Dr\.?\s+/, '').charAt(0)}
                 </div>
                 <div>
@@ -115,7 +120,7 @@ export const DoctorDetail = () => {
                     <h2 style={{ fontSize: 22, fontWeight: 900, color: '#111827', margin: 0 }}>
                       Dr. {doctor.name.replace(/^Dr\.?\s+/, '')}
                     </h2>
-                    {doctor.isVerified && <VerifiedBadge />}
+                    {doctor.verificationStatus === 'APPROVED' && <VerifiedBadge />}
                   </div>
                   <p style={{ fontSize: 14, color: '#6B7280', fontWeight: 600 }}>{doctor.specialization}</p>
                   {doctor.organizationIds?.length > 0 && (
@@ -255,9 +260,14 @@ export const DoctorDetail = () => {
                   <p style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{value}</p>
                 </div>
               ))}
-              {doctor.isVerified ? (
+              {doctor.verificationStatus === 'APPROVED' ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#065F46', fontWeight: 700 }}>
                   <CheckCircle size={14} color="#059669" /> Verified Doctor
+                </div>
+              ) : doctor.verificationStatus === 'REJECTED' ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#991B1B', fontWeight: 600 }}>
+                  <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#FEE2E2', border: '1.5px solid #DC2626', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: '#DC2626' }}>✕</span>
+                  Verification Rejected
                 </div>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#92400E', fontWeight: 600 }}>
