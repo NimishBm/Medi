@@ -123,6 +123,7 @@ router.get("/", async (req, res) => {
 
     const doctorsByName = await Doctor.find({
       isActive: true,
+      verificationStatus: { $ne: 'REJECTED' },
       name: searchRegex,
     })
       .select("-password")
@@ -135,6 +136,7 @@ router.get("/", async (req, res) => {
     const doctorsBySpecialization =
       await Doctor.find({
         isActive: true,
+        verificationStatus: { $ne: 'REJECTED' },
         specialization: searchRegex,
       })
         .select("-password")
@@ -147,6 +149,7 @@ router.get("/", async (req, res) => {
     const doctorsByOrganization =
       await Doctor.find({
         isActive: true,
+        verificationStatus: { $ne: 'REJECTED' },
         organization: searchRegex,
       })
         .select("-password")
@@ -326,6 +329,7 @@ router.get("/", async (req, res) => {
 
     const allDoctors = await Doctor.find({
       isActive: true,
+      verificationStatus: { $ne: 'REJECTED' },
     })
       .select("-password")
       .lean();

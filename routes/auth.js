@@ -175,6 +175,13 @@ router.post(
       });
     }
 
+    // Prevent rejected doctors from logging in
+    if (role === 'DOCTOR' && user.verificationStatus === 'REJECTED') {
+      return res.status(403).json({
+        message: 'Your account has been rejected and is not eligible to login'
+      });
+    }
+
     const token = generateToken(user, role);
 
     res.json({
