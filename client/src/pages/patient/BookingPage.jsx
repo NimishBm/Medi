@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { doctorAPI, appointmentAPI } from '../../services/api';
+import { doctorAPI, appointmentAPI, paymentAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import { ChevronLeft, Stethoscope, Calendar, Clock, User, Users, Paperclip, X } from 'lucide-react';
@@ -99,7 +99,6 @@ export const BookingPage = () => {
     if (!form.appointmentDate || !form.appointmentTime) { toast.error('Select date and time'); return; }
     setBooking(true);
     try {
-      // Build attendees list from selected checkboxes
       const attendees = [];
       if (selectedAttendees.has('self')) {
         attendees.push({ isFamilyMember: false });
@@ -122,7 +121,7 @@ export const BookingPage = () => {
         });
       }
 
-      const payload = {
+      const appointmentPayload = {
         patientId: user._id,
         doctorId,
         appointmentDate: form.appointmentDate,
@@ -132,9 +131,64 @@ export const BookingPage = () => {
         bookedBy: user._id,
         attendees,
       };
-      await appointmentAPI.createAppointment(payload);
-      toast.success('Appointment booked!');
-      navigate('/patient/payments');
+
+      const totalAmount = (doctor.consultationFee || 0) * (attendees.length || 1);
+
+      // Free consultation — skip Razorpay, create appointment directly
+      if (totalAmount === 0) {
+        await appointmentAPI.createAppointment(appointmentPayload);
+        toast.success('Appointment booked!');
+        navigate('/patient/booking-confirmed', {
+          state: { doctor, appointmentPayload, totalAmount: 0 },
+        });
+        return;
+      }
+
+      // Paid — open Razorpay checkout
+      const { data: order } = await paymentAPI.createRazorpayOrder({ amount: totalAmount });
+
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.id,
+        name: 'ClinicFlow',
+        description: `Appointment with Dr. ${doctor.name}`,
+        handler: async (response) => {
+          try {
+            const { data: appt } = await paymentAPI.verifyRazorpayPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              appointmentPayload,
+              totalAmount,
+            });
+            toast.success('Payment successful! Appointment booked.');
+            navigate('/patient/booking-confirmed', {
+              state: {
+                appointment: Array.isArray(appt) ? appt[0] : appt,
+                doctor,
+                totalAmount,
+                paymentId: response.razorpay_payment_id,
+              },
+            });
+          } catch (err) {
+            toast.error(err.response?.data?.message || 'Payment verification failed');
+          }
+        },
+        prefill: { name: user?.name, email: user?.email, contact: user?.phone },
+        theme: { color: '#0D9488' },
+        modal: { ondismiss: () => setBooking(false) },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', () => {
+        toast.error('Payment failed. Please try again.');
+        setBooking(false);
+      });
+      rzp.open();
+      // booking state stays true until handler resolves or modal dismissed
+      return;
     } catch (e) {
       toast.error(e.response?.data?.message || 'Failed to book appointment');
     } finally { setBooking(false); }
