@@ -1,0 +1,24 @@
+* [33m97acf5e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev[m[33m, [m[1;31morigin/dev[m[33m)[m added hospital
+[31m|[m * [33md031311[m[33m ([m[1;31morigin/greeshma[m[33m, [m[1;31morigin/development[m[33m)[m fix: emit queue updates to specific doctor room instead of all clients
+[31m|[m * [33m3187e7d[m feat: auto-update patients seen list when appointments are booked
+[31m|[m * [33ma473f2d[m fix: improve Razorpay payment implementation and configuration
+[31m|[m *   [33m30393aa[m merge: pull updates from development branch
+[31m|[m [33m|[m[34m\[m  
+[31m|[m [33m|[m *   [33m415b50f[m[33m ([m[1;32mdevelopment[m[33m)[m Merge branch 'dev' into development
+[31m|[m [33m|[m [35m|[m[31m\[m  
+[31m|[m [33m|[m[31m_[m[35m|[m[31m/[m  
+[31m|[m[31m/[m[33m|[m [35m|[m   
+* [33m|[m [35m|[m [33m412217c[m fix: add RAZORPAY to Payment model enums + razorpay ID fields
+* [33m|[m [35m|[m [33m96917cf[m fix: razorpay verify key trim + robust navigation after payment
+* [33m|[m [35m|[m [33m024bff3[m feat: restore Razorpay payment flow and booking confirmation page
+[36m|[m [33m|[m *   [33m218435a[m Merge branch 'development' of https://github.com/NimishBm/Medi into development
+[36m|[m [33m|[m [1;31m|[m[36m\[m  
+[36m|[m [33m|[m[36m_[m[1;31m|[m[36m/[m  
+[36m|[m[36m/[m[33m|[m [1;31m|[m   
+* [33m|[m [1;31m|[m [33mb859a01[m fix: add razorpay to package.json dependencies
+* [33m|[m [1;31m|[m   [33me193c18[m Merge dev into development: resolve payment/booking conflicts
+[1;33m|[m[1;34m\[m [33m\[m [1;31m\[m  
+[1;33m|[m * [33m|[m [1;31m|[m [33m6e28b55[m login fix
+[1;33m|[m * [33m|[m [1;31m|[m   [33m734924e[m Merge remote-tracking branch 'origin/development' into dev
+[1;33m|[m [1;35m|[m[1;36m\[m [33m\[m [1;31m\[m  
+[1;33m|[m * [1;36m|[m [33m|[m [1;31m|[m [33m958d5f3[m notification working both

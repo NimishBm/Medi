@@ -177,7 +177,14 @@ organizationIds: [
     verificationNote: {
       type: String,
       default: ''
-    }
+    },
+
+    patientsSeen: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Patient'
+      }
+    ]
   },
   {
     timestamps: true

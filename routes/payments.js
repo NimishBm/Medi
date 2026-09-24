@@ -6,6 +6,7 @@ import Appointment from '../models/Appointment.js';
 import Doctor from '../models/Doctor.js';
 import Patient from '../models/Patient.js';
 import Notification from '../models/Notification.js';
+import Queue from '../models/Queue.js';
 import { io } from '../server.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { catchAsyncErrors } from '../utils/catchAsyncErrors.js';
@@ -157,18 +158,22 @@ router.post(
 router.post(
   '/razorpay/order',
   protect,
-  authorize('PATIENT'),
   catchAsyncErrors(async (req, res) => {
     const { amount } = req.body; // amount in INR (not paise)
     if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' });
 
-    const order = await getRazorpay().orders.create({
-      amount:   Math.round(amount * 100), // convert to paise
-      currency: 'INR',
-      receipt:  `rcpt_${Date.now()}`,
-    });
-
-    res.json(order);
+    try {
+      const razorpay = getRazorpay();
+      const order = await razorpay.orders.create({
+        amount:   Math.round(amount * 100), // convert to paise
+        currency: 'INR',
+        receipt:  `rcpt_${Date.now()}`,
+      });
+      res.json(order);
+    } catch (error) {
+      console.error('Razorpay order creation error:', error);
+      res.status(500).json({ message: 'Failed to create Razorpay order', error: error.message });
+    }
   })
 );
 
@@ -176,7 +181,6 @@ router.post(
 router.post(
   '/razorpay/verify',
   protect,
-  authorize('PATIENT'),
   catchAsyncErrors(async (req, res) => {
     const {
       razorpay_order_id,
@@ -186,18 +190,29 @@ router.post(
       totalAmount,
     } = req.body;
 
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ message: 'Missing payment verification details' });
+    }
+
     // Verify HMAC-SHA256 signature
     const secret = process.env.RAZORPAY_KEY_SECRET?.trim();
     if (!secret) {
+      console.error('RAZORPAY_KEY_SECRET is not configured');
       return res.status(500).json({ message: 'RAZORPAY_KEY_SECRET is not configured' });
     }
-    const expected = crypto
-      .createHmac('sha256', secret)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest('hex');
 
-    if (expected !== razorpay_signature) {
-      return res.status(400).json({ message: 'Payment verification failed — invalid signature' });
+    try {
+      const expected = crypto
+        .createHmac('sha256', secret)
+        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+        .digest('hex');
+
+      if (expected !== razorpay_signature) {
+        return res.status(400).json({ message: 'Payment verification failed — invalid signature' });
+      }
+    } catch (error) {
+      console.error('Signature verification error:', error);
+      return res.status(500).json({ message: 'Signature verification failed' });
     }
 
     // Create appointment(s) — reuse the same logic as POST /api/appointments
@@ -228,6 +243,17 @@ router.post(
         bookedFor: attendee,
       });
       createdAppointments.push(appt);
+
+      // Auto-add patient to doctor's patientsSeen list
+      try {
+        await Doctor.findByIdAndUpdate(
+          doctorId,
+          { $addToSet: { patientsSeen: patientId } },
+          { new: true }
+        );
+      } catch (dErr) {
+        console.error('[Doctor] failed to update patientsSeen:', dErr.message);
+      }
     }
 
     // Save a Payment record
