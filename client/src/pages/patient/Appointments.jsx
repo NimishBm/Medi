@@ -183,6 +183,17 @@ export const Appointments = () => {
                           </p>
                           {apt.doctorId?.specialization && <p style={{ fontSize: 13, color: T, fontWeight: 600, marginBottom: 4 }}>{apt.doctorId.specialization}</p>}
                           {apt.doctorId && <p style={{ fontSize: 12, color: '#6B7280' }}>{apt.doctorId.experience}yr exp · ₹{apt.doctorId.consultationFee}</p>}
+                          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 600 }}>For:</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: apt.bookedFor?.isFamilyMember ? '#7C3AED' : '#374151' }}>
+                              {apt.bookedFor?.isFamilyMember ? apt.bookedFor.name : (user?.name || 'You')}
+                            </span>
+                            {apt.bookedFor?.isFamilyMember && apt.bookedFor.relationship && (
+                              <span style={{ fontSize: 10, background: '#F3E8FF', color: '#7C3AED', padding: '1px 7px', borderRadius: 8, fontWeight: 700 }}>
+                                {apt.bookedFor.relationship}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: sc.bg, color: sc.color, flexShrink: 0 }}>{apt.status}</span>
                       </div>
@@ -208,12 +219,6 @@ export const Appointments = () => {
                         </div>
                       </div>
 
-                      {apt.bookedFor?.isFamilyMember && (
-                        <div style={{ marginTop: 10, background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
-                          <span style={{ color: '#065F46', fontWeight: 600 }}>Booked for: </span>
-                          <span style={{ color: '#374151' }}>{apt.bookedFor.name} ({apt.bookedFor.relationship})</span>
-                        </div>
-                      )}
 
                       {apt.reason && (
                         <p style={{ marginTop: 10, fontSize: 12, color: '#6B7280' }}>

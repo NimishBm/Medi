@@ -50,7 +50,7 @@ export const PatientBlog = () => {
     const load = async () => {
       setIsLoading(true);
       try {
-        const res = await blogAPI.getPublicPosts(activeCategory === 'All' ? null : activeCategory);
+        const res = await blogAPI.getFeed(activeCategory !== 'All' ? { category: activeCategory } : {});
         setPosts(res.data || []);
       } catch {
         toast.error('Failed to load articles');
@@ -61,14 +61,9 @@ export const PatientBlog = () => {
     load();
   }, [activeCategory]);
 
-  const openPost = async (post) => {
+  const openPost = (post) => {
     blogAPI.incrementView(post._id).catch(() => {});
-    try {
-      const res = await blogAPI.getPublicPost(post._id);
-      setSelectedPost(res.data);
-    } catch {
-      setSelectedPost(post);
-    }
+    setSelectedPost(post);
   };
 
   const filtered = posts.filter((p) =>

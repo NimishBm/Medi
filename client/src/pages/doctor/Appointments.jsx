@@ -191,7 +191,9 @@ const RescheduleModal = ({ appointment, onClose, onSaved }) => {
           <div>
             <h3 className="text-base font-bold text-gray-900">Reschedule Appointment</h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Patient: <span className="font-medium text-gray-700">{appointment.patientId?.name}</span>
+              Patient: <span className="font-medium text-gray-700">
+                {appointment.bookedFor?.isFamilyMember ? `${appointment.bookedFor.name} (${appointment.bookedFor.relationship || 'Family'})` : appointment.patientId?.name}
+              </span>
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
@@ -409,7 +411,9 @@ export const DoctorAppointments = () => {
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 space-y-1.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Patient:</span>
-                  <span className="font-semibold text-gray-900">{cancellingApt.patientId?.name}</span>
+                  <span className="font-semibold text-gray-900">
+                    {cancellingApt.bookedFor?.isFamilyMember ? cancellingApt.bookedFor.name : cancellingApt.patientId?.name}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Scheduled:</span>
@@ -607,7 +611,11 @@ export const DoctorAppointments = () => {
                       <div className="flex items-start sm:items-center gap-2 sm:gap-4">
                         <span className="text-base sm:text-lg font-bold text-teal-600">#{apt.tokenNumber}</span>
                         <div>
-                          <p className="font-medium text-sm sm:text-base text-gray-900">{apt.patientId.name}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-medium text-sm sm:text-base text-gray-900">
+                              {apt.bookedFor?.isFamilyMember ? apt.bookedFor.name : apt.patientId?.name}
+                            </p>
+                          </div>
                           {apt.reason && <p className="text-xs text-gray-600">{apt.reason}</p>}
                         </div>
                       </div>

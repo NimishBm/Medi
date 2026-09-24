@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { doctorAPI, queueAPI } from '../../services/api';
+import { doctorAPI, queueAPI, appointmentAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import { ChevronLeft, Stethoscope, Star, Clock, MapPin, Phone, CheckCircle, Calendar, Building2 } from 'lucide-react';
@@ -15,20 +15,34 @@ export const DoctorDetail = () => {
   const dispatch = useDispatch();
   const user = useSelector(s => s.auth.user);
 
-  const [doctor, setDoctor]       = useState(null);
+  const [doctor, setDoctor]         = useState(null);
   const [queueStats, setQueueStats] = useState(null);
-  const [loading, setLoading]     = useState(true);
+  const [myAppt, setMyAppt]         = useState(null);
+  const [loading, setLoading]       = useState(true);
   const isMobile = useIsMobile();
 
   useEffect(() => {
     const fetch = async () => {
       try {
-        const [docRes, qRes] = await Promise.all([
+        const [docRes, qRes, apptRes] = await Promise.all([
           doctorAPI.getDoctorById(doctorId),
           queueAPI.getQueueByDoctorId(doctorId),
+          user?.role === 'PATIENT' ? appointmentAPI.getAppointments() : Promise.resolve({ data: [] }),
         ]);
         setDoctor(docRes.data);
         setQueueStats(qRes.data);
+
+        // Find the nearest upcoming/today appointment with this specific doctor
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const appts = (Array.isArray(apptRes.data) ? apptRes.data : [])
+          .filter(a => a.status !== 'CANCELLED')
+          .filter(a => {
+            const did = a.doctorId?._id || a.doctorId;
+            return String(did) === String(doctorId);
+          })
+          .filter(a => new Date(a.appointmentDate).toISOString().slice(0, 10) >= todayStr)
+          .sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate));
+        setMyAppt(appts[0] || null);
       } catch {
         toast.error('Failed to load doctor details');
         navigate(user ? '/patient/marketplace' : '/marketplace');
@@ -52,8 +66,23 @@ export const DoctorDetail = () => {
     </div>
   );
 
-  const wait = (queueStats?.waiting || 0) * (doctor.averageConsultationTime || 10);
   const bookRoute = user ? `/patient/doctors/${doctorId}/book` : null;
+
+  const fmtTime = (t) => {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  };
+
+  const fmtApptLabel = () => {
+    if (!myAppt) return null;
+    const dateStr = new Date(myAppt.appointmentDate).toISOString().slice(0, 10);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const datePart = dateStr === todayStr
+      ? 'Today'
+      : new Date(myAppt.appointmentDate).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' });
+    return `${datePart} · ${fmtTime(myAppt.appointmentTime)}`;
+  };
 
   const handleBook = () => {
     if (user) navigate(bookRoute);
@@ -142,8 +171,8 @@ export const DoctorDetail = () => {
               {[
                 { label: 'Experience', value: `${doctor.experience}yr` },
                 { label: 'Fees', value: `₹${doctor.consultationFee}` },
-                { label: 'Avg Visit', value: `${doctor.averageConsultationTime || 10}m` },
-                { label: 'Waiting', value: `${queueStats?.waiting || 0}` },
+                { label: 'Rating', value: doctor.averageRating > 0 ? `${doctor.averageRating.toFixed(1)} ★` : '—' },
+                { label: 'In Queue', value: `${queueStats?.waiting || 0}` },
               ].map(({ label, value }) => (
                 <div key={label} style={{ background: '#F5F7FA', borderRadius: 12, padding: '12px 14px' }}>
                   <p style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>{label}</p>
@@ -152,16 +181,37 @@ export const DoctorDetail = () => {
               ))}
             </div>
 
-            {/* Wait time alert */}
-            <div style={{ background: wait === 0 ? '#F0FDF4' : wait <= 20 ? '#FFFBEB' : '#FEF2F2', border: `1.5px solid ${wait === 0 ? '#BBF7D0' : wait <= 20 ? '#FDE68A' : '#FECACA'}`, borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Clock size={18} color={wait === 0 ? '#065F46' : wait <= 20 ? '#92400E' : '#991B1B'} />
-              <div>
-                <p style={{ fontWeight: 700, fontSize: 14, color: wait === 0 ? '#065F46' : wait <= 20 ? '#92400E' : '#991B1B' }}>
-                  {wait === 0 ? 'Doctor is available now' : `Estimated wait: ~${wait} minutes`}
-                </p>
-                <p style={{ fontSize: 12, color: '#6B7280' }}>{queueStats?.waiting || 0} patients currently waiting</p>
+            {/* Appointment / queue status */}
+            {myAppt ? (
+              <div style={{ background: '#F0FDF4', border: '1.5px solid #BBF7D0', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Calendar size={18} color={T} />
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: 14, color: '#065F46' }}>
+                    Your appointment: {fmtApptLabel()}
+                  </p>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                    {myAppt.tokenNumber && (
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#1D4ED8', background: '#EFF6FF', padding: '2px 8px', borderRadius: 6 }}>
+                        Token #{myAppt.tokenNumber}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 12, color: '#6B7280' }}>
+                      {queueStats?.waiting || 0} patients currently in queue
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div style={{ background: '#F5F7FA', border: '1.5px solid #E5E7EB', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Clock size={18} color="#9CA3AF" />
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: 14, color: '#374151' }}>
+                    {queueStats?.waiting === 0 ? 'No one in queue right now' : `${queueStats?.waiting || 0} patients currently in queue`}
+                  </p>
+                  <p style={{ fontSize: 12, color: '#9CA3AF' }}>Book an appointment to secure your slot</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -233,8 +283,20 @@ export const DoctorDetail = () => {
               <p style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>Book Now</p>
               <p style={{ fontSize: 13, color: '#99F6E4', marginBottom: 16 }}>₹{doctor.consultationFee} consultation fee</p>
               <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
-                <p style={{ fontSize: 11, color: '#CCFBF1' }}>Estimated wait</p>
-                <p style={{ fontSize: 22, fontWeight: 900 }}>{wait === 0 ? 'No wait' : `~${wait}m`}</p>
+                {myAppt ? (
+                  <>
+                    <p style={{ fontSize: 11, color: '#CCFBF1' }}>Your appointment</p>
+                    <p style={{ fontSize: 16, fontWeight: 900 }}>{fmtApptLabel()}</p>
+                    {myAppt.tokenNumber && (
+                      <p style={{ fontSize: 12, color: '#99F6E4', marginTop: 2 }}>Token #{myAppt.tokenNumber}</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 11, color: '#CCFBF1' }}>Currently in queue</p>
+                    <p style={{ fontSize: 22, fontWeight: 900 }}>{queueStats?.waiting || 0}</p>
+                  </>
+                )}
               </div>
               <button onClick={handleBook}
                 style={{ width: '100%', background: '#fff', color: T, fontWeight: 800, fontSize: 14, padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer' }}>

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { doctorAPI, queueAPI, searchAPI, organizationAPI } from '../../services/api';
+import { doctorAPI, queueAPI, searchAPI, organizationAPI, appointmentAPI } from '../../services/api';
 import { logout } from '../../store/slices/authSlice';
 import toast from 'react-hot-toast';
 import {
@@ -70,6 +70,7 @@ export const Marketplace = () => {
   const [activeTab, setActiveTab]         = useState('doctors');
   const [organizations, setOrganizations] = useState([]);
   const [orgsLoading, setOrgsLoading]     = useState(false);
+  const [myAppointments, setMyAppointments] = useState([]);
   const [currentPage, setCurrentPage]     = useState(1);
   const DOCS_PER_PAGE = 12;
 
@@ -86,10 +87,11 @@ export const Marketplace = () => {
       try {
         setLoading(true);
 
-        const [doctorsResult, queueResult, orgsResult] = await Promise.allSettled([
+        const [doctorsResult, queueResult, orgsResult, apptResult] = await Promise.allSettled([
           doctorAPI.getDoctors(),
           queueAPI.getQueueStats(),
           organizationAPI.getOrganizations(),
+          user?.role === 'PATIENT' ? appointmentAPI.getAppointments() : Promise.resolve({ data: [] }),
         ]);
 
         if (doctorsResult.status === 'fulfilled') {
@@ -108,6 +110,11 @@ export const Marketplace = () => {
 
         if (orgsResult.status === 'fulfilled') {
           setOrganizations(orgsResult.value.data?.organizations || []);
+        }
+
+        if (apptResult.status === 'fulfilled') {
+          const appts = Array.isArray(apptResult.value.data) ? apptResult.value.data : [];
+          setMyAppointments(appts.filter(a => a.status !== 'CANCELLED'));
         }
       } finally {
         setLoading(false);
@@ -207,12 +214,10 @@ export const Marketplace = () => {
       if (cityFiltered.length > 0) r = cityFiltered;
     }
     return [...r].sort((a, b) => {
-      const wA = (queueStats[a._id]?.waiting || 0) * (a.averageConsultationTime || 10);
-      const wB = (queueStats[b._id]?.waiting || 0) * (b.averageConsultationTime || 10);
       if (sortBy === 'rating') return (b.averageRating || 0) - (a.averageRating || 0);
       if (sortBy === 'fee_low') return a.consultationFee - b.consultationFee;
       if (sortBy === 'fee_high') return b.consultationFee - a.consultationFee;
-      if (sortBy === 'wait') return wA - wB;
+      if (sortBy === 'wait') return (queueStats[a._id]?.waiting || 0) - (queueStats[b._id]?.waiting || 0);
       if (sortBy === 'experience') return b.experience - a.experience;
       return 0;
     });
@@ -223,6 +228,38 @@ export const Marketplace = () => {
     const base = searchResults !== null ? searchResults : doctors;
     return base.filter(d => d.city?.toLowerCase() === detectedCity.toLowerCase()).length === 0;
   }, [detectedCity, doctors, searchResults, search]);
+
+  // Map doctorId → the patient's nearest upcoming/today appointment with that doctor
+  const myApptMap = useMemo(() => {
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const map = {};
+    for (const a of myAppointments) {
+      const dateStr = new Date(a.appointmentDate).toISOString().slice(0, 10);
+      if (dateStr < todayStr) continue; // skip past appointments
+      const did = a.doctorId?._id || a.doctorId;
+      if (!did) continue;
+      const existing = map[did];
+      if (!existing || dateStr < new Date(existing.appointmentDate).toISOString().slice(0, 10)) {
+        map[did] = a;
+      }
+    }
+    return map;
+  }, [myAppointments]);
+
+  const fmtTime = (t) => {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  };
+
+  const fmtApptDate = (a) => {
+    const dateStr = new Date(a.appointmentDate).toISOString().slice(0, 10);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (dateStr === todayStr) return `Today · ${fmtTime(a.appointmentTime)}`;
+    const d = new Date(a.appointmentDate);
+    return `${d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} · ${fmtTime(a.appointmentTime)}`;
+  };
 
   const availableCities = useMemo(() => {
     const fromDoctors = [...new Set(doctors.map(d => d.city).filter(Boolean))].sort();
@@ -245,11 +282,6 @@ export const Marketplace = () => {
     if (currentPage <= 4) return [1, 2, 3, 4, 5, '...', totalPages];
     if (currentPage >= totalPages - 3) return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
     return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
-  };
-
-  const getWait = id => {
-    const s = queueStats[id] || { waiting: 0 };
-    return (s.waiting || 0) * (doctors.find(d => d._id === id)?.averageConsultationTime || 10);
   };
 
   if (loading) return (
@@ -509,7 +541,7 @@ export const Marketplace = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 16 }}>
                 {paginatedDocs.map(doc => {
                   const stats = queueStats[doc._id] || { waiting: 0 };
-                  const wait = getWait(doc._id);
+                  const myAppt = myApptMap[doc._id];
                   const rating = doc.averageRating > 0 ? doc.averageRating.toFixed(1) : null;
                   return (
                     <div key={doc._id}
@@ -524,13 +556,15 @@ export const Marketplace = () => {
                           <div style={{ width: 50, height: 50, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 20 }}>
                             {doc.name.charAt(0)}
                           </div>
-                          <span style={{
-                            fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 20,
-                            background: wait === 0 ? '#D1FAE5' : wait <= 20 ? '#FEF9C3' : '#FEE2E2',
-                            color: wait === 0 ? '#065F46' : wait <= 20 ? '#92400E' : '#991B1B',
-                          }}>
-                            {wait === 0 ? 'Available' : `~${wait}m wait`}
-                          </span>
+                          {myAppt ? (
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 20, background: '#F0FDF4', color: '#065F46' }}>
+                              Your Appt
+                            </span>
+                          ) : stats.waiting > 0 ? (
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 20, background: '#F3F4F6', color: '#6B7280' }}>
+                              {stats.waiting} in queue
+                            </span>
+                          ) : null}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: 2 }}>
                           <p style={{ fontWeight: 800, fontSize: 15, color: '#111827', lineHeight: 1.3, margin: 0 }}>
@@ -562,9 +596,18 @@ export const Marketplace = () => {
                             </span>
                           </>}
                         </div>
-                        <div style={{ display: 'flex', gap: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }}>
-                          <span style={{ background: '#F3F4F6', color: '#374151', padding: '3px 8px', borderRadius: 6 }}>{stats.waiting || 0} waiting</span>
-                        </div>
+                        {myAppt && (
+                          <div style={{ display: 'flex', gap: 6, fontSize: 11, fontWeight: 600, marginBottom: 14, flexWrap: 'wrap' }}>
+                            <span style={{ background: '#F0FDF4', color: T, padding: '3px 8px', borderRadius: 6 }}>
+                              {fmtApptDate(myAppt)}
+                            </span>
+                            {myAppt.tokenNumber && (
+                              <span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '3px 8px', borderRadius: 6 }}>
+                                Token #{myAppt.tokenNumber}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div style={{ padding: '0 16px 16px', marginTop: 'auto' }}>
                         <button

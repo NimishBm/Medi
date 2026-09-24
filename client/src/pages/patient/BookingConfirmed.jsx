@@ -11,7 +11,11 @@ export const BookingConfirmed = () => {
     try { return JSON.parse(sessionStorage.getItem('bookingConfirmed') || 'null'); }
     catch { return null; }
   })();
-  const { appointment, doctor, totalAmount, paymentId } = state || stored || {};
+  const { appointment, doctor, totalAmount, paymentId, appointmentPayload } = state || stored || {};
+
+  // Resolve who the appointment is for (first non-self attendee, or self)
+  const forAttendees = (appointmentPayload?.attendees || []).filter(a => a.isFamilyMember);
+  const forSelf = (appointmentPayload?.attendees || []).some(a => !a.isFamilyMember);
 
   const fmtDate = (iso) =>
     iso ? new Date(iso).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—';
@@ -45,6 +49,25 @@ export const BookingConfirmed = () => {
               <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>{doctor?.specialization || ''}</p>
             </div>
           </div>
+
+          {/* Booked for */}
+          {(forAttendees.length > 0 || forSelf) && (
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', minWidth: 60 }}>For</span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {forSelf && (
+                  <span style={{ fontSize: 12, fontWeight: 700, background: '#F0FDF4', color: '#065F46', padding: '3px 10px', borderRadius: 20, border: '1px solid #BBF7D0' }}>
+                    Myself
+                  </span>
+                )}
+                {forAttendees.map((a, i) => (
+                  <span key={i} style={{ fontSize: 12, fontWeight: 700, background: '#F3E8FF', color: '#7C3AED', padding: '3px 10px', borderRadius: 20, border: '1px solid #DDD6FE' }}>
+                    {a.name} <span style={{ fontWeight: 400, opacity: 0.7 }}>({a.relationship})</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Date + time */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid #F3F4F6' }}>
