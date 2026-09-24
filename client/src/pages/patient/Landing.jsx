@@ -69,7 +69,7 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
         let doctorsArray = [];
         if (doctorsRes.status === 'fulfilled') {
           const data = doctorsRes.value.data;
-          doctorsArray = Array.isArray(data) ? data : (data?.doctors || []);
+          doctorsArray = Array.isArray(data) ? data : (data?.doctors || []).filter(d => d.verificationStatus !== 'REJECTED');
         }
 
         const top8 = doctorsArray
@@ -573,7 +573,7 @@ const LoggedOutView = ({ navigate, searchInput, setSearchInput, handleSearch, ha
               Login
             </button>
             <button
-              onClick={() => navigate('/login/patient')}
+              onClick={() => navigate('/register')}
               style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: '#0D9488', border: 'none', borderRadius: 8, padding: '8px 18px', cursor: 'pointer' }}
             >
               {isMobile ? 'Sign Up' : 'Sign Up Free'}

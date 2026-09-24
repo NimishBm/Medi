@@ -47,6 +47,10 @@ import { DoctorPayments } from './pages/doctor/Payments';
 import { AdminLogin } from './pages/admin/Login';
 import { AdminDashboard } from './pages/admin/Dashboard';
 
+// Organization Pages
+import { OrganizationLogin } from './pages/organization/Login';
+import { OrganizationDashboard } from './pages/organization/Dashboard';
+
 // Display
 import { WaitingRoomDisplay } from './pages/WaitingRoomDisplay';
 
@@ -105,6 +109,18 @@ function AppRoutes() {
             element={
               <ProtectedRoute requiredRoles={['ADMIN']}>
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Organization Routes */}
+          <Route path="/org/login" element={<OrganizationLogin />} />
+          <Route path="/org/register" element={<OrganizationLogin />} />
+          <Route
+            path="/org/dashboard"
+            element={
+              <ProtectedRoute requiredRoles={['ORGANIZATION']}>
+                <OrganizationDashboard />
               </ProtectedRoute>
             }
           />

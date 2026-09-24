@@ -21,6 +21,7 @@ import paymentRoutes from './routes/payments.js';
 import analyticsRoutes from './routes/analytics.js';
 import searchRoutes from './routes/search.js';
 import organizationRoutes from './routes/organizations.js';
+import organizationAuthRoutes from './routes/organizationAuth.js';
 import adminRoutes from './routes/admin.js';
 import blogRoutes, { getAdminBlogPosts, updateBlogPostStatus, deleteBlogPost } from './routes/blog.js';
 import notificationRoutes from './routes/notifications.js';
@@ -74,6 +75,7 @@ app.get(['/api', '/api/'], (req, res) => {
       search: '/api/search',
       organizations: '/api/organizations',
       admin: '/api/admin',
+      'org-auth': '/api/org-auth',
       blog: '/api/blog',
     },
   });
@@ -159,6 +161,9 @@ app.use('/search', searchRoutes);
 
 app.use('/api/organizations', organizationRoutes);
 app.use('/organizations', organizationRoutes);
+
+app.use('/api/org-auth', organizationAuthRoutes);
+app.use('/org-auth', organizationAuthRoutes);
 
 app.use('/api/admin', adminRoutes);
 app.use('/admin', adminRoutes);

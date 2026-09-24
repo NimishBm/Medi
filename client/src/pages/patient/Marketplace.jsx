@@ -90,10 +90,10 @@ export const Marketplace = () => {
         ]);
 
         if (doctorsResult.status === 'fulfilled') {
-          const data = doctorsResult.value.data;
-          const allDoctors = Array.isArray(data) ? data : (data?.doctors || []);
-          const activeDoctors = allDoctors.filter(d => d.verificationStatus !== 'REJECTED');
-          setDoctors(activeDoctors);
+          let doctorsList = Array.isArray(doctorsResult.value.data) ? doctorsResult.value.data : [];
+          // Safety filter: Remove any REJECTED doctors
+          doctorsList = doctorsList.filter(d => d.verificationStatus !== 'REJECTED');
+          setDoctors(doctorsList);
         } else {
           setDoctors([]);
           if (doctorsResult.reason?.response?.status !== 401) {
@@ -136,7 +136,9 @@ export const Marketplace = () => {
       try {
         setSearchLoading(true);
         const res = await searchAPI.search(query);
-        setSearchResults(res.data.doctors || []);
+        let results = res.data.doctors || [];
+        results = results.filter(d => d.verificationStatus !== 'REJECTED');
+        setSearchResults(results);
         setSearchType(res.data.searchType || null);
       } catch {
         setSearchResults(null);

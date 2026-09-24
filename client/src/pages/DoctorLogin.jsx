@@ -33,6 +33,14 @@ export const DoctorLogin = () => {
         toast.error('Please use your doctor account.');
         return;
       }
+      if (res.data.user.verificationStatus === 'REJECTED') {
+        toast.error('Your account has been rejected. Please contact admin for more information.');
+        return;
+      }
+      if (res.data.user.verificationStatus !== 'APPROVED') {
+        toast.error('Your account is pending approval. Please wait for admin verification.');
+        return;
+      }
       dispatch(setUser({ user: res.data.user, token: res.data.token }));
       toast.success('Welcome back, Doctor!');
       navigate('/doctor');

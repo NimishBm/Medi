@@ -40,7 +40,7 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
-// Get all doctors
+// Get all doctors (hide REJECTED, show APPROVED and PENDING)
 router.get(
   '/',
   catchAsyncErrors(async (req, res) => {
@@ -48,7 +48,7 @@ router.get(
     const limit = parseInt(req.query.limit) || 5000;
     const skip = (page - 1) * limit;
 
-    const doctors = await Doctor.find({ isActive: true })
+    const doctors = await Doctor.find({ isActive: true ,verificationStatus: { $ne: 'REJECTED' }})
       .select('name specialization consultationFee profilePhoto averageRating totalReviews experience organizationIds')
       .populate('organizationIds', 'name city type logo')
       .lean()
@@ -76,7 +76,8 @@ router.get(
   '/specializations',
   catchAsyncErrors(async (req, res) => {
     const specializations = await Doctor.distinct('specialization', {
-      isActive: true
+      isActive: true,
+      verificationStatus: { $ne: 'REJECTED' }
     });
 
     res.json(specializations.filter(Boolean).sort());
@@ -99,6 +100,12 @@ router.get(
     }
 
     res.set('Cache-Control', 'public, max-age=600');
+    if (doctor.verificationStatus === 'REJECTED') {
+      return res.status(404).json({
+        message: 'Doctor not found'
+      });
+    }
+
     res.json(doctor);
   })
 );

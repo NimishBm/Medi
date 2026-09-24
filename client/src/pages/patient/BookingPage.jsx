@@ -87,7 +87,14 @@ export const BookingPage = () => {
 
   useEffect(() => {
     doctorAPI.getDoctorById(doctorId)
-      .then(r => setDoctor(r.data))
+      .then(r => {
+        if (r.data.verificationStatus === 'REJECTED') {
+          toast.error('This doctor is not available');
+          navigate('/patient/marketplace');
+        } else {
+          setDoctor(r.data);
+        }
+      })
       .catch(() => { toast.error('Failed to load doctor'); navigate('/patient/marketplace'); })
       .finally(() => setLoading(false));
   }, [doctorId]);
