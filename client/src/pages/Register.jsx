@@ -45,7 +45,7 @@ export const Register = () => {
       // The register endpoint returns the user without a role field.
       // Inject it so ProtectedRoute and role-based checks work immediately.
       dispatch(setUser({ user: { ...res.data.user, role: 'PATIENT' }, token: res.data.token }));
-      toast.success('Account created! Welcome to ClinicFlow.');
+      toast.success('Account created! Welcome to MediQ.');
       navigate('/patient');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Registration failed');
@@ -66,7 +66,7 @@ export const Register = () => {
           <div style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.2)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Stethoscope size={24} color="#fff" strokeWidth={2.5} />
           </div>
-          <span style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '-0.5px' }}>ClinicFlow</span>
+          <span style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '-0.5px' }}>MediQ</span>
         </div>
 
         <h2 style={{ fontSize: 28, fontWeight: 900, color: '#fff', lineHeight: 1.3, marginBottom: 8 }}>
@@ -99,7 +99,7 @@ export const Register = () => {
             <div style={{ width: 36, height: 36, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Stethoscope size={18} color="#fff" strokeWidth={2.5} />
             </div>
-            <span style={{ fontSize: 19, fontWeight: 900, color: T }}>ClinicFlow</span>
+            <span style={{ fontSize: 19, fontWeight: 900, color: T }}>MediQ</span>
           </div>
 
           <div style={{ background: '#fff', borderRadius: 20, padding: '32px 28px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)', border: '1.5px solid #E5E7EB' }}>

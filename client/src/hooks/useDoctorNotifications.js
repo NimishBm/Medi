@@ -69,13 +69,13 @@ const showBrowserNotification = (data) => {
   ].filter(Boolean);
 
   const notification = new Notification(titleLine, {
-    body:    bodyParts.join('\n') || 'View appointment details in ClinicFlow',
+    body:    bodyParts.join('\n') || 'View appointment details in MediQ',
     icon:    '/favicon.ico',      // uses the project's existing favicon
     tag:     `appt-${data?.appointmentId || Date.now()}`, // deduplication key
     requireInteraction: false,
   });
 
-  // Clicking the browser notification focuses the ClinicFlow tab
+  // Clicking the browser notification focuses the MediQ tab
   notification.onclick = () => {
     window.focus();
     notification.close();

@@ -15,7 +15,7 @@ export const Sidebar = ({ nav, navItems }) => {
   return (
     <aside className="w-64 bg-white shadow-md h-screen flex flex-col">
       <div className="p-6 border-b">
-        <h1 className="text-2xl font-bold text-blue-600">ClinicFlow</h1>
+        <h1 className="text-2xl font-bold text-blue-600">MediQ</h1>
         <p className="text-sm text-gray-600">{user?.role}</p>
       </div>
 

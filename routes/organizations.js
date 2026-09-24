@@ -171,7 +171,7 @@ router.get(
 router.get('/search', catchAsyncErrors(async (req, res) => {
     const query = (req.query.q || '').trim();
 
-    if (query.length < 4) {
+    if (query.length < 2) {
       return res.json({
         success: true,
         organizations: []

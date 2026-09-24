@@ -4,7 +4,7 @@ import Admin from '../models/Admin.js';
 
 dotenv.config();
 
-const EMAIL = 'admin@clinicflow.com';
+const EMAIL = 'admin@MediQ.com';
 const PASSWORD = 'Admin@1234';
 
 async function createAdmin() {

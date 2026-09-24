@@ -127,7 +127,7 @@ export const DoctorPayments = () => {
     <div className="min-h-screen bg-gray-50 font-sans">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-[#1E3A5F] border-b border-[#2D4F7C] shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/doctor')}
@@ -183,7 +183,7 @@ export const DoctorPayments = () => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         {/* Top Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl border border-teal-200 p-5 shadow-sm hover:shadow-md transition">

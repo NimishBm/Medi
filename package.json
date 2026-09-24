@@ -1,7 +1,7 @@
 {
-  "name": "clinicflow",
+  "name": "MediQ",
   "version": "1.0.0",
-  "description": "ClinicFlow - Clinic Management & Smart Patient Queue System",
+  "description": "MediQ - Clinic Management & Smart Patient Queue System",
   "keywords": [],
   "homepage": "https://github.com/NimishBm/Medi#readme",
   "bugs": {
@@ -22,6 +22,7 @@
     "start": "node server.js",
     "server:dev": "nodemon server.js",
     "seed": "node scripts/seed.js",
+    "seed-orgs": "node scripts/seedOrganizations.js",
     "seed-bodhi": "node scripts/importBodhi.js",
     "client:dev": "cd client && npm run dev",
     "client:build": "cd client && npm run build",
