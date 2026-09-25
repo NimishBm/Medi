@@ -28,6 +28,7 @@ import { PatientProfile } from './pages/patient/Profile';
 import { CompleteProfile } from './pages/patient/CompleteProfile';
 import { PatientBlog } from './pages/patient/Blog';
 import { BookingConfirmed } from './pages/patient/BookingConfirmed';
+import { PaymentFailed } from './pages/patient/PaymentFailed';
 import { OrganizationDetail } from './pages/patient/OrganizationDetail';
 
 // Doctor Pages
@@ -246,6 +247,14 @@ function AppRoutes() {
             element={
               <ProtectedRoute requiredRoles={['PATIENT']}>
                 <BookingConfirmed />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patient/payment-failed"
+            element={
+              <ProtectedRoute requiredRoles={['PATIENT']}>
+                <PaymentFailed />
               </ProtectedRoute>
             }
           />

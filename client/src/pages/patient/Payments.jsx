@@ -273,6 +273,7 @@ const ReceiptCard = ({ payment: p, user }) => {
         <Row label="Payment Method" value={p.paymentMethod} />
         {p.razorpayPaymentId && <Row label="Transaction ID" value={p.razorpayPaymentId} mono />}
         {p.razorpayOrderId   && <Row label="Order ID"       value={p.razorpayOrderId}   mono />}
+        {p.failureReason     && <Row label="Failure Reason" value={p.failureReason} />}
       </Section>
 
       <div style={{ border: '1.5px solid #E5E7EB', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>

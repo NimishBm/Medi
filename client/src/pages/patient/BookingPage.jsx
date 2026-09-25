@@ -196,9 +196,18 @@ export const BookingPage = () => {
       };
 
       const rzp = new window.Razorpay(options);
-      rzp.on('payment.failed', () => {
-        toast.error('Payment failed. Please try again.');
-        setBooking(false);
+      rzp.on('payment.failed', (response) => {
+        const errorReason = response?.error?.description || 'Payment was declined or cancelled.';
+        const errorCode   = response?.error?.code || null;
+        paymentAPI.recordFailure({
+          doctorId: doctor._id,
+          totalAmount,
+          razorpayOrderId: order.id,
+          failureReason: errorReason,
+          errorCode,
+        }).catch(() => {});
+        sessionStorage.setItem('paymentFailed', JSON.stringify({ doctor, totalAmount, errorReason, errorCode }));
+        window.location.href = '/patient/payment-failed';
       });
       rzp.open();
       // booking state stays true until handler resolves or modal dismissed

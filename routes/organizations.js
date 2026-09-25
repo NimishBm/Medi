@@ -20,7 +20,12 @@ router.get(
 
     const result = await Promise.all(
       orgs.map(async (org) => {
-        const doctorCount = await OrganizationDoctor.countDocuments({ organizationId: org._id });
+        const [byJoin, byName] = await Promise.all([
+          Doctor.countDocuments({ organizationIds: org._id }),
+          Doctor.countDocuments({ organization: { $regex: new RegExp(org.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') } }),
+        ]);
+        // Use the larger of the two counts (avoids double-counting by picking max; exact dedup not needed for display)
+        const doctorCount = Math.max(byJoin, byName);
         return { ...org, doctorCount };
       })
     );
@@ -221,41 +226,37 @@ router.get('/search', async (req, res) => {
 // Get one organization and its doctors
 router.get('/:id', async (req, res) => {
   try {
-    const organization = await Organization.findById(
-      req.params.id
-    ).lean();
+    const organization = await Organization.findById(req.params.id).lean();
 
     if (!organization) {
-      return res.status(404).json({
-        success: false,
-        message: 'Organization not found'
-      });
+      return res.status(404).json({ success: false, message: 'Organization not found' });
     }
 
-    const organizationDoctors =
-      await OrganizationDoctor.find({
-        organizationId: organization._id
-      })
-        .populate({
-          path: 'doctorId',
-          select: '-password'
-        })
-        .lean();
+    // Find doctors linked by ObjectId array, join table, OR organization name string
+    const joinRecords = await OrganizationDoctor.find({ organizationId: organization._id }).lean();
+    const joinIds = joinRecords.map(r => r.doctorId);
 
-    res.json({
-      success: true,
-      organization,
-      doctors: organizationDoctors
-        .map((item) => item.doctorId)
-        .filter(Boolean)
+    const doctors = await Doctor.find({
+      $or: [
+        { organizationIds: organization._id },
+        { _id: { $in: joinIds } },
+        { organization: { $regex: new RegExp(organization.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') } },
+      ],
+    }).select('-password').lean();
+
+    // Deduplicate by _id
+    const seen = new Set();
+    const unique = doctors.filter(d => {
+      const id = String(d._id);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
     });
+
+    res.json({ success: true, organization, doctors: unique });
   } catch (error) {
     console.error('Organization fetch error:', error);
-
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch organization'
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch organization' });
   }
 });
 

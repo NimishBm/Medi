@@ -154,6 +154,29 @@ router.post(
   })
 );
 
+// POST /api/payments/razorpay/failure — record a failed payment attempt
+router.post(
+  '/razorpay/failure',
+  protect,
+  catchAsyncErrors(async (req, res) => {
+    const { doctorId, totalAmount, razorpayOrderId, failureReason, errorCode } = req.body;
+    if (!doctorId || !totalAmount) return res.status(400).json({ message: 'doctorId and totalAmount are required' });
+
+    await Payment.create({
+      patientId:      req.user.id,
+      doctorId,
+      consultationFee: totalAmount,
+      totalAmount,
+      paymentMethod:  'RAZORPAY',
+      status:         'FAILED',
+      razorpayOrderId: razorpayOrderId || undefined,
+      failureReason:  failureReason || errorCode || 'Unknown',
+    });
+
+    res.json({ ok: true });
+  })
+);
+
 // POST /api/payments/razorpay/order — create a Razorpay order before showing checkout
 router.post(
   '/razorpay/order',

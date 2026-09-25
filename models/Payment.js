@@ -5,8 +5,10 @@ const paymentSchema = new mongoose.Schema(
     appointmentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Appointment',
-      required: true,
+      required: false,
     },
+
+    failureReason: String,
 
     patientId: {
       type: mongoose.Schema.Types.ObjectId,
