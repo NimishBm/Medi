@@ -127,6 +127,7 @@ export const prescriptionAPI = {
 export const paymentAPI = {
   createPayment: (data) => api.post('/payments', data),
   getPaymentsByPatient: (patientId) => api.get(`/payments/patient/${patientId}`),
+  getPaymentsByDoctor: (doctorId) => api.get(`/payments/doctor/${doctorId}`),
   getPaymentById: (id) => api.get(`/payments/${id}`),
   refundPayment: (id, data) => api.post(`/payments/${id}/refund`, data),
   createRazorpayOrder: (data) => api.post('/payments/razorpay/order', data),
@@ -172,6 +173,7 @@ export const searchAPI = {
 
 export const blogAPI = {
   getPosts:       (status) => api.get('/blog/posts', { params: status ? { status } : {} }),
+  getFeed:        (params) => api.get('/blog/feed', { params }),
   createPost:     (data)   => api.post('/blog/posts', data),
   updatePost:     (id, data) => api.put(`/blog/posts/${id}`, data),
   deletePost:     (id)     => api.delete(`/blog/posts/${id}`),
@@ -203,6 +205,11 @@ export const orgAuthAPI = {
   getDoctors: () => api.get('/org-auth/doctors'),
   getStats: () => api.get('/org-auth/stats'),
   getDoctorDetail: (doctorId) => api.get(`/org-auth/doctor/${doctorId}`),
+};
+export const adminBlogAPI = {
+  getPosts:     (status) => api.get('/admin/blog', { params: status ? { status } : {} }),
+  updateStatus: (id, status) => api.put(`/admin/blog/${id}/status`, { status }),
+  deletePost:   (id) => api.delete(`/admin/blog/${id}`),
 };
 
 export default api;

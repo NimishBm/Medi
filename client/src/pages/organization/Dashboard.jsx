@@ -285,6 +285,7 @@ export const OrganizationDashboard = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Experience</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rating</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -304,6 +305,11 @@ export const OrganizationDashboard = () => {
                       <td className="px-6 py-4 text-sm text-gray-600">
                         ⭐ {doctor.averageRating?.toFixed(1) || 'N/A'} ({doctor.totalReviews || 0})
                       </td>
+                      <td className="px-6 py-4 text-sm">
+                        <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-xs">
+                          Book Now
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

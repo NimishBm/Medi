@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { organizationAPI } from '../../services/api';
-import { doctorAPI } from '../../services/api';
+import { logout } from '../../store/slices/authSlice';
 import {
   ChevronLeft, MapPin, Phone, Globe, Building2, Stethoscope, Star,
 } from 'lucide-react';
@@ -27,6 +27,7 @@ const TYPE_COLORS = {
 export const OrganizationDetail = () => {
   const { orgId } = useParams();
   const navigate  = useNavigate();
+  const dispatch  = useDispatch();
   const user      = useSelector(s => s.auth.user);
 
   const [org,     setOrg]     = useState(null);
@@ -39,12 +40,7 @@ export const OrganizationDetail = () => {
         setLoading(true);
         const res = await organizationAPI.getById(orgId);
         setOrg(res.data.organization);
-        const doctorIds = res.data.doctors || [];
-        const doctorRequests = doctorIds.map(id => doctorAPI.getDoctorById(id));
-        const responses = await Promise.all(doctorRequests);
-        // 3. Extract the data from each response and update state
-        const fullDoctorsData = responses.map(r => r.data);
-        setDoctors(fullDoctorsData || []);
+        setDoctors(res.data.doctors || []);
       } catch {
         toast.error('Failed to load organization');
         navigate(-1);
@@ -84,7 +80,26 @@ export const OrganizationDetail = () => {
             </div>
             <span style={{ fontWeight: 800, fontSize: 16, color: '#1D4ED8', letterSpacing: '-0.3px' }}>MediQ</span>
           </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {user ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F3F4F6', padding: '5px 10px', borderRadius: 20 }}>
+                  <div style={{ width: 24, height: 24, background: '#1D4ED8', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12 }}>
+                    {user.name?.charAt(0)}
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{user.name?.split(' ')[0]}</span>
+                </div>
+                <button onClick={() => dispatch(logout())} style={{ fontSize: 12, fontWeight: 600, color: '#6B7280', background: 'none', border: 'none', cursor: 'pointer' }}>Logout</button>
+              </>
+            ) : (
+              <button onClick={() => navigate('/login/patient')}
+                style={{ background: '#1D4ED8', color: '#fff', fontWeight: 700, fontSize: 12, padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer' }}>
+                Login
+              </button>
+            )}
+          </div>
         </div>
+        <div style={{ background: 'linear-gradient(90deg,#1D4ED8,#2563EB)', height: 4 }} />
       </header>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px 48px' }}>

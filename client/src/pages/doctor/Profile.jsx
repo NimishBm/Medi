@@ -274,8 +274,8 @@ export const DoctorProfile = () => {
     const p = user?.profilePhoto;
     if (!p) return null;
     if (p.startsWith('http')) return p;
-    const base = (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes('localhost')) ? import.meta.env.VITE_API_URL.replace('/api', '') : '';
-    return `${base}${p}`;
+    if (p.startsWith('/')) return p;
+    return p;
   });
 
   const [nq, setNq] = useState('');  // new qualification

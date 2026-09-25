@@ -158,7 +158,7 @@ router.post(
     res.json({
       message: 'Photo uploaded successfully',
       profilePhoto: fullUrl,
-      user: { ...doctor.toJSON(), role: 'DOCTOR' }
+      user: { ...doctor.toJSON(), profilePhoto: fullUrl, role: 'DOCTOR' }
     });
   })
 );

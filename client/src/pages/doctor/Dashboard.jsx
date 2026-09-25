@@ -1,7 +1,7 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { logout } from '../../store/slices/authSlice';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { doctorProfileAPI, queueAPI, organizationAPI } from '../../services/api';
 import { setUser } from '../../store/slices/authSlice';
@@ -274,6 +274,13 @@ export const DoctorDashboard = () => {
     return <Navigate to="/login/doctor" replace />;
   }
 
+  const profilePhotoUrl = useMemo(() => {
+    if (!user?.profilePhoto) return null;
+    if (user.profilePhoto.startsWith('http')) return user.profilePhoto;
+    if (user.profilePhoto.startsWith('/')) return user.profilePhoto;
+    return user.profilePhoto;
+  }, [user?.profilePhoto]);
+
   const getWorkingDays = () => {
     if (!user?.availability) return 0;
     return Object.values(user.availability).filter(day => day?.start && day?.end).length;
@@ -481,7 +488,8 @@ export const DoctorDashboard = () => {
                   <div className="relative">
                     {user?.profilePhoto ? (
                       <img
-                        src={user.profilePhoto}
+                        key={user?.profilePhoto}
+                        src={profilePhotoUrl}
                         alt={user.name}
                         className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
                       />

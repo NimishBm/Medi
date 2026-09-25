@@ -523,11 +523,6 @@ export const Marketplace = () => {
                   {selectedCategory !== 'all' && <span> in <span style={{ color: T, fontWeight: 600 }}>{CATEGORIES.find(c => c.id === selectedCategory)?.name}</span></span>}
                   {detectedCity && !cityFallback && !search.trim() && <span> near <span style={{ color: T, fontWeight: 600 }}>{detectedCity}</span></span>}
                 </p>
-                {cityFallback && (
-                  <p style={{ fontSize: 12, color: '#D97706', margin: '4px 0 0', fontWeight: 600 }}>
-                    No doctors near {detectedCity} — showing all doctors
-                  </p>
-                )}
               </div>
               {totalPages > 1 && (
                 <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>
