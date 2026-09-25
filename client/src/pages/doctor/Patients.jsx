@@ -409,7 +409,7 @@ export const DoctorPatients = () => {
 
       {/* Header */}
       <header className="sticky top-0 z-40 bg-[#1E3A5F] border-b border-[#2D4F7C] shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => navigate('/doctor')} className="sm:hidden text-teal-300 hover:text-white p-2">
               <ArrowLeft size={24} />
@@ -419,7 +419,7 @@ export const DoctorPatients = () => {
             </div>
             <div>
               <h1 className="text-base sm:text-lg font-bold text-white leading-tight">Patients</h1>
-              <p className="text-xs text-teal-300 hidden sm:block">ClinicFlow</p>
+              <p className="text-xs text-teal-300 hidden sm:block">MediQ</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -439,7 +439,7 @@ export const DoctorPatients = () => {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-4 sm:py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {/* Title */}
         <div className="mb-4 sm:mb-8 hidden sm:block">
           <h2 className="text-2xl font-bold text-gray-900 mb-1">My Patients</h2>

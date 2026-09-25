@@ -1,8 +1,8 @@
-# Browser Notifications Implementation Guide - ClinicFlow
+# Browser Notifications Implementation Guide - MediQ
 
 ## Overview
 
-The ClinicFlow project has a complete real-time browser notification system for doctors. When a patient books an appointment with a doctor, the doctor receives:
+The MediQ project has a complete real-time browser notification system for doctors. When a patient books an appointment with a doctor, the doctor receives:
 
 1. **In-app notification** (always visible in the notification bell)
 2. **Browser notification** (OS-level popup, if permission granted)
@@ -130,7 +130,7 @@ When doctor receives a browser notification:
 - **Body**: Includes time, date, token number, family member info (if applicable)
 - **Icon**: Project favicon
 - **Tag**: `appt-${appointmentId}` (deduplicates notifications)
-- **Click Action**: Clicking notification focuses the ClinicFlow tab
+- **Click Action**: Clicking notification focuses the MediQ tab
 
 ### Code Location
 - useDoctorNotifications.js lines 51-83: `showBrowserNotification(data)`
@@ -217,7 +217,7 @@ Watch for THREE notifications appearing in Window 2:
 - **When**: Immediately after patient books
 - **What**: OS-level popup showing appointment details (patient name, date, time, token number)
 - **Appears only if**: Permission = 'granted' from Step 1
-- **Action**: Click it → ClinicFlow tab focuses
+- **Action**: Click it → MediQ tab focuses
 - **Location**: Varies by OS (top-right on Windows, different on Mac/Linux)
 
 **C. Notification Bell Badge Update**
@@ -292,7 +292,7 @@ Watch for THREE notifications appearing in Window 2:
 ### Issue: Browser notification not appearing (but toast works)
 
 **Check 1: Permission granted?**
-- Open browser settings → Notifications → ClinicFlow site
+- Open browser settings → Notifications → MediQ site
 - Should show "Allow" not "Block"
 - Reset if needed: Clear site data and reload
 

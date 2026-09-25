@@ -118,20 +118,6 @@ router.delete(
   })
 );
 
-// GET /my — get authenticated doctor's linked organizations
-router.get(
-  '/my',
-  protect,
-  authorize('DOCTOR'),
-  catchAsyncErrors(async (req, res) => {
-    const links = await OrganizationDoctor.find({ doctorId: req.user.id })
-      .populate('organizationId')
-      .lean();
-    const organizations = links.map(l => l.organizationId).filter(Boolean);
-    res.json({ success: true, organizations });
-  })
-);
-
 // POST /join — doctor joins an organization (self-link only)
 router.post(
   '/join',
@@ -172,12 +158,25 @@ router.delete(
   })
 );
 
+// GET /my — get authenticated doctor's linked organizations
+router.get(
+  '/my',
+  protect,
+  authorize('DOCTOR'),
+  catchAsyncErrors(async (req, res) => {
+    const links = await OrganizationDoctor.find({ doctorId: req.user.id })
+      .populate('organizationId')
+      .lean();
+    const organizations = links.map(l => l.organizationId).filter(Boolean);
+    res.json({ success: true, organizations });
+  })
+);
+
 // Search organizations
-router.get('/search', async (req, res) => {
-  try {
+router.get('/search', catchAsyncErrors(async (req, res) => {
     const query = (req.query.q || '').trim();
 
-    if (query.length < 4) {
+    if (query.length < 2) {
       return res.json({
         success: true,
         organizations: []
@@ -196,7 +195,8 @@ router.get('/search', async (req, res) => {
           })
             .populate({
               path: 'doctorId',
-              select: '-password'
+              select: '-password',
+              match: { verificationStatus: { $ne: 'REJECTED' } }
             })
             .lean();
 
@@ -213,15 +213,7 @@ router.get('/search', async (req, res) => {
       success: true,
       organizations: result
     });
-  } catch (error) {
-    console.error('Organization search error:', error);
-
-    res.status(500).json({
-      success: false,
-      message: 'Organization search failed'
-    });
-  }
-});
+}));
 
 // Get one organization and its doctors
 router.get('/:id', async (req, res) => {
@@ -232,9 +224,16 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Organization not found' });
     }
 
-    // Find doctors linked by ObjectId array, join table, OR organization name string
-    const joinRecords = await OrganizationDoctor.find({ organizationId: organization._id }).lean();
-    const joinIds = joinRecords.map(r => r.doctorId);
+    const organizationDoctors =
+      await OrganizationDoctor.find({
+        organizationId: organization._id
+      })
+        .populate({
+          path: 'doctorId',
+          select: '-password',
+          match: { verificationStatus: { $ne: 'REJECTED' } }
+        })
+        .lean();
 
     const doctors = await Doctor.find({
       $or: [

@@ -29,6 +29,11 @@ export const DoctorDetail = () => {
           queueAPI.getQueueByDoctorId(doctorId),
           user?.role === 'PATIENT' ? appointmentAPI.getAppointments() : Promise.resolve({ data: [] }),
         ]);
+        if (docRes.data.verificationStatus === 'REJECTED') {
+          toast.error('This doctor profile is not available');
+          navigate(user ? '/patient/marketplace' : '/marketplace');
+          return;
+        }
         setDoctor(docRes.data);
         setQueueStats(qRes.data);
 
@@ -49,7 +54,7 @@ export const DoctorDetail = () => {
       } finally { setLoading(false); }
     };
     fetch();
-  }, [doctorId]);
+  }, [doctorId, navigate, user]);
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F5F7FA' }}>
@@ -104,7 +109,7 @@ export const DoctorDetail = () => {
             <div style={{ width: 32, height: 32, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Stethoscope size={16} color="#fff" strokeWidth={2.5} />
             </div>
-            <span style={{ fontWeight: 800, fontSize: 16, color: T }}>ClinicFlow</span>
+            <span style={{ fontWeight: 800, fontSize: 16, color: T }}>MediQ</span>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             {user ? (
@@ -136,7 +141,7 @@ export const DoctorDetail = () => {
           <div style={{ padding: '0 24px 24px', marginTop: -32 }}>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
-                <div style={{ width: 72, height: 72, background: '#fff', borderRadius: '50%', border: `4px solid #fff`, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T, fontWeight: 900, fontSize: 28 }}>
+                <div style={{ width: 72, height: 72, background: '#fff', borderRadius: '50%', border: `4px solid #fff`,marginTop:'-16px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T, fontWeight: 900, fontSize: 28 }}>
                   {doctor.name.replace(/^Dr\.?\s+/, '').charAt(0)}
                 </div>
                 <div>
@@ -144,7 +149,7 @@ export const DoctorDetail = () => {
                     <h2 style={{ fontSize: 22, fontWeight: 900, color: '#111827', margin: 0 }}>
                       Dr. {doctor.name.replace(/^Dr\.?\s+/, '')}
                     </h2>
-                    {doctor.isVerified && <VerifiedBadge />}
+                    <VerificationBadge status={doctor.verificationStatus || 'PENDING'} />
                   </div>
                   <p style={{ fontSize: 14, color: '#6B7280', fontWeight: 600 }}>{doctor.specialization}</p>
                   {doctor.organizationIds?.length > 0 && (
@@ -317,16 +322,32 @@ export const DoctorDetail = () => {
                   <p style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{value}</p>
                 </div>
               ))}
-              {doctor.isVerified ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#065F46', fontWeight: 700 }}>
-                  <CheckCircle size={14} color="#059669" /> Verified Doctor
-                </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#92400E', fontWeight: 600 }}>
-                  <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#FEF3C7', border: '1.5px solid #D97706', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: '#D97706' }}>!</span>
-                  Verification Pending
-                </div>
-              )}
+              <div style={{ paddingTop: 8 }}>
+                {(doctor.verificationStatus || 'PENDING') === 'APPROVED' ? (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#065F46', fontWeight: 700, marginBottom: 4 }}>
+                      <CheckCircle size={14} color="#059669" /> Verified Doctor
+                    </div>
+                    <p style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>Admin approved - Credentials verified and validated</p>
+                  </div>
+                ) : (doctor.verificationStatus || 'PENDING') === 'REJECTED' ? (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#991B1B', fontWeight: 600, marginBottom: 4 }}>
+                      <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#FEE2E2', border: '1.5px solid #DC2626', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: '#DC2626' }}>✕</span>
+                      Verification Rejected
+                    </div>
+                    <p style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>Admin rejected - Credentials did not meet requirements</p>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#92400E', fontWeight: 600, marginBottom: 4 }}>
+                      <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#FEF3C7', border: '1.5px solid #D97706', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: '#D97706' }}>!</span>
+                      Verification Pending
+                    </div>
+                    <p style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>Under admin review - Credentials being validated</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -335,12 +356,44 @@ export const DoctorDetail = () => {
   );
 };
 
-const VerifiedBadge = () => (
-  <div title="Verified Doctor" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#D1FAE5', border: '1.5px solid #6EE7B7', borderRadius: 20, padding: '3px 9px', flexShrink: 0 }}>
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-      <path d="M12 2L14.5 7.5L21 8.27L16.5 12.64L17.68 19.1L12 16.1L6.32 19.1L7.5 12.64L3 8.27L9.5 7.5L12 2Z" fill="#059669" />
-      <path d="M9 12L11 14L15 10" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-    <span style={{ fontSize: 11, fontWeight: 700, color: '#065F46' }}>Verified</span>
-  </div>
-);
+const VerificationBadge = ({ status }) => {
+  const badges = {
+    APPROVED: {
+      bg: '#D1FAE5',
+      border: '#6EE7B7',
+      text: '#065F46',
+      label: 'Verified',
+      icon: (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L14.5 7.5L21 8.27L16.5 12.64L17.68 19.1L12 16.1L6.32 19.1L7.5 12.64L3 8.27L9.5 7.5L12 2Z" fill="#059669" />
+          <path d="M9 12L11 14L15 10" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    },
+    PENDING: {
+      bg: '#FEF3C7',
+      border: '#D97706',
+      text: '#92400E',
+      label: 'Pending',
+      icon: <span style={{ fontSize: 10, fontWeight: 900, color: '#D97706' }}>!</span>
+    },
+    REJECTED: {
+      bg: '#FEE2E2',
+      border: '#DC2626',
+      text: '#991B1B',
+      label: 'Rejected',
+      icon: <span style={{ fontSize: 10, fontWeight: 900, color: '#DC2626' }}>✕</span>
+    }
+  };
+
+  const badge = badges[status] || badges.PENDING;
+
+  return (
+    <div title={`Verification: ${status}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: badge.bg, border: `1.5px solid ${badge.border}`, borderRadius: 20, padding: '3px 9px', flexShrink: 0 }}>
+      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14 }}>
+        {badge.icon}
+      </div>
+      <span style={{ fontSize: 11, fontWeight: 700, color: badge.text }}>{badge.label}</span>
+    </div>
+  );
+};

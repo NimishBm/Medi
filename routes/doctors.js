@@ -40,7 +40,7 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
-// Get all doctors
+// Get all doctors (hide REJECTED, show APPROVED and PENDING)
 router.get(
   '/',
   catchAsyncErrors(async (req, res) => {
@@ -48,9 +48,9 @@ router.get(
     const limit = parseInt(req.query.limit) || 5000;
     const skip = (page - 1) * limit;
 
-    const doctors = await Doctor.find({ isActive: true })
-      .select('name specialization consultationFee profilePhoto averageRating totalReviews experience organizationIds organization city')
-      .populate('organizationIds', 'name city type logo')
+    const doctors = await Doctor.find({ isActive: true ,verificationStatus: { $ne: 'REJECTED' }})
+      .select('name specialization consultationFee profilePhoto averageRating totalReviews experience organizationId')
+      .populate('organizationId', 'name city type logo')
       .lean()
       .skip(skip)
       .limit(limit)
@@ -76,7 +76,8 @@ router.get(
   '/specializations',
   catchAsyncErrors(async (req, res) => {
     const specializations = await Doctor.distinct('specialization', {
-      isActive: true
+      isActive: true,
+      verificationStatus: { $ne: 'REJECTED' }
     });
 
     res.json(specializations.filter(Boolean).sort());
@@ -89,7 +90,7 @@ router.get(
   catchAsyncErrors(async (req, res) => {
     const doctor = await Doctor.findById(req.params.id)
       .select('-password')
-      .populate('organizationIds', 'name city type logo')
+      .populate('organizationId', 'name city type logo')
       .lean();
 
     if (!doctor) {
@@ -99,6 +100,12 @@ router.get(
     }
 
     res.set('Cache-Control', 'public, max-age=600');
+    if (doctor.verificationStatus === 'REJECTED') {
+      return res.status(404).json({
+        message: 'Doctor not found'
+      });
+    }
+
     res.json(doctor);
   })
 );
@@ -110,7 +117,7 @@ router.get(
   catchAsyncErrors(async (req, res) => {
     const doctor = await Doctor.findById(req.params.id)
       .select('-password')
-      .populate('organizationIds', 'name city type logo');
+      .populate('organizationId', 'name city type logo');
 
     if (!doctor) {
       return res.status(404).json({

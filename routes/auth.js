@@ -21,7 +21,7 @@ const generateToken = (user, role) => {
       role,
       email: user.email
     },
-    process.env.JWT_SECRET || 'clinicflow_super_secret_jwt_key_2026',
+    process.env.JWT_SECRET || 'MediQ_super_secret_jwt_key_2026',
     { expiresIn: '7d' }
   );
 };
@@ -172,6 +172,13 @@ router.post(
     if (!isPasswordValid) {
       return res.status(401).json({
         message: 'Invalid email or password'
+      });
+    }
+
+    // Prevent rejected doctors from logging in
+    if (role === 'DOCTOR' && user.verificationStatus === 'REJECTED') {
+      return res.status(403).json({
+        message: 'Your account has been rejected and is not eligible to login'
       });
     }
 

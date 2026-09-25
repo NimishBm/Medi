@@ -50,7 +50,7 @@ export const DoctorLanding = () => {
             <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
               <Heart className="text-white" size={24} strokeWidth={2.5} />
             </div>
-            <h1 className="text-xl font-bold text-gray-900">ClinicFlow</h1>
+            <h1 className="text-xl font-bold text-gray-900">MediQ</h1>
           </div>
 
           {user ? (
@@ -246,9 +246,9 @@ export const DoctorLanding = () => {
         </div>
       </section>
 
-      {/* Why ClinicFlow */}
+      {/* Why MediQ */}
       <section className="max-w-7xl mx-auto px-4 py-16 md:py-20">
-        <h2 className="text-3xl font-bold text-gray-900 mb-10 text-center">Why Choose ClinicFlow?</h2>
+        <h2 className="text-3xl font-bold text-gray-900 mb-10 text-center">Why Choose MediQ?</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Feature 1 */}
           <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
@@ -283,7 +283,7 @@ export const DoctorLanding = () => {
       <section className="bg-gradient-to-r from-blue-700 to-blue-600 text-white py-16 md:py-20">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to transform your practice?</h2>
-          <p className="text-blue-100 text-lg mb-8">Join thousands of doctors already using ClinicFlow.</p>
+          <p className="text-blue-100 text-lg mb-8">Join thousands of doctors already using MediQ.</p>
           <button
             onClick={handleGetStarted}
             className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3.5 rounded-full font-bold text-base transition-colors"
@@ -296,7 +296,7 @@ export const DoctorLanding = () => {
       {/* Footer */}
       <footer className="border-t border-gray-200 py-6">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-gray-600 text-sm">© 2026 ClinicFlow. All rights reserved.</p>
+          <p className="text-gray-600 text-sm">© 2026 MediQ. All rights reserved.</p>
         </div>
       </footer>
     </div>

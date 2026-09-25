@@ -32,7 +32,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       const url = error.config?.url || '';
-      const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register');
+      const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/org-auth/login') || url.includes('/org-auth/register');
       const isAdminEndpoint = url.includes('/admin/');
       if (!isAuthEndpoint && !isAdminEndpoint) {
         localStorage.removeItem('token');
@@ -127,7 +127,6 @@ export const prescriptionAPI = {
 export const paymentAPI = {
   createPayment: (data) => api.post('/payments', data),
   getPaymentsByPatient: (patientId) => api.get(`/payments/patient/${patientId}`),
-  getPaymentsByDoctor: (doctorId) => api.get(`/payments/doctor/${doctorId}`),
   getPaymentById: (id) => api.get(`/payments/${id}`),
   refundPayment: (id, data) => api.post(`/payments/${id}/refund`, data),
   createRazorpayOrder: (data) => api.post('/payments/razorpay/order', data),
@@ -173,7 +172,6 @@ export const searchAPI = {
 
 export const blogAPI = {
   getPosts:       (status) => api.get('/blog/posts', { params: status ? { status } : {} }),
-  getFeed:        (params) => api.get('/blog/feed', { params }),
   createPost:     (data)   => api.post('/blog/posts', data),
   updatePost:     (id, data) => api.put(`/blog/posts/${id}`, data),
   deletePost:     (id)     => api.delete(`/blog/posts/${id}`),
@@ -187,23 +185,20 @@ export const blogAPI = {
   },
 };
 
-export const adminBlogAPI = {
-  getPosts:     (status) => api.get('/admin/blog', { params: status ? { status } : {} }),
-  updateStatus: (id, status) => api.put(`/admin/blog/${id}/status`, { status }),
-  deletePost:   (id)     => api.delete(`/admin/blog/${id}`),
+export const organizationAPI = {
+  getAll:       () => api.get('/organizations'),
+  getById:      (id) => api.get(`/organizations/${id}`),
 };
 
-export const organizationAPI = {
-  getOrganizations:    ()    => api.get('/organizations'),
-  getOrganizationById: (id)  => api.get(`/organizations/${id}`),
-  searchOrganizations: (q)   => api.get('/organizations/search', { params: { q } }),
-  createOrganization:  (data) => api.post('/organizations', data),
-  updateOrganization:  (id, data) => api.put(`/organizations/${id}`, data),
-  addDoctor:           (id, doctorId) => api.post(`/organizations/${id}/doctors`, { doctorId }),
-  removeDoctor:        (id, doctorId) => api.delete(`/organizations/${id}/doctors/${doctorId}`),
-  getMyOrganizations:  ()    => api.get('/organizations/my'),
-  joinOrganization:    (orgId) => api.post('/organizations/join', { organizationId: orgId }),
-  leaveOrganization:   (orgId) => api.delete(`/organizations/leave/${orgId}`),
+export const orgAuthAPI = {
+  register: (data) => api.post('/org-auth/register', data),
+  login: (data) => api.post('/org-auth/login', data),
+  getMe: () => api.get('/org-auth/me'),
+  updateProfile: (data) => api.put('/org-auth/profile', data),
+  changePassword: (data) => api.put('/org-auth/password', data),
+  getDoctors: () => api.get('/org-auth/doctors'),
+  getStats: () => api.get('/org-auth/stats'),
+  getDoctorDetail: (doctorId) => api.get(`/org-auth/doctor/${doctorId}`),
 };
 
 export default api;

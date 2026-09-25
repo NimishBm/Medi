@@ -327,7 +327,7 @@ export const DoctorBlog = () => {
 
       {/* ── Header ── */}
       <header className="sticky top-0 z-50 bg-[#1E3A5F] border-b border-[#2D4F7C] shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button type="button"
               onClick={() => view !== 'list' ? setView('list') : navigate('/doctor')}
@@ -370,7 +370,7 @@ export const DoctorBlog = () => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
 
         {/* ══════════════════════════════════════
             CREATE / EDIT FORM

@@ -104,7 +104,10 @@ const ProfileTab = ({ doctor }) => (
 
     <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-2.5">
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Verification</p>
-      <InfoRow label="Status"        value={doctor.verificationStatus} />
+      <div className="flex gap-2 text-sm">
+        <span className="text-gray-500 w-40 shrink-0">Verification Status</span>
+        <StatusBadge status={doctor.verificationStatus} />
+      </div>
       <InfoRow label="License Check" value={doctor.licenseVerified ? 'Verified ✓' : 'Not verified'} />
       {doctor.verificationNote && <InfoRow label="Note" value={doctor.verificationNote} />}
       <InfoRow label="Active"        value={doctor.isActive ? 'Yes' : 'No'} />
@@ -163,7 +166,7 @@ const PatientsTab = ({ patients }) => (
       <div className="flex items-center justify-center h-40 text-gray-400">No patients yet</div>
     ) : (
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm select-none">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-5 py-3 text-left font-semibold text-gray-600">Patient</th>
@@ -173,10 +176,17 @@ const PatientsTab = ({ patients }) => (
           </thead>
           <tbody className="divide-y divide-gray-100">
             {patients.map((p) => (
-              <tr key={p._id} className="hover:bg-gray-50">
+              <tr key={p._id} className="hover:bg-purple-50 transition-colors cursor-pointer">
                 <td className="px-5 py-3">
-                  <p className="font-medium text-gray-900">{p.name}</p>
-                  <p className="text-gray-400 text-xs">{p.email}</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center shrink-0 text-purple-500 text-sm font-medium">
+                      {p.name?.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{p.name}</p>
+                      <p className="text-gray-400 text-xs truncate">{p.email}</p>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-5 py-3 text-gray-600">{p.phone || '—'}</td>
                 <td className="px-5 py-3 text-gray-600">{p.appointmentCount}</td>
@@ -352,7 +362,7 @@ export const DoctorDetailView = ({ doctorId, onBack }) => {
               </span>
               {doctor.licenseVerified && (
                 <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
-                  <CheckCircle size={11} /> License Verified
+                  <CheckCircle size={11} /> License ✓
                 </span>
               )}
             </div>

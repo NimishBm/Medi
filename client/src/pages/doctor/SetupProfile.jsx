@@ -73,7 +73,7 @@ export const SetupProfile = () => {
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
               <Heart className="text-white" size={18} strokeWidth={2.5} />
             </div>
-            <h1 className="text-base font-bold text-gray-900">ClinicFlow</h1>
+            <h1 className="text-base font-bold text-gray-900">MediQ</h1>
           </div>
           <h2 className="text-base font-bold text-gray-900">Complete Your Profile</h2>
           <div></div>

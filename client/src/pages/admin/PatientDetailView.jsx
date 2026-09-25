@@ -126,7 +126,7 @@ const AppointmentsTab = ({ appointments }) => (
       <div className="flex items-center justify-center h-40 text-gray-400">No appointments yet</div>
     ) : (
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm select-none">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-5 py-3 text-left font-semibold text-gray-600">Doctor</th>
@@ -139,10 +139,17 @@ const AppointmentsTab = ({ appointments }) => (
           </thead>
           <tbody className="divide-y divide-gray-100">
             {appointments.map((a) => (
-              <tr key={a._id} className="hover:bg-gray-50">
+              <tr key={a._id} className="hover:bg-slate-50 transition-colors cursor-pointer">
                 <td className="px-5 py-3">
-                  <p className="font-medium text-gray-900">{a.doctorId?.name || '—'}</p>
-                  <p className="text-gray-400 text-xs">{a.doctorId?.specialization || ''}</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0 text-slate-600 text-sm font-medium">
+                      {a.doctorId?.name?.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{a.doctorId?.name || '—'}</p>
+                      <p className="text-gray-400 text-xs truncate">{a.doctorId?.specialization || ''}</p>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-5 py-3 text-gray-600 whitespace-nowrap">
                   {new Date(a.appointmentDate).toLocaleDateString()}

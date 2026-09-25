@@ -62,7 +62,7 @@ export const CompleteProfile = () => {
         <div style={{ width: 38, height: 38, background: `linear-gradient(135deg,${T},#0F766E)`, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Stethoscope size={20} color="#fff" strokeWidth={2.5} />
         </div>
-        <span style={{ fontSize: 20, fontWeight: 900, color: T }}>ClinicFlow</span>
+        <span style={{ fontSize: 20, fontWeight: 900, color: T }}>MediQ</span>
       </div>
 
       <div style={{ width: '100%', maxWidth: 440, background: '#fff', borderRadius: 20, padding: '36px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.07)', border: '1.5px solid #E5E7EB' }}>

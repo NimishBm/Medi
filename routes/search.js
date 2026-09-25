@@ -123,7 +123,9 @@ router.get("/", async (req, res) => {
 
     const doctorsByName = await Doctor.find({
       isActive: true,
+      verificationStatus: { $ne: 'REJECTED' },
       name: searchRegex,
+      verificationStatus: { $ne: 'REJECTED' }
     })
       .select("-password")
       .lean();
@@ -135,7 +137,9 @@ router.get("/", async (req, res) => {
     const doctorsBySpecialization =
       await Doctor.find({
         isActive: true,
+        verificationStatus: { $ne: 'REJECTED' },
         specialization: searchRegex,
+        verificationStatus: { $ne: 'REJECTED' }
       })
         .select("-password")
         .lean();
@@ -147,7 +151,9 @@ router.get("/", async (req, res) => {
     const doctorsByOrganization =
       await Doctor.find({
         isActive: true,
+        verificationStatus: { $ne: 'REJECTED' },
         organization: searchRegex,
+        verificationStatus: { $ne: 'REJECTED' }
       })
         .select("-password")
         .lean();
@@ -179,9 +185,7 @@ router.get("/", async (req, res) => {
     if (directDoctorMap.size > 0) {
       return res.json({
         success: true,
-        doctors: Array.from(
-          directDoctorMap.values()
-        ),
+        doctors: Array.from(directDoctorMap.values()),
         searchType: "doctor",
       });
     }
@@ -326,6 +330,7 @@ router.get("/", async (req, res) => {
 
     const allDoctors = await Doctor.find({
       isActive: true,
+      verificationStatus: { $ne: 'REJECTED' }
     })
       .select("-password")
       .lean();

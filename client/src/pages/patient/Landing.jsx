@@ -71,7 +71,7 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
         let doctorsArray = [];
         if (doctorsRes.status === 'fulfilled') {
           const data = doctorsRes.value.data;
-          doctorsArray = Array.isArray(data) ? data : (data?.doctors || []);
+          doctorsArray = Array.isArray(data) ? data : (data?.doctors || []).filter(d => d.verificationStatus !== 'REJECTED');
         }
 
         const top8 = doctorsArray
@@ -178,7 +178,7 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
             <div style={{ width: 34, height: 34, background: 'linear-gradient(135deg,#0D9488,#0F766E)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Stethoscope size={18} color="#fff" strokeWidth={2.5} />
             </div>
-            <span style={{ fontWeight: 800, fontSize: 17, color: '#0D9488', letterSpacing: '-0.3px' }}>ClinicFlow</span>
+            <span style={{ fontWeight: 800, fontSize: 17, color: '#0D9488', letterSpacing: '-0.3px' }}>MediQ</span>
           </div>
 
           {/* Location — hidden on mobile */}
@@ -311,7 +311,7 @@ const LoggedInView = ({ user, dispatch, navigate, searchInput, setSearchInput, h
                 <div style={{ width: 32, height: 32, background: 'rgba(255,255,255,0.2)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Stethoscope size={16} color="#fff" strokeWidth={2.5} />
                 </div>
-                <span style={{ fontWeight: 800, fontSize: 16, color: '#fff' }}>ClinicFlow</span>
+                <span style={{ fontWeight: 800, fontSize: 16, color: '#fff' }}>MediQ</span>
               </div>
               <button onClick={() => setSidebarOpen(false)}
                 style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#fff', display: 'flex', padding: 6 }}>
@@ -633,7 +633,7 @@ const LoggedOutView = ({ navigate, searchInput, setSearchInput, handleSearch, ha
             <div style={{ width: 34, height: 34, background: 'linear-gradient(135deg,#0D9488,#0F766E)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Stethoscope size={18} color="#fff" strokeWidth={2.5} />
             </div>
-            <span style={{ fontWeight: 800, fontSize: 17, color: '#0D9488', letterSpacing: '-0.3px' }}>ClinicFlow</span>
+            <span style={{ fontWeight: 800, fontSize: 17, color: '#0D9488', letterSpacing: '-0.3px' }}>MediQ</span>
           </div>
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -644,7 +644,7 @@ const LoggedOutView = ({ navigate, searchInput, setSearchInput, handleSearch, ha
               Login
             </button>
             <button
-              onClick={() => navigate('/login/patient')}
+              onClick={() => navigate('/register')}
               style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: '#0D9488', border: 'none', borderRadius: 8, padding: '8px 18px', cursor: 'pointer' }}
             >
               {isMobile ? 'Sign Up' : 'Sign Up Free'}
@@ -806,7 +806,7 @@ const LoggedOutView = ({ navigate, searchInput, setSearchInput, handleSearch, ha
       {/* ── How It Works ── */}
       <section style={{ background: '#fff', padding: '40px 16px' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#111827', marginBottom: 28, textAlign: 'center' }}>How ClinicFlow Works</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#111827', marginBottom: 28, textAlign: 'center' }}>How MediQ Works</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 20 }}>
             {[
               { step: '01', icon: Search, title: 'Search', desc: 'Find doctors by symptom, name, or specialty.' },
@@ -848,7 +848,7 @@ const LoggedOutView = ({ navigate, searchInput, setSearchInput, handleSearch, ha
         <div style={{ background: 'linear-gradient(135deg,#F0FDF4,#E0F7FA)', border: '1.5px solid #99F6E4', borderRadius: 20, padding: '32px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h3 style={{ fontSize: 20, fontWeight: 800, color: '#111827', marginBottom: 6 }}>Ready to take charge of your health?</h3>
-            <p style={{ color: '#6B7280', fontSize: 14 }}>Join thousands of patients who trust ClinicFlow every day.</p>
+            <p style={{ color: '#6B7280', fontSize: 14 }}>Join thousands of patients who trust MediQ every day.</p>
           </div>
           <button
             onClick={() => navigate('/register')}
@@ -860,7 +860,7 @@ const LoggedOutView = ({ navigate, searchInput, setSearchInput, handleSearch, ha
       </section>
 
       <footer style={{ borderTop: '1px solid #E5E7EB', padding: '16px', textAlign: 'center' }}>
-        <p style={{ color: '#9CA3AF', fontSize: 12 }}>© 2026 ClinicFlow · All rights reserved.</p>
+        <p style={{ color: '#9CA3AF', fontSize: 12 }}>© 2026 MediQ · All rights reserved.</p>
       </footer>
     </div>
   );

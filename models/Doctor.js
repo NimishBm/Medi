@@ -32,12 +32,11 @@ const doctorSchema = new mongoose.Schema(
   trim: true
 },
 
-organizationIds: [
+organizationId: 
   {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Organization'
-  }
-],
+  },
 
 organization: {
   type: String,

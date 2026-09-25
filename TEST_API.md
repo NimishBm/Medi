@@ -62,7 +62,7 @@ npm run server:dev
 Then in another terminal, check MongoDB:
 ```bash
 mongosh "your-mongodb-uri"
-use clinicflow
+use MediQ
 db.Doctors.find({ isActive: true }).count()
 ```
 

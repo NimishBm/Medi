@@ -1,4 +1,4 @@
-# ClinicFlow - Clinic Management & Smart Patient Queue System
+# MediQ - Clinic Management & Smart Patient Queue System
 
 A complete, production-ready full-stack clinic management system with real-time queue updates, appointment booking, and role-based dashboards for patients, doctors, and receptionists.
 
@@ -122,7 +122,7 @@ cp .env server/.env
 
 Edit `server/.env`:
 ```env
-MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/clinicflow?retryWrites=true&w=majority
+MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/MediQ?retryWrites=true&w=majority
 JWT_SECRET=your_super_secret_jwt_key_change_this_in_production
 PORT=5000
 NODE_ENV=development
@@ -322,7 +322,7 @@ The application uses Socket.IO for real-time updates:
 
 ```bash
 cd server
-heroku create clinicflow-api
+heroku create MediQ-api
 heroku config:set MONGO_URI=your_mongodb_uri
 heroku config:set JWT_SECRET=your_secret
 git push heroku main
