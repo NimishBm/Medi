@@ -90,12 +90,8 @@ export const Marketplace = () => {
         const [doctorsResult, queueResult, orgsResult, apptResult] = await Promise.allSettled([
           doctorAPI.getDoctors(),
           queueAPI.getQueueStats(),
-<<<<<<< HEAD
-          organizationAPI.getOrganizations(),
-          user?.role === 'PATIENT' ? appointmentAPI.getAppointments() : Promise.resolve({ data: [] }),
-=======
           organizationAPI.getAll(),
->>>>>>> origin/development
+          user?.role === 'PATIENT' ? appointmentAPI.getAppointments() : Promise.resolve({ data: [] }),
         ]);
 
         if (doctorsResult.status === 'fulfilled') {
