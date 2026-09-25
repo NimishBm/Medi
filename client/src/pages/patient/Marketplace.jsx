@@ -88,11 +88,11 @@ export const Marketplace = () => {
         const [doctorsResult, queueResult, orgsResult] = await Promise.allSettled([
           doctorAPI.getDoctors(),
           queueAPI.getQueueStats(),
-          organizationAPI.getAll(),
+          organizationAPI.getOrganizations(),
         ]);
 
         if (doctorsResult.status === 'fulfilled') {
-          let doctorsList = Array.isArray(doctorsResult.value.data?.doctors) ? doctorsResult.value.data.doctors : [];
+          let doctorsList = Array.isArray(doctorsResult.value.data) ? doctorsResult.value.data : [];
           // Safety filter: Remove any REJECTED doctors
           doctorsList = doctorsList.filter(d => d.verificationStatus !== 'REJECTED');
           setDoctors(doctorsList);
@@ -384,11 +384,11 @@ export const Marketplace = () => {
                           </div>
                         )}
 
-                        {/* <div style={{ display: 'flex', gap: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }}>
+                        <div style={{ display: 'flex', gap: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }}>
                           <span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '3px 8px', borderRadius: 6 }}>
                             {org.doctorCount ?? 0} doctor{org.doctorCount !== 1 ? 's' : ''}
                           </span>
-                        </div>  removed because count require fetching of doctors mathcing the org id*/ }
+                        </div>
                       </div>
                       <div style={{ padding: '0 16px 16px', marginTop: 'auto' }}>
                         <button

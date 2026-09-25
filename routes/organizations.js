@@ -225,16 +225,21 @@ router.get('/:id', async (req, res) => {
     }
 
     const organizationDoctors =
-      await Doctor.find({
-        organizationId: organization._id,
-         verificationStatus: { $ne: 'REJECTED' } 
-      }).lean();
-      
+      await OrganizationDoctor.find({
+        organizationId: organization._id
+      })
+        .populate({
+          path: 'doctorId',
+          select: '-password',
+          match: { verificationStatus: { $ne: 'REJECTED' } }
+        })
+        .lean();
+
     res.json({
       success: true,
       organization,
       doctors: organizationDoctors
-        .map((item) => item._id)
+        .map((item) => item.doctorId)
         .filter(Boolean)
     });
   } catch (error) {
