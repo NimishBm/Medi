@@ -186,8 +186,12 @@ export const blogAPI = {
 };
 
 export const organizationAPI = {
-  getAll:       () => api.get('/organizations'),
-  getById:      (id) => api.get(`/organizations/${id}`),
+  getAll:              () => api.get('/organizations'),
+  getById:             (id) => api.get(`/organizations/${id}`),
+  getMyOrganizations:  () => api.get('/organizations/my'),
+  searchOrganizations: (query) => api.get('/organizations/search', { params: { q: query } }),
+  joinOrganization:    (orgId) => api.post(`/organizations/${orgId}/join`),
+  leaveOrganization:   (orgId) => api.post(`/organizations/${orgId}/leave`),
 };
 
 export const orgAuthAPI = {
