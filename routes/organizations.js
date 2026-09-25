@@ -224,23 +224,12 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Organization not found' });
     }
 
-    const organizationDoctors =
-      await OrganizationDoctor.find({
-        organizationId: organization._id
-      })
-        .populate({
-          path: 'doctorId',
-          select: '-password',
-          match: { verificationStatus: { $ne: 'REJECTED' } }
-        })
-        .lean();
-
     const doctors = await Doctor.find({
       $or: [
         { organizationIds: organization._id },
-        { _id: { $in: joinIds } },
         { organization: { $regex: new RegExp(organization.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') } },
       ],
+      verificationStatus: { $ne: 'REJECTED' },
     }).select('-password').lean();
 
     // Deduplicate by _id
