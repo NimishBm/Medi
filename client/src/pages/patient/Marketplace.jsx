@@ -88,11 +88,12 @@ export const Marketplace = () => {
         const [doctorsResult, queueResult, orgsResult] = await Promise.allSettled([
           doctorAPI.getDoctors(),
           queueAPI.getQueueStats(),
-          organizationAPI.getOrganizations(),
+          organizationAPI.getAll(),
         ]);
 
         if (doctorsResult.status === 'fulfilled') {
-          let doctorsList = Array.isArray(doctorsResult.value.data) ? doctorsResult.value.data : [];
+          let doctorsList = Array.isArray(doctorsResult.value.data?.doctors) ? doctorsResult.value.data.doctors : [];
+          console.log(doctorsList);
           // Safety filter: Remove any REJECTED doctors
           doctorsList = doctorsList.filter(d => d.verificationStatus !== 'REJECTED');
           setDoctors(doctorsList);
